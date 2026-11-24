@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨代模型前端擂台赛 - 自行车骑鹈鹕</title>
+    <style>
+        :root {
+            --primary: #FF6B6B;
+            --secondary: #4ECDC4;
+            --accent: #FFE66D;
+            --dark: #2C3E50;
+            --light: #F7F9FC;
+            --panel-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--light);
+        }
+
+        /* 背景层 */
+        #bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            transition: filter 0.5s ease;
+        }
+
+        .sun {
+            position: absolute;
+            top: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #FFE66D, #FF9F43);
+            border-radius: 50%;
+            box-shadow: 0 0 40px rgba(255, 159, 67, 0.6);
+            transition: transform 0.5s;
+        }
+
+        .cloud {
+            position: absolute;
+            background: white;
+            border-radius: 50px;
+            opacity: 0.8;
+            animation: floatCloud linear infinite;
+        }
+
+        @keyframes floatCloud {
+            from { transform: translateX(-200px); }
+            to { transform: translateX(100vw); }
+        }
+
+        /* 舞台容器 */
+        #stage-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+            z-index: 1;
+        }
+
+        /* 主画布 */
+        #scene-svg {
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 800px;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+        }
+
+        /* 控制面板 */
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel-bg);
+            padding: 15px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            z-index: 100;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--dark);
+            margin-bottom: 5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            outline: none;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: var(--secondary);
+        }
+
+        /* 状态指示器 */
+        #status-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--dark);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* 鱼群特效 */
+        .fish {
+            position: absolute;
+            width: 30px;
+            height: 15px;
+            background: var(--secondary);
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .fish::after {
+            content: '';
+            position: absolute;
+            right: -5px;
+            top: 50%;
+            width: 0; 
+            height: 0; 
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 8px solid var(--secondary);
+        }
+
+        /* 震动特效类 */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* 提示文字 */
+        .tip {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            color: #aaa;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 背景层 -->
+    <div id="bg-layer">
+        <div class="sun"></div>
+        <div class="cloud" style="top: 10%; width: 120px; height: 40px; animation-duration: 25s;"></div>
+        <div class="cloud" style="top: 30%; width: 180px; height: 60px; animation-duration: 35s; animation-delay: 5s;"></div>
+        <div class="cloud" style="top: 15%; width: 90px; height: 30px; animation-duration: 20s; animation-delay: 10s;"></div>
+    </div>
+
+    <!-- 状态显示 -->
+    <div id="status-display">
+        状态：<span id="bird-status">平静</span><br>
+        速度：<span id="speed-val">0</span> km/h<br>
+        体力：<span id="energy-val">100%</span>
+    </div>
+
+    <!-- 主舞台 -->
+    <div id="stage-container">
+        <!-- SVG 内容将由 JS 生成，这里预留结构 -->
+        <svg id="scene-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+            <defs>
+                <!-- 定义渐变和滤镜 -->
+                <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#E0F7FA;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:1" />
+                </linearGradient>
+                <filter id="shadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                    <feOffset dx="2" dy="2" result="offsetblur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.3"/>
+                    </feComponentTransfer>
+                    <feMerge> 
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/> 
+                    </feMerge>
+                </filter>
+                
+                <!-- 纹理图案 -->
+                <pattern id="grassPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M10 0 L20 10 L0 10 Z" fill="#7CB342"/>
+                    <path d="M10 10 L20 20 L0 20 Z" fill="#558B2F"/>
+                </pattern>
+            </defs>
+
+            <!-- 地面 -->
+            <rect x="0" y="450" width="800" height="150" fill="#AED581" rx="10" />
+            <rect x="0" y="450" width="800" height="150" fill="url(#grassPattern)" opacity="0.5" />
+            
+            <!-- 道路 (根据模式切换) -->
+            <g id="road-layer">
+                <rect x="100" y="460" width="600" height="40" fill="#CFD8DC" stroke="#90A4AE" stroke-width="2"/>
+                <!-- 石子路装饰 -->
+                <circle cx="200" cy="480" r="3" fill="#5D4037" opacity="0.3"/>
+                <circle cx="350" cy="470" r="4" fill="#5D4037" opacity="0.3"/>
+                <circle cx="500" cy="485" r="3" fill="#5D4037" opacity="0.3"/>
+                <circle cx="650" cy="475" r="5" fill="#5D4037" opacity="0.3"/>
+            </g>
+
+            <!-- 角色组 -->
+            <g id="character-group" transform="translate(400, 300)">
+                <!-- 鹈鹕 (下方坐骑) -->
+                <g id="pelican">
+                    <!-- 身体 -->
+                    <ellipse cx="0" cy="0" rx="60" ry="40" fill="#FFF9C4" />
+                    <!-- 脖子 -->
+                    <path d="M-20,-30 Q-30,-70 -40,-90" stroke="#FFF9C4" stroke-width="18" fill="none" stroke-linecap="round"/>
+                    <!-- 头 -->
+                    <circle cx="-50" cy="-100" r="25" fill="#FFF9C4" />
+                    <!-- 眼睛 -->
+                    <circle cx="-50" cy="-100" r="3" fill="#333" />
+                    <!-- 喙 (带喉囊) -->
+                    <path id="beak-path" d="M-55,-95 Q-30,-90 -20,-110" stroke="#E65100" stroke-width="10" fill="none" stroke-linecap="round"/>
+                    <path id="pouch-path" d="M-20,-110 Q-10,-130 -30,-120" stroke="#E65100" stroke-width="8" fill="rgba(255,255,255,0.4)" stroke-linecap="round"/>
+                    
+                    <!-- 翅膀 -->
+                    <path id="wing-l" d="M-20,-20 Q-60,-10 -70,20 Q-60,40 -20,30 Z" fill="#FFF9C4" stroke="#DCCC9C" stroke-width="2"/>
+                    <path id="wing-r" d="M20,-20 Q60,-10 70,20 Q60,40 20,30 Z" fill="#FFF9C4" stroke="#DCCC9C" stroke-width="2"/>
+                    
+                    <!-- 腿/脚 -->
+                    <g id="legs">
+                        <path d="M-10,10 L-10,40" stroke="#8D6E63" stroke-width="6" stroke-linecap="round"/>
+                        <path d="M10,10 L10,40" stroke="#8D6E63" stroke-width="6" stroke-linecap="round"/>
+                        <!-- 蹼 -->
+                        <path d="M-12,40 Q-10,45 -8,42 M-8,40 Q-6,45 -4,42 M4,40 Q6,45 8,42 M8,40 Q10,45 12,42" stroke="#5D4037" stroke-width="2" fill="none"/>
+                    </g>
+                </g>
+
+                <!-- 连接件 (缰绳) -->
+                <line x1="-70" y1="-100" x2="100" y2="-50" stroke="#5D4037" stroke-width="2" stroke-dasharray="5,5" />
+
+                <!-- 自行车 (上方骑手) -->
+                <g id="bicycle" transform="translate(0, -40)">
+                    <!-- 车架 -->
+                    <path d="M0,0 L-40,-60 L-40,-100 L0,-100 L40,-100 L40,-60 L0,0" fill="none" stroke="#555" stroke-width="8" stroke-linejoin="round"/>
+                    <line x1="-40" y1="-60" x2="40" y2="-60" stroke="#555" stroke-width="8" /> <!-- 上管 -->
+                    <line x1="-40" y1="-60" x2="40" y2="-60" stroke="#E65100" stroke-width="4" stroke-dasharray="5,5" /> <!-- 装饰线 -->
+                    
+                    <!-- 车座 -->
+                    <path d="M-40,-100 Q-50,-110 -40,-120 L40,-120 Q50,-110 40,-100" fill="#333" stroke="#333" stroke-width="2"/>
+                    
+                    <!-- 车把 -->
+                    <path d="M-40,-60 Q-80,-80 -90,-50" fill="none" stroke="#555" stroke-width="8" stroke-linecap="round"/>
+                    <line x1="-90" y1="-50" x2="-110" y2="-50" stroke="#555" stroke-width="8" stroke-linecap="round"/> <!-- 握把 -->
+                    
+                    <!-- 链条 -->
+                    <path d="M-30,-100 Q-30,-40 30,-40 Q30,-100 30,-100" fill="none" stroke="#888" stroke-width="4" stroke-dasharray="2,2"/>
+                    
+                    <!-- 前轮 -->
+                    <g id="wheel-front">
+                        <circle cx="40" cy="-100" r="25" fill="none" stroke="#333" stroke-width="6"/>
+                        <circle cx="40" cy="-100" r="25" fill="none" stroke="#DDD" stroke-width="1" stroke-dasharray="2,2"/>
+                        <circle cx="40" cy="-100" r="10" fill="#333"/>
+                        <line x1="40" y1="-75" x2="40" y2="-125" stroke="#333" stroke-width="2"/>
+                        <line x1="15" y1="-100" x2="65" y2="-100" stroke="#333" stroke-width="2"/>
+                    </g>
+
+                    <!-- 后轮 -->
+                    <g id="wheel-back">
+                        <circle cx="-40" cy="-100" r="25" fill="none" stroke="#333" stroke-width="6"/>
+                        <circle cx="-40" cy="-100" r="25" fill="none" stroke="#DDD" stroke-width="1" stroke-dasharray="2,2"/>
+                        <circle cx="-40" cy="-100" r="10" fill="#333"/>
+                        <line x1="-40" y1="-75" x2="-40" y2="-125" stroke="#333" stroke-width="2"/>
+                        <line x1="-65" y1="-100" x2="-15" y2="-100" stroke="#333" stroke-width="2"/>
+                    </g>
+
+                    <!-- 脚踏 -->
+                    <g id="pedals">
+                        <circle cx="-20" cy="-40" r="8" fill="#333"/>
+                        <circle cx="20" cy="-40" r="8" fill="#333"/>
+                        <line x1="-20" y1="-40" x2="0" y2="-20" stroke="#333" stroke-width="4"/>
+                        <line x1="20" y1="-40" x2="0" y2="-20" stroke="#333" stroke-width="4"/>
+                    </g>
+                </g>
+            </g>
+        </svg>
+    </div>
+
+    <!-- 控制面板 -->
+    <div id="controls">
+        <button id="btn-ring" title="按车铃！">🔔 按车铃</button>
+        <div class="control-group">
+            <label>速度 / 冲刺</label>
+            <input type="range" id="speed-slider" min="0" max="100" value="20">
+        </div>
+        <div class="control-group">
+            <label>路况</label>
+            <select id="road-select" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
+                <option value="flat">平坦大道</option>
+                <option value="rough">崎岖碎石</option>
+            </select>
+        </div>
+        <button id="btn-feed" class="secondary" title="投喂小鱼恢复体力">🐟 投喂小鱼</button>
+    </div>
+
+    <div class="tip">双击背景可切换日夜模式 | 按住车铃不放可连续按</div>
+
+<script>
+/**
+ * 核心逻辑模块
+ */
+
+// 1. 状态管理
+const state = {
+    speed: 20, // 0-100
+    energy: 100,
+    isNight: false,
+    roadType: 'flat',
+    birdStatus: 'calm', // calm, running, scared
+    timeScale: 1,
+    lastTime: performance.now()
+};
+
+// DOM 元素引用
+const els = {
+    svg: document.getElementById('scene-svg'),
+    bgLayer: document.getElementById('bg-layer'),
+    sun: document.querySelector('.sun'),
+    pelicanGroup: document.getElementById('pelican'),
+    wheelFront: document.getElementById('wheel-front'),
+    wheelBack: document.getElementById('wheel-back'),
+    pedals: document.getElementById('pedals'),
+    wingsL: document.getElementById('wing-l'),
+    wingsR: document.getElementById('wing-r'),
+    legs: document.getElementById('legs'),
+    beakPath: document.getElementById('beak-path'),
+    pouchPath: document.getElementById('pouch-path'),
+    statusDisplay: document.getElementById('status-display'),
+    birdStatusText: document.getElementById('bird-status'),
+    speedVal: document.getElementById('speed-val'),
+    energyVal: document.getElementById('energy-val'),
+    btnRing: document.getElementById('btn-ring'),
+    slider: document.getElementById('speed-slider'),
+    roadSelect: document.getElementById('road-select'),
+    btnFeed: document.getElementById('btn-feed')
+};
+
+// 2. 音频合成器 (Web Audio API)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let ringOscillator = null;
+
+function playBellSound() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(2000, audioCtx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 1.5);
+}
+
+function playBreathSound() {
+    // 简单的白噪音模拟喘气
+    if (Math.random() > 0.7) return; // 降低频率
+    
+    const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 秒
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+    
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.05;
+    noise.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
+}
+
+// 3. 动画循环
+function animate(timestamp) {
+    const dt = (timestamp - state.lastTime) / 1000;
+    state.lastTime = timestamp;
+
+    // 更新 UI
+    els.speedVal.textContent = Math.round(state.speed);
+    els.energyVal.textContent = `${Math.floor(state.energy)}%`;
+    els.birdStatusText.textContent = state.birdStatus.toUpperCase();
+
+    // 能量消耗逻辑
+    if (state.speed > 0 && state.birdStatus !== 'scared') {
+        state.energy -= state.speed * 0.02;
+        if (state.energy <= 0) {
+            state.energy = 0;
+            state.speed = 0;
+            els.slider.value = 0;
+            updateBirdVisuals();
+        }
+    } else if (state.speed === 0) {
+        state.energy += 0.5; // 休息回血
+        if (state.energy > 100) state.energy = 100;
+    }
+
+    // 动画计算
+    const baseSpeed = state.speed * 0.05;
+    
+    // 车轮旋转 (基于速度和颠簸)
+    let rotation = (timestamp / 100) * (baseSpeed * 0.5 + (state.roadType === 'rough' ? Math.sin(timestamp/200)*0.2 : 0));
+    els.wheelFront.style.transform = `rotate(${rotation}deg)`;
+    els.wheelBack.style.transform = `rotate(${-rotation}deg)`; // 反向旋转更自然
+
+    // 脚踏联动
+    let pedalRot = (timestamp / 50) * baseSpeed;
+    els.pedals.style.transform = `rotate(${pedalRot}deg)`;
+
+    // 鹈鹕腿部动画 (步态)
+    let legAnim = Math.sin(timestamp / 100 * baseSpeed) * 10;
+    els.legs.style.transform = `translateX(${legAnim}px)`;
+
+    // 鹈鹕翅膀扑腾
+    let wingAnim = Math.cos(timestamp / 80 * baseSpeed) * 15;
+    els.wingsL.setAttribute('transform', `scaleX(${wingAnim > 0 ? -1 : 1}) rotate(${wingAnim}deg)`);
+    els.wingsR.setAttribute('transform', `scaleX(${wingAnim > 0 ? 1 : -1}) rotate(${-wingAnim}deg)`);
+
+    // 鹈鹕身体上下浮动 (呼吸 + 颠簸)
+    let bounce = Math.sin(timestamp / 150) * (state.speed * 0.1);
+    let roughBounce = state.roadType === 'rough' ? Math.sin(timestamp / 50) * 5 : 0;
+    els.pelicanGroup.style.transform = `translateY(${bounce + roughBounce}px)`;
+
+    // 喉囊大小变化 (呼吸/惊吓)
+    let pouchScale = 1 + (Math.sin(timestamp / 200) * 0.1);
+    if (state.birdStatus === 'scared') pouchScale = 1.5;
+    els.pouchPath.setAttribute('transform', `scale(${pouchScale})`);
+
+    // 背景云朵移动视差
+    document.querySelectorAll('.cloud').forEach((cloud, i) => {
+        cloud.style.transform = `translateX(${(timestamp / 100) * (i % 2 === 0 ? 0.5 : 0.2)}px)`;
+    });
+
+    requestAnimationFrame(animate);
+}
+
+// 4. 交互逻辑
+function updateBirdVisuals() {
+    if (state.speed > 60) {
+        state.birdStatus = 'running';
+        els.statusDisplay.style.color = '#E65100';
+    } else if (state.speed > 0) {
+        state.birdStatus = 'walking';
+        els.statusDisplay.style.color = '#333';
+    } else {
+        state.birdStatus = 'calm';
+        els.statusDisplay.style.color = '#333';
+    }
+}
+
+els.slider.addEventListener('input', (e) => {
+    state.speed = parseInt(e.target.value);
+    updateBirdVisuals();
+});
+
+els.btnRing.addEventListener('mousedown', () => {
+    if (state.energy < 20) {
+        alert("鹈鹕太累了，没力气跑！");
+        return;
+    }
+    state.speed = 80; // 突然加速
+    els.slider.value = 80;
+    playBellSound();
+    
+    // 视觉反馈
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 500);
+    
+    // 鹈鹕受惊反应
+    state.birdStatus = 'scared';
+    els.pouchPath.setAttribute('stroke', '#FFEB3B'); // 变色表示惊恐
+    els.beakPath.setAttribute('stroke', '#D32F2F');
+    
+    // 持续受惊效果
+    setInterval(() => {
+        if (state.birdStatus === 'scared') {
+            playBreathSound();
+            // 随机快速闪烁
+            els.pelicanGroup.style.filter = "brightness(1.2)";
+            setTimeout(() => els.pelicanGroup.style.filter = "", 100);
+        }
+    }, 500);
+
+    // 几秒后恢复
+    setTimeout(() => {
+        state.birdStatus = 'running';
+        els.pouchPath.setAttribute('stroke', '#E65100');
+        els.beakPath.setAttribute('stroke', '#E65100');
+    }, 2000);
+});
+
+els.btnFeed.addEventListener('click', () => {
+    state.energy = 100;
+    els.energyVal.textContent = "100%";
+    els.energyVal.style.color = "#4ECDC4";
+    
+    // 粒子特效
+    createFishEffect();
+});
+
+function createFishEffect() {
+    const fish = document.createElement('div');
+    fish.className = 'fish';
+    fish.style.left = '50%';
+    fish.style.top = '50%';
+    document.body.appendChild(fish);
+    
+    // 简单的抛射动画
+    let x = 50;
+    let y = 50;
+    let vx = 5;
+    let vy = -5;
+    
+    function animFish() {
+        x += vx;
+        y += vy;
+        vy += 0.2; // gravity
+        
+        fish.style.left = x + '%';
+        fish.style.top = y + '%';
+        
+        if (y > 80) {
+            fish.remove();
+        } else {
+            requestAnimationFrame(animFish);
+        }
+    }
+    animFish();
+}
+
+els.roadSelect.addEventListener('change', (e) => {
+    state.roadType = e.target.value;
+    // 更新背景中的石子
+    const circles = document.querySelectorAll('#road-layer circle');
+    circles.forEach(c => c.style.display = (state.roadType === 'rough') ? 'block' : 'none');
+});
+
+// 日夜切换 (双击背景)
+els.svg.addEventListener('dblclick', () => {
+    state.isNight = !state.isNight;
+    if (state.isNight) {
+        els.bgLayer.style.background = "#0f2027";
+        els.bgLayer.style.backgroundImage = "linear-gradient(to bottom, #203a43, #2c5364)";
+        els.sun.style.opacity = 0;
+        els.sun.style.boxShadow = "none";
+        els.clouds.forEach(c => c.style.backgroundColor = "#fff"); // 保持云白色但变暗
+        document.querySelectorAll('.cloud').forEach(c => c.style.filter = "brightness(0.5)");
+    } else {
+        els.bgLayer.style.background = "";
+        els.bgLayer.style.backgroundImage = "";
+        els.sun.style.opacity = 1;
+        els.sun.style.boxShadow = "0 0 40px rgba(255, 159, 67, 0.6)";
+        document.querySelectorAll('.cloud').forEach(c => c.style.filter = "none");
+    }
+});
+
+// 初始化
+requestAnimationFrame(animate);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>一辆自行车正在骑着一只鹈鹕 · A Bicycle Riding a Pelican</title>
+<style>
+  :root{
+    --ui-bg: rgba(255,255,255,0.75);
+    --ui-blur: 6px;
+    --ui-border: rgba(0,0,0,0.08);
+    --accent: #2a9d8f;
+    --accent-2: #e76f51;
+    --text: #234;
+  }
+  html,body{
+    margin:0;
+    padding:0;
+    height:100%;
+    background:#cfe9ff;
+    overflow:hidden;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans CJK SC, "PingFang SC", "Microsoft Yahei", Arial, sans-serif;
+    color: var(--text);
+  }
+  canvas{
+    display:block;
+    width:100vw;
+    height:100vh;
+    background:#bfe5ff;
+  }
+  .ui{
+    position:fixed;
+    top:12px;
+    left:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    z-index:10;
+    user-select:none;
+  }
+  .panel{
+    backdrop-filter: blur(var(--ui-blur));
+    background: var(--ui-bg);
+    border:1px solid var(--ui-border);
+    border-radius:14px;
+    padding:10px 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+    min-width:220px;
+  }
+  .panel h3{
+    margin:0 0 6px 0;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.5px;
+    color:#123;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin:6px 0;
+  }
+  .row label{
+    font-size:13px;
+    opacity:.85;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    width:140px;
+    background:transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:6px;
+    background:linear-gradient(90deg, var(--accent), #6ec3b6);
+    border-radius:6px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px; height:16px;
+    border-radius:50%;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.2);
+    margin-top:-5px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  }
+  .btn{
+    appearance:none;
+    border:0;
+    padding:8px 12px;
+    border-radius:10px;
+    background: linear-gradient(#fff,#f4f6f8);
+    color:#123;
+    font-weight:600;
+    box-shadow:0 2px 0 rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.8);
+    cursor:pointer;
+    transition:transform .05s ease, box-shadow .2s ease, background .3s ease;
+    border:1px solid var(--ui-border);
+  }
+  .btn:active{
+    transform: translateY(1px);
+  }
+  .btn.acc{ background: linear-gradient(#eafff9,#dbfff3); border-color:#9adacc; }
+  .btn.warn{ background: linear-gradient(#fff0eb,#ffe7df); border-color:#ffb29f; }
+  .btn.dark{ background: linear-gradient(#eef2ff,#e7eaff); border-color:#b7c2ff; }
+  .status{
+    display:flex; align-items:center; gap:8px; justify-content:space-between;
+  }
+  .bar{
+    position:relative; flex:1; height:10px; background:#e9eef5; border-radius:8px; overflow:hidden; border:1px solid rgba(0,0,0,0.07);
+  }
+  .bar .fill{
+    position:absolute; left:0; top:0; bottom:0; width:50%; background:linear-gradient(90deg,#5bc0a7,#2a9d8f); border-radius:8px;
+  }
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{
+    font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid var(--ui-border);
+    background:rgba(255,255,255,0.85); backdrop-filter: blur(var(--ui-blur));
+  }
+  .credit{
+    position:fixed; right:12px; bottom:12px; z-index: 10;
+    backdrop-filter: blur(var(--ui-blur));
+    background: var(--ui-bg);
+    border:1px solid var(--ui-border);
+    border-radius:999px;
+    padding:6px 10px;
+    font-size:12px; color:#345; box-shadow:0 8px 16px rgba(0,0,0,0.08);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ui">
+  <div class="panel">
+    <h3>驾驶控件（自行车驾鹈鹕）</h3>
+    <div class="row">
+      <label>速度</label>
+      <input id="speed" type="range" min="0.2" max="2.0" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <button id="bell" class="btn acc">按车铃 Ding!</button>
+      <button id="sprint" class="btn warn">冲刺</button>
+    </div>
+    <div class="row">
+      <button id="feed" class="btn">投喂小鱼</button>
+      <button id="road" class="btn">路况: 平路</button>
+    </div>
+    <div class="row">
+      <button id="day" class="btn dark">切换 天气</button>
+      <span class="chip" id="phaseLabel">白天</span>
+    </div>
+    <div class="status">
+      <span>体力</span>
+      <div class="bar"><div class="fill" id="stamFill"></div></div>
+      <span id="stamText">100%</span>
+    </div>
+    <div class="chips">
+      <span class="chip">车铃=鹈鹕受惊加速</span>
+      <span class="chip">投喂=恢复体力</span>
+      <span class="chip">颠簸=更抖</span>
+    </div>
+  </div>
+</div>
+
+<div class="credit">跨代模型前端擂台赛 · 统一考卷「自行车骑鹈鹕」</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // Canvas setup
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  function resize(){
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(window.innerWidth * DPR);
+    canvas.height = Math.floor(window.innerHeight * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // UI elements
+  const speedSlider = document.getElementById('speed');
+  const bellBtn = document.getElementById('bell');
+  const sprintBtn = document.getElementById('sprint');
+  const feedBtn = document.getElementById('feed');
+  const roadBtn = document.getElementById('road');
+  const dayBtn = document.getElementById('day');
+  const phaseLabel = document.getElementById('phaseLabel');
+  const stamFill = document.getElementById('stamFill');
+  const stamText = document.getElementById('stamText');
+
+  // Audio: simple synthesized bell using Web Audio API
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ audioCtx = null; }
+    }
+  }
+  function bellSound(){
+    ensureAudio();
+    if(!audioCtx) return;
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.4, now + 0.01);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+    master.connect(ctx.destination);
+
+    // Two partials for a ding-like bell
+    const o1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    o1.type = 'sine';
+    o1.frequency.setValueAtTime(1800, now);
+    g1.gain.setValueAtTime(0.6, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    o1.connect(g1).connect(master);
+
+    const o2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(900, now);
+    g2.gain.setValueAtTime(0.3, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    o2.connect(g2).connect(master);
+
+    // slight FM for metallic shimmer
+    const mod = ctx.createOscillator();
+    mod.type = 'sine';
+    mod.frequency.setValueAtTime(5, now);
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(20, now);
+    mod.connect(modGain);
+    modGain.connect(o1.frequency);
+    modGain.connect(o2.frequency);
+
+    o1.start(now); o2.start(now); mod.start(now);
+    o1.stop(now + 1.0); o2.stop(now + 1.0); mod.stop(now + 1.0);
+  }
+
+  // World state
+  const state = {
+    baseSpeed: parseFloat(speedSlider.value), // 0.2..2.0
+    speed: 0, // current actual speed (px/ms-ish factor)
+    speedBoost: 0, // ephemeral add
+    stamina: 1.0, // 0..1
+    bumpiness: 0, // 0 smooth, 1 bumpy
+    dayPhase: 0, // 0 day, 1 dusk, 2 night
+    bgOffset: 0,
+    clouds: [],
+    feathers: [],
+    droplets: [],
+    fish: [],
+    lastBellAt: -9999,
+    cameraShake: 0,
+    ringShock: 0,
+    sprinting: 0
+  };
+
+  // Initialize clouds
+  function initClouds(){
+    state.clouds = [];
+    for(let i=0;i<8;i++){
+      state.clouds.push({
+        x: Math.random()*2000,
+        y: 80 + Math.random()*200,
+        scale: 0.6 + Math.random()*1.2,
+        speed: 0.03 + Math.random()*0.06
+      });
+    }
+  }
+  initClouds();
+
+  // Utility
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+  function randRange(a,b){ return a + Math.random()*(b-a); }
+
+  // Background color sets
+  const skySets = [
+    { // day
+      skyTop: '#8fd3ff', skyBot: '#dff5ff',
+      sea: '#78c9ff', sea2:'#5bb5f0',
+      sun: '#ffd166',
+      starAlpha: 0
+    },
+    { // dusk
+      skyTop: '#fcb08b', skyBot:'#ffd9aa',
+      sea: '#7ab1e8', sea2:'#5f96cf',
+      sun: '#ff9f43',
+      starAlpha: 0.15
+    },
+    { // night
+      skyTop: '#0b2153', skyBot:'#153a7a',
+      sea: '#0c4476', sea2:'#0b3a66',
+      sun: '#fff8b4',
+      starAlpha: 0.6
+    }
+  ];
+
+  // Event handlers
+  speedSlider.addEventListener('input', ()=>{
+    state.baseSpeed = parseFloat(speedSlider.value);
+  });
+
+  function triggerBell(){
+    bellSound();
+    // shock effect: pelican startled => immediate speed boost
+    state.speedBoost = Math.max(state.speedBoost, 0.8); // add a sudden boost
+    state.lastBellAt = performance.now();
+    state.cameraShake = 12;
+    state.ringShock = 1.0;
+    // spawn a few feathers from wings
+    for(let i=0;i<6;i++){
+      state.feathers.push({
+        x: 0, y: 0, // will be placed near pelican later
+        vx: randRange(-0.4,0.4), vy: randRange(-1.2,-0.4),
+        life: randRange(500,900), born: performance.now(), r: randRange(3,6)
+      });
+    }
+  }
+  bellBtn.addEventListener('click', ()=>{
+    triggerBell();
+  });
+
+  sprintBtn.addEventListener('click', ()=>{
+    // temporary sprint if stamina available
+    if(state.stamina > 0.2){
+      state.sprinting = 1.0;
+      state.speedBoost = Math.max(state.speedBoost, 0.6);
+      state.cameraShake = 8;
+      // spawn droplets (sweat beads)
+      for(let i=0;i<8;i++){
+        state.droplets.push({
+          x: 0, y: 0, vx: randRange(-0.4,0.3), vy: randRange(-1.0,-0.4),
+          life: randRange(300,700), born: performance.now(), r: randRange(2,3), blue:true
+        });
+      }
+    }
+  });
+
+  roadBtn.addEventListener('click', ()=>{
+    state.bumpiness = (state.bumpiness+1)%2;
+    roadBtn.textContent = state.bumpiness ? '路况: 颠簸' : '路况: 平路';
+  });
+
+  dayBtn.addEventListener('click', ()=>{
+    state.dayPhase = (state.dayPhase+1)%3;
+    phaseLabel.textContent = state.dayPhase===0 ? '白天' : state.dayPhase===1 ? '黄昏' : '夜晚';
+  });
+
+  feedBtn.addEventListener('click', ()=>{
+    // spawn a fish flying to the pelican mouth
+    // fish originates near UI panel area
+    const origin = { x: 80, y: 120 };
+    // target mouth will be computed dynamically; store placeholder
+    state.fish.push({
+      x: origin.x, y: origin.y,
+      vx: 0, vy: 0, t: 0, dur: 1200 + Math.random()*400, start: performance.now(), eaten:false
+    });
+  });
+
+  // Runtime helpers for draw positions
+  function getPelicanAnchor(){
+    const w = canvas.width/DPR, h = canvas.height/DPR;
+    // Keep pelican roughly center-bottom area
+    const ground = h*0.78;
+    const x = w*0.5;
+    const y = ground - 40; // baseline
+    return {x, y, ground};
+  }
+
+  // Drawing background with parallax
+  function drawBackground(dt){
+    const w = canvas.width/DPR, h = canvas.height/DPR;
+    const set = skySets[state.dayPhase];
+
+    // SKY gradient
+    const grad = ctx.createLinearGradient(0,0,0,h*0.7);
+    grad.addColorStop(0, set.skyTop);
+    grad.addColorStop(1, set.skyBot);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+
+    // sun/moon
+    const sunY = h*0.2;
+    const sunX = w*0.8;
+    ctx.save();
+    ctx.globalAlpha = state.dayPhase===2 ? 0.75 : 1.0;
+    ctx.fillStyle = set.sun;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 26, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // stars at night
+    if(set.starAlpha > 0){
+      ctx.save();
+      ctx.globalAlpha = set.starAlpha;
+      ctx.fillStyle = '#ffffff';
+      for(let i=0;i<80;i++){
+        const sx = (i*53 % 997)/997 * w;
+        const sy = (i*137 % 991)/991 * h*0.5;
+        const r = ((i*7)%3)/1.5 + 0.3;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Clouds
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 1;
+    for(const c of state.clouds){
+      c.x -= c.speed * state.baseSpeed * (0.5 + state.speedBoost) * (dt/16);
+      if(c.x < -200) c.x = w + Math.random()*400;
+      drawCloud(c.x, c.y, c.scale);
+    }
+    ctx.restore();
+
+    // Sea horizon
+    const horizon = h*0.55;
+    ctx.save();
+    const seaGrad = ctx.createLinearGradient(0,horizon,0,h);
+    seaGrad.addColorStop(0, set.sea);
+    seaGrad.addColorStop(1, set.sea2);
+    ctx.fillStyle = seaGrad;
+    ctx.fillRect(0,horizon,w,h);
+    // waves
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    const t = performance.now()*0.001;
+    for(let i=0;i<4;i++){
+      ctx.beginPath();
+      let y = horizon + i*14 + 6*Math.sin(t*1.5 + i);
+      for(let x=0;x<w;x+=6){
+        const wy = y + Math.sin((x*0.02) + t*1.8 + i)*2;
+        if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Boardwalk (near ground, parallax)
+    drawBoardwalk();
+  }
+
+  function drawCloud(cx, cy, s){
+    const lumps = [
+      {dx:0, dy:0, r:25*s},
+      {dx:20*s, dy:-8*s, r:18*s},
+      {dx:-20*s, dy:-10*s, r:18*s},
+      {dx:35*s, dy:6*s, r:16*s},
+    ];
+    ctx.beginPath();
+    for(let i=0;i<lumps.length;i++){
+      const l = lumps[i];
+      ctx.moveTo(cx+l.dx + l.r, cy+l.dy);
+      ctx.arc(cx+l.dx, cy+l.dy, l.r, 0, Math.PI*2);
+    }
+    ctx.fill();
+  }
+
+  function drawBoardwalk(){
+    const w = canvas.width/DPR, h = canvas.height/DPR;
+    const ground = h*0.78;
+    const tall = h - ground + 40;
+    // wood base
+    ctx.save();
+    let woodGrad = ctx.createLinearGradient(0,ground,0,h);
+    woodGrad.addColorStop(0, '#c99a6b');
+    woodGrad.addColorStop(1, '#a8794b');
+    ctx.fillStyle = woodGrad;
+    ctx.fillRect(0, ground, w, h-ground);
+
+    // plank lines with parallax scrolling
+    const plankW = 60;
+    state.bgOffset += state.speed * 0.8;
+    let offset = -(state.bgOffset % plankW);
+    ctx.fillStyle = '#b7895a';
+    for(let x = offset; x < w+plankW; x += plankW){
+      ctx.fillRect(x, ground, 8, tall);
+    }
+    // subtle grain lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 1;
+    for(let y=ground+8; y<h; y+=10){
+      ctx.beginPath();
+      ctx.moveTo(0,y);
+      ctx.lineTo(w,y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Pelican drawing and animation
+  function drawPelicanAndBike(dt){
+    const t = performance.now()*0.001;
+    const anchor = getPelicanAnchor();
+    const speed = state.speed;
+    const runFreq = lerp(1.8, 4.0, clamp(speed/2.4, 0, 1)); // steps per second
+    const runPhase = t*runFreq*2*Math.PI;
+
+    // body bounce and pouch wobble
+    const bump = state.bumpiness ? 1 : 0;
+    const bounceAmp = lerp(6, 12, clamp(speed/2,0,1)) + bump*4;
+    const bounce = Math.sin(runPhase)*bounceAmp;
+
+    // camera shake (bell or sprint)
+    let camX = 0, camY = 0;
+    if(state.cameraShake>0){
+      camX = (Math.random()*2-1)*state.cameraShake*0.5;
+      camY = (Math.random()*2-1)*state.cameraShake*0.5;
+      state.cameraShake = Math.max(0, state.cameraShake - 0.6);
+    }
+
+    const x = anchor.x + camX;
+    const y = anchor.y + camY + bounce;
+
+    // legs animation (webbed feet)
+    const legSpread = 18;
+    const step = Math.sin(runPhase);
+    const legA = { x: x-16, y: y+38 + 3*Math.cos(runPhase*0.5) };
+    const legB = { x: x+16, y: y+38 - 3*Math.cos(runPhase*0.5) };
+
+    // Wing flap based on speed
+    const flap = Math.sin(t*lerp(3,6, clamp(speed,0,2)/2))*lerp(6,12, clamp(speed/2,0,1));
+
+    // draw shadow
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(x, y+50, 70, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // Pelican body
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Tail
+    ctx.fillStyle = '#e8f0ff';
+    ctx.strokeStyle = '#5b6e7b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x-64, y+6);
+    ctx.lineTo(x-88, y-2);
+    ctx.lineTo(x-72, y+18);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    // Body ellipse
+    ctx.fillStyle = '#f9fbff';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 74, 40, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#6f8694';
+    ctx.stroke();
+
+    // Wings (two layers)
+    ctx.save();
+    ctx.translate(x, y-10);
+    ctx.rotate((-10+flap*0.5)*Math.PI/180);
+    wingShape(58, 26);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(x-10, y-12);
+    ctx.rotate((8-flap*0.4)*Math.PI/180);
+    wingShape(46, 22, true);
+    ctx.restore();
+
+    // Neck
+    ctx.strokeStyle = '#6f8694';
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.moveTo(x+20, y-4);
+    ctx.quadraticCurveTo(x+46, y-28, x+54, y-34);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+
+    // Head
+    ctx.fillStyle = '#f9fbff';
+    ctx.beginPath();
+    ctx.arc(x+62, y-38, 16, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Eye
+    const startled = state.ringShock>0.1 || state.sprinting>0.1;
+    ctx.fillStyle = startled ? '#1a2a42' : '#22364e';
+    ctx.beginPath();
+    ctx.arc(x+66, y-42, startled?3.3:2.6, 0, Math.PI*2);
+    ctx.fill();
+    // eyebrow / expression
+    ctx.strokeStyle = '#1f2f46';
+    ctx.beginPath();
+    ctx.moveTo(x+56, y-50);
+    ctx.quadraticCurveTo(x+62, y-54 - (startled?2:0), x+68, y-50);
+    ctx.stroke();
+
+    // Beak + pouch
+    // Harness strap around beak to attach reins
+    ctx.strokeStyle='#ab7b2b';
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.arc(x+62, y-38, 14, Math.PI*0.1, Math.PI*1.2);
+    ctx.stroke();
+    ctx.lineWidth=2;
+
+    // Beak top
+    ctx.fillStyle = '#f6c25f';
+    ctx.beginPath();
+    ctx.moveTo(x+68, y-40);
+    ctx.lineTo(x+118, y-46);
+    ctx.quadraticCurveTo(x+126, y-46, x+128, y-44);
+    ctx.lineTo(x+116, y-40);
+    ctx.lineTo(x+72, y-36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Gular pouch (big throat)
+    const pouchWobble = Math.sin(t*5 + Math.sin(runPhase))*6 * (0.6 + 0.4*speed);
+    ctx.fillStyle = '#ffb36a';
+    ctx.beginPath();
+    ctx.moveTo(x+64, y-34);
+    ctx.quadraticCurveTo(x+70, y-20, x+68, y-6 + pouchWobble);
+    ctx.quadraticCurveTo(x+48, y+12 + pouchWobble, x+30, y-2);
+    ctx.quadraticCurveTo(x+50, y-18, x+64, y-34);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#cc8c43';
+    ctx.stroke();
+
+    // Legs + webbed feet
+    drawLeg(legA.x, legA.y, step);
+    drawLeg(legB.x, legB.y, -step);
+
+    ctx.restore();
+
+    // Bicycle on top riding the pelican
+    // Mount point on pelican back
+    const mountX = x - 4;
+    const mountY = y - 24;
+
+    drawBicycle(mountX, mountY, dt, speed, bounce);
+
+    // reins from handlebar to harness
+    ctx.save();
+    ctx.strokeStyle = '#6b3e0d';
+    ctx.lineWidth = 2;
+    const reinSlack = 6*Math.sin(t*2);
+    // handlebar points
+    const hbL = {x: mountX + 22, y: mountY - 18};
+    const hbR = {x: mountX + 38, y: mountY - 18};
+    const harness = {x: x+62, y: y-38};
+    ctx.beginPath();
+    ctx.moveTo(hbL.x, hbL.y);
+    ctx.quadraticCurveTo((hbL.x+harness.x)/2, (hbL.y+harness.y)/2 - reinSlack, harness.x, harness.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(hbR.x, hbR.y);
+    ctx.quadraticCurveTo((hbR.x+harness.x)/2, (hbR.y+harness.y)/2 + reinSlack, harness.x, harness.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // Place particles relative to pelican
+    placeParticlesAroundPelican(x, y-10);
+  }
+
+  function wingShape(w, h, back=false){
+    ctx.fillStyle = back ? '#ebf2ff' : '#e6eefc';
+    ctx.strokeStyle = '#6f8694';
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(w*0.4, -h, w, 0);
+    ctx.quadraticCurveTo(w*0.4, h*0.8, 0, 0);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // feathers
+    ctx.strokeStyle = 'rgba(96,115,130,0.6)';
+    for(let i=0;i<4;i++){
+      ctx.beginPath();
+      ctx.moveTo(w*(i+1)/5, 0);
+      ctx.quadraticCurveTo(w*(i+1)/5 - 6, (i%2? -h*0.5: h*0.5), w*(i+1)/5 - 12, 0);
+      ctx.stroke();
+    }
+  }
+
+  function drawLeg(x, y, step){
+    ctx.save();
+    ctx.strokeStyle = '#6b6e7a';
+    ctx.lineWidth = 6;
+    // upper segment
+    ctx.beginPath();
+    ctx.moveTo(x, y-6);
+    ctx.lineTo(x + 6*step, y+8);
+    ctx.stroke();
+    // lower segment
+    ctx.beginPath();
+    ctx.moveTo(x + 6*step, y+8);
+    ctx.lineTo(x + 10*step, y+24);
+    ctx.stroke();
+    // webbed foot
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#e18c3f';
+    ctx.fillStyle = '#ff9b4f';
+    ctx.beginPath();
+    const fx = x + 10*step, fy = y+24;
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx+16, fy+6);
+    ctx.lineTo(fx+6, fy+10);
+    ctx.lineTo(fx+18, fy+14);
+    ctx.lineTo(fx, fy+12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Bicycle drawing
+  const bike = {
+    wheelRot: 0,
+    pedalRot: 0,
+    chainDash: 0,
+    tilt: 0
+  };
+
+  function drawBicycle(x, y, dt, speed, bounce){
+    // tilt with speed and bounce
+    bike.tilt = lerp(bike.tilt, clamp(speed*0.1 + (bounce>0?0.02:-0.02), -0.2, 0.25), 0.1);
+
+    // wheel rotation based on speed
+    bike.wheelRot += speed * (dt/16) * 0.15; // arbitrary scaling
+    bike.pedalRot += speed * (dt/16) * 0.25;
+    bike.chainDash += speed * (dt/16) * 4;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(bike.tilt);
+
+    // Wheels
+    const r = 20; // wheel radius
+    const wheelBase = 64;
+    const wx1 = -wheelBase/2, wx2 = wheelBase/2;
+    drawWheel(wx1, 0, r, bike.wheelRot);
+    drawWheel(wx2, 0, r, bike.wheelRot);
+
+    // Frame: classic diamond
+    ctx.strokeStyle = '#2b3d52';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Points
+    const BB = {x: 0, y: 0}; // bottom bracket center (between wheels)
+    const head = {x: wx2-4, y: -18};
+    const seatT = {x: wx1+6, y: -14};
+    const topT = {x: (head.x+seatT.x)/2, y: -18};
+    // Down tube BB -> head
+    strokeSeg(BB, head);
+    // Seat tube BB -> seat
+    strokeSeg(BB, seatT);
+    // Top tube seat -> head
+    strokeSeg(seatT, head);
+    // Chain stays BB -> rear hub
+    strokeSeg({x: wx1+2, y: 0}, BB);
+    // Seat stays seat -> rear hub
+    strokeSeg(seatT, {x: wx1+2, y: 0});
+
+    // Handlebar with a little "grip"
+    ctx.strokeStyle = '#3a4f6a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(head.x, head.y);
+    ctx.lineTo(head.x+20, head.y);
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#6aa2d8';
+    ctx.beginPath();
+    ctx.moveTo(head.x+18, head.y);
+    ctx.lineTo(head.x+22, head.y);
+    ctx.stroke();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#3a4f6a';
+    ctx.beginPath();
+    ctx.moveTo(head.x, head.y);
+    ctx.lineTo(head.x-6, head.y-8);
+    ctx.stroke();
+
+    // Seat / saddle
+    ctx.fillStyle = '#2b3d52';
+    ctx.beginPath();
+    ctx.roundRect(seatT.x-6, seatT.y-4, 14, 6, 3);
+    ctx.fill();
+
+    // Crank + chainring
+    const ringR = 8;
+    ctx.save();
+    ctx.translate(BB.x, BB.y);
+    ctx.strokeStyle = '#3e5169';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, 0, Math.PI*2);
+    ctx.stroke();
+
+    // crank arms
+    ctx.save();
+    ctx.rotate(bike.pedalRot);
+    ctx.strokeStyle = '#3a4f6a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(12,0); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(-12,0); ctx.stroke();
+    // pedals
+    ctx.fillStyle = '#2b3d52';
+    ctx.beginPath(); ctx.roundRect(12, -2.5, 8, 5, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-20, -2.5, 8, 5, 2); ctx.fill();
+    ctx.restore();
+
+    // chain path front ring -> rear cog
+    const rearCog = {x: wx1+2, y: 0};
+    ctx.strokeStyle = '#2d2d2d';
+    ctx.lineWidth = 2;
+    // upper chain
+    dashedLine(BB.x+ringR, BB.y, rearCog.x+3, rearCog.y-3, 6, bike.chainDash);
+    // lower chain
+    dashedLine(BB.x+ringR, BB.y+3, rearCog.x+3, rearCog.y+3, 6, bike.chainDash+3);
+
+    ctx.restore(); // end crank group
+
+    // Cute anthropomorphic bike eyes on head tube (optional humor)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(head.x+2, head.y-6, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(head.x+7, head.y-6, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1d2a3b';
+    ctx.beginPath(); ctx.arc(head.x+2, head.y-6, 1.1, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(head.x+7, head.y-6, 1.1, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function strokeSeg(a,b){
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  function drawWheel(cx, cy, r, rot){
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    // tire
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+    ctx.stroke();
+    // rim
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#7e95a8';
+    ctx.beginPath();
+    ctx.arc(0, 0, r-3, 0, Math.PI*2);
+    ctx.stroke();
+    // spokes
+    ctx.strokeStyle = '#9bb2c2';
+    ctx.lineWidth = 1.5;
+    for(let i=0;i<14;i++){
+      const a = i*(Math.PI*2/14);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo((r-4)*Math.cos(a), (r-4)*Math.sin(a));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function dashedLine(x1,y1,x2,y2, dash=6, offset=0){
+    // simple dashed chain effect by drawing dots along the segment
+    const dx = x2-x1, dy = y2-y1;
+    const len = Math.hypot(dx,dy);
+    const nx = dx/len, ny = dy/len;
+    const step = dash;
+    let d = (offset % step);
+    ctx.save();
+    ctx.fillStyle = '#2d2d2d';
+    while(d < len){
+      const px = x1 + nx*d;
+      const py = y1 + ny*d;
+      ctx.beginPath();
+      ctx.arc(px, py, 0.9, 0, Math.PI*2);
+      ctx.fill();
+      d += step;
+    }
+    ctx.restore();
+  }
+
+  // Particles near pelican (feathers & droplets)
+  function placeParticlesAroundPelican(px, py){
+    const now = performance.now();
+    // update feathers
+    for(const f of state.feathers){
+      if(!f.spawned){
+        f.x = px + randRange(-40, 40);
+        f.y = py + randRange(-30, 10);
+        f.spawned = true;
+      }
+      const dt = (now - f.born);
+      f.vy += 0.0015 * dt/16;
+      f.x += f.vx * dt/16;
+      f.y += f.vy * dt/16;
+    }
+    state.feathers = state.feathers.filter(f=> now - f.born < f.life);
+    // update droplets
+    for(const d of state.droplets){
+      if(!d.spawned){
+        d.x = px + randRange(-6, 6);
+        d.y = py - 16 + randRange(-6, 6);
+        d.spawned = true;
+      }
+      const dt = (now - d.born);
+      d.vy += 0.002 * dt/16;
+      d.x += d.vx * dt/16;
+      d.y += d.vy * dt/16;
+    }
+    state.droplets = state.droplets.filter(d=> now - d.born < d.life);
+    // draw
+    ctx.save();
+    for(const f of state.feathers){
+      const a = 1 - (now - f.born)/f.life;
+      ctx.globalAlpha = 0.5*a;
+      ctx.fillStyle = '#eef6ff';
+      ctx.beginPath();
+      ctx.ellipse(f.x, f.y, f.r, f.r*0.6, 0.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+    for(const d of state.droplets){
+      const a = 1 - (now - d.born)/d.life;
+      ctx.globalAlpha = 0.5*a;
+      ctx.fillStyle = d.blue ? '#a4ddff' : '#d0e9ff';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Fish feeding animation
+  function updateFish(){
+    const now = performance.now();
+    const anchor = getPelicanAnchor();
+    const mouth = { x: anchor.x+62, y: anchor.y-38 }; // pelican mouth position
+    for(const f of state.fish){
+      const t = clamp((now - f.start)/f.dur, 0, 1);
+      // simple quadratic Bezier from start -> mid -> mouth
+      const sx = f.x0 ?? f.x; const sy = f.y0 ?? f.y;
+      if(f.x0 === undefined){ f.x0 = f.x; f.y0 = f.y; }
+      const mx = (sx + mouth.x)/2 + 40;
+      const my = Math.min(sy, mouth.y) - 80;
+      const bx = (1-t)*(1-t)*sx + 2*(1-t)*t*mx + t*t*mouth.x;
+      const by = (1-t)*(1-t)*sy + 2*(1-t)*t*my + t*t*mouth.y;
+      f.x = bx; f.y = by;
+      if(!f.eaten && t >= 0.98){
+        f.eaten = true;
+        // stamina restore
+        state.stamina = clamp(state.stamina + 0.25, 0, 1);
+        // small happy blink: reduce ringShock negative
+        state.ringShock = Math.max(0, state.ringShock - 0.5);
+      }
+    }
+    state.fish = state.fish.filter(f=> (now - f.start) < (f.dur + 300));
+    // draw fish
+    ctx.save();
+    for(const f of state.fish){
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate(-0.4);
+      ctx.fillStyle = '#5aa2d6';
+      ctx.strokeStyle = '#2c5e86';
+      ctx.lineWidth = 1.5;
+      // body
+      ctx.beginPath();
+      ctx.ellipse(0,0,10,5,0,0,Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      // tail
+      ctx.beginPath();
+      ctx.moveTo(-10,0);
+      ctx.lineTo(-16,3);
+      ctx.lineTo(-16,-3);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // eye
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(4,-1,1.5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#1a2a3b';
+      ctx.beginPath(); ctx.arc(4,-1,0.6,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Main loop
+  let lastTime = performance.now();
+  (function loop(){
+    const now = performance.now();
+    let dt = now - lastTime; if(!isFinite(dt) || dt>100) dt = 16;
+    lastTime = now;
+
+    // Ease speed towards base + boosts and stamina
+    // stamina drains with speed and sprinting; recovers slowly otherwise
+    const target = state.baseSpeed + state.speedBoost + (state.sprinting>0?0.2:0);
+    state.speed = lerp(state.speed, target, 0.08);
+    // apply stamina effect
+    const use = state.speed;
+    const staminaDrain = (use*use)*0.00025 + (state.sprinting>0?0.0015:0);
+    state.stamina = clamp(state.stamina - staminaDrain*(dt), 0, 1);
+    if(state.sprinting<=0.0001){
+      state.stamina = clamp(state.stamina + 0.00008*dt, 0, 1);
+    }
+    // if stamina low, auto limit speed and wheeze bounce
+    if(state.stamina < 0.25){
+      state.speed = Math.min(state.speed, state.baseSpeed*0.7);
+    }
+
+    // decay boosts
+    state.speedBoost = Math.max(0, state.speedBoost - 0.004*(dt));
+    state.sprinting = Math.max(0, state.sprinting - 0.003*(dt));
+    state.ringShock = Math.max(0, state.ringShock - 0.004*(dt));
+
+    // Draw
+    ctx.clearRect(0,0,canvas.width/DPR, canvas.height/DPR);
+    drawBackground(dt);
+    drawPelicanAndBike(dt);
+    updateFish();
+
+    // UI status
+    const perc = Math.round(state.stamina*100);
+    stamFill.style.width = `${perc}%`;
+    stamText.textContent = `${perc}%`;
+
+    requestAnimationFrame(loop);
+  })();
+
+  // Helper: canvas roundRect polyfill for Safari older (if not supported)
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+      const cr = Math.min(r, w/2, h/2);
+      this.beginPath();
+      this.moveTo(x+cr, y);
+      this.lineTo(x+w-cr, y);
+      this.quadraticCurveTo(x+w, y, x+w, y+cr);
+      this.lineTo(x+w, y+h-cr);
+      this.quadraticCurveTo(x+w, y+h, x+w-cr, y+h);
+      this.lineTo(x+cr, y+h);
+      this.quadraticCurveTo(x, y+h, x, y+h-cr);
+      this.lineTo(x, y+cr);
+      this.quadraticCurveTo(x, y, x+cr, y);
+      this.closePath();
+    };
+  }
+
+  // Accessibility: keyboard triggers
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='b' || e.key==='B'){ triggerBell(); }
+    if(e.key===' '){ e.preventDefault(); sprintBtn.click(); }
+  });
+
+})();
+</script>
+</body>
+</html>

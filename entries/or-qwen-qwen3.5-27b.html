@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕 - 跨代模型前端擂台赛</title>
+    <style>
+        :root {
+            --sky-top: #87CEEB;
+            --sky-bottom: #E0F7FA;
+            --ocean: #29B6F6;
+            --sand: #F4E1C1;
+            --pelican-body: #FFFFFF;
+            --pelican-beak: #FFB74D;
+            --pelican-pouch: #FF8A65;
+            --bike-frame: #D32F2F;
+            --bike-rim: #333;
+            --anim-speed: 1s; /* 基础速度控制 */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom) 60%, var(--ocean) 60%, var(--ocean) 100%);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- 舞台与背景 --- */
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* 视差背景层 */
+        .parallax-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            will-change: transform;
+        }
+
+        /* 云朵 */
+        .clouds {
+            height: 60%;
+            background-image: 
+                radial-gradient(circle, rgba(255,255,255,0.8) 10%, transparent 10%),
+                radial-gradient(circle, rgba(255,255,255,0.8) 10%, transparent 10%);
+            background-size: 100px 100px, 60px 60px;
+            background-position: 0 20%, 50px 50px;
+            opacity: 0.6;
+        }
+
+        /* 远海波浪 */
+        .waves-far {
+            top: 55%;
+            height: 10%;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0,
+                transparent 20px,
+                rgba(255,255,255,0.3) 20px,
+                rgba(255,255,255,0.3) 40px
+            );
+        }
+
+        /* 近景沙滩/水面 */
+        .ground {
+            top: 60%;
+            height: 40%;
+            background: var(--ocean);
+            border-top: 10px solid rgba(255,255,255,0.5);
+            z-index: 1;
+        }
+
+        /* 粒子层（风/水花） */
+        #particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* --- 核心角色容器 --- */
+        #characters {
+            position: absolute;
+            bottom: 20%; /* 在沙滩上 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 300px;
+            z-index: 10;
+            /* 整体颠簸动画 */
+            animation: bobbing var(--anim-speed) ease-in-out infinite alternate;
+        }
+
+        /* SVG 样式 */
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* --- 鹈鹕动画 --- */
+        .pelican-leg {
+            transform-origin: 140px 200px; /* 髋关节 */
+            animation: run var(--anim-speed) linear infinite;
+        }
+        .pelican-leg.back {
+            animation-delay: -0.5s;
+        }
+        .pelican-wing {
+            transform-origin: 180px 120px;
+            animation: flap var(--anim-speed) ease-in-out infinite alternate;
+        }
+        .pelican-pouch {
+            animation: pouch-pulse var(--anim-speed) ease-in-out infinite alternate;
+        }
+        .pelican-head {
+            transform-origin: 130px 80px;
+            animation: head-nod var(--anim-speed) ease-in-out infinite;
+        }
+
+        /* --- 自行车动画 --- */
+        .bike-wheel {
+            transform-origin: center;
+            animation: spin var(--anim-speed) linear infinite;
+        }
+        .bike-pedal {
+            transform-origin: 190px 190px;
+            animation: spin var(--anim-speed) linear infinite; /* 与车轮同步 */
+        }
+        .bike-handlebars {
+            transform-origin: 100px 120px;
+            animation: handle-shake 0.1s ease-out; /* 默认无震动，JS 触发 */
+        }
+        
+        /* 缰绳 */
+        .reins {
+            stroke: #5D4037;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 5;
+            animation: dash 1s linear infinite;
+        }
+
+        /* --- 特效类 --- */
+        .sprinting .pelican-leg { animation-duration: 0.2s; }
+        .sprinting .pelican-wing { animation-duration: 0.2s; }
+        .sprinting .bike-wheel { animation-duration: 0.2s; }
+        .sprinting .bike-pedal { animation-duration: 0.2s; }
+        .sprinting #characters { animation-duration: 0.2s; }
+        
+        .honking .bike-handlebars { animation: handle-shake 0.1s infinite; }
+        .honking .pelican-head { animation: head-jerk 0.2s ease-out; }
+
+        /* --- UI 控件 --- */
+        #ui-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-honk { background: #FF9800; }
+        .btn-feed { background: #2196F3; }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 150px;
+        }
+        
+        input[type=range] {
+            width: 100%;
+            accent-color: #D32F2F;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* --- 动画关键帧 --- */
+        @keyframes run {
+            0% { transform: rotate(-30deg); }
+            50% { transform: rotate(30deg); }
+            100% { transform: rotate(-30deg); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes flap {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-20deg); }
+        }
+        @keyframes bobbing {
+            0% { transform: translateX(-50%) translateY(0); }
+            100% { transform: translateX(-50%) translateY(-10px); }
+        }
+        @keyframes pouch-pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+        @keyframes head-nod {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+            100% { transform: rotate(0deg); }
+        }
+        @keyframes handle-shake {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+            100% { transform: rotate(0deg); }
+        }
+        @keyframes head-jerk {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(20deg) translateX(5px); }
+            100% { transform: rotate(0deg); }
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+        @keyframes fish-fly {
+            0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translate(-100px, -150px) scale(1); opacity: 0; }
+        }
+
+        /* 鱼 */
+        #fish {
+            position: absolute;
+            bottom: 100px;
+            right: 50px;
+            width: 40px;
+            height: 20px;
+            z-index: 50;
+            pointer-events: none;
+        }
+        .feeding #fish {
+            animation: fish-fly 0.8s ease-in-out forwards;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="stage">
+        <!-- 背景层 -->
+        <div class="parallax-layer clouds" id="bg-clouds"></div>
+        <div class="parallax-layer waves-far" id="bg-waves"></div>
+        <div class="parallax-layer ground" id="bg-ground"></div>
+        
+        <!-- 粒子画布 -->
+        <canvas id="particles"></canvas>
+
+        <!-- 核心角色 SVG -->
+        <div id="characters">
+            <svg viewBox="0 0 400 300">
+                <!-- 鹈鹕 -->
+                <g class="pelican-group">
+                    <!-- 后腿 -->
+                    <g class="pelican-leg back">
+                        <path d="M120,200 L100,260 L110,270 L140,270 L150,260" fill="#FF8A65" stroke="#E64A19" stroke-width="2"/>
+                    </g>
+                    
+                    <!-- 身体 -->
+                    <ellipse cx="180" cy="160" rx="80" ry="60" fill="var(--pelican-body)" stroke="#DDD" stroke-width="2"/>
+                    
+                    <!-- 翅膀 (左侧) -->
+                    <path class="pelican-wing" d="M140,140 Q100,100 80,150 Q100,200 140,180 Z" fill="#EEE" stroke="#CCC" stroke-width="2"/>
+
+                    <!-- 腿 (前腿) -->
+                    <g class="pelican-leg">
+                        <path d="M160,200 L180,260 L190,270 L220,270 L230,260" fill="#FF8A65" stroke="#E64A19" stroke-width="2"/>
+                    </g>
+
+                    <!-- 脖子 -->
+                    <path d="M200,140 Q220,100 200,80" stroke="var(--pelican-body)" stroke-width="20" stroke-linecap="round"/>
+                    <path d="M200,140 Q220,100 200,80" stroke="white" stroke-width="16" stroke-linecap="round"/>
+
+                    <!-- 头部 -->
+                    <g class="pelican-head">
+                        <!-- 喙上 -->
+                        <path d="M200,80 Q240,80 280,70 L270,90 Q220,90 200,95 Z" fill="var(--pelican-beak)"/>
+                        <!-- 喉囊 -->
+                        <path class="pelican-pouch" d="M200,95 Q240,130 270,90 L280,70" fill="var(--pelican-pouch)" />
+                        <!-- 眼睛 -->
+                        <circle cx="210" cy="75" r="4" fill="#333"/>
+                        <circle cx="212" cy="73" r="1" fill="white"/>
+                    </g>
+                </g>
+
+                <!-- 自行车 (骑在鹈鹕背上) -->
+                <g class="bike-group" transform="translate(0, -20)">
+                    <!-- 缰绳 -->
+                    <path class="reins" d="M100,120 Q150,100 210,80" />
+
+                    <!-- 后轮 -->
+                    <g class="bike-wheel" transform="translate(100, 190)">
+                        <circle r="35" fill="none" stroke="#333" stroke-width="4"/>
+                        <circle r="35" fill="none" stroke="#DDD" stroke-width="1" stroke-dasharray="5 5"/>
+                        <line x1="0" y1="-35" x2="0" y2="35" stroke="#999" stroke-width="1"/>
+                        <line x1="-35" y1="0" x2="35" y2="0" stroke="#999" stroke-width="1"/>
+                    </g>
+
+                    <!-- 前轮 -->
+                    <g class="bike-wheel" transform="translate(280, 190)">
+                        <circle r="35" fill="none" stroke="#333" stroke-width="4"/>
+                        <circle r="35" fill="none" stroke="#DDD" stroke-width="1" stroke-dasharray="5 5"/>
+                        <line x1="0" y1="-35" x2="0" y2="35" stroke="#999" stroke-width="1"/>
+                        <line x1="-35" y1="0" x2="35" y2="0" stroke="#999" stroke-width="1"/>
+                    </g>
+
+                    <!-- 车架 -->
+                    <path d="M100,190 L190,190 L140,120 L260,120 L280,190" fill="none" stroke="var(--bike-frame)" stroke-width="6" stroke-linejoin="round"/>
+                    <path d="M140,120 L130,100" stroke="var(--bike-frame)" stroke-width="6"/> <!-- 立管 -->
+                    
+                    <!-- 车座 -->
+                    <path d="M120,120 Q140,110 160,120" fill="none" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+
+                    <!-- 车把 (充当缰绳手) -->
+                    <g class="bike-handlebars">
+                        <path d="M130,100 L100,90" stroke="#555" stroke-width="4" stroke-linecap="round"/>
+                        <path d="M100,90 Q90,80 100,90" fill="none" stroke="#555" stroke-width="4"/> <!-- 握把 -->
+                        <!-- 铃铛 -->
+                        <circle cx="110" cy="95" r="6" fill="#FFD700" stroke="#F57F17"/>
+                    </g>
+
+                    <!-- 脚踏 (模拟骑行动作) -->
+                    <g class="bike-pedal" transform="translate(190, 190)">
+                        <circle r="20" fill="none" stroke="#555" stroke-width="2"/>
+                        <rect x="-2" y="-25" width="4" height="10" fill="#333"/>
+                        <rect x="-2" y="15" width="4" height="10" fill="#333"/>
+                    </g>
+                </g>
+            </svg>
+        </div>
+
+        <!-- 投喂的鱼 -->
+        <div id="fish">
+            <svg viewBox="0 0 40 20">
+                <path d="M0,10 Q20,0 40,10 Q20,20 0,10" fill="#FF9800"/>
+                <circle cx="35" cy="8" r="1" fill="#333"/>
+            </svg>
+        </div>
+
+        <!-- UI 面板 -->
+        <div id="ui-panel">
+            <div class="control-group">
+                <button class="btn btn-honk" id="btn-honk">🔔 按车铃</button>
+                <span class="status-text">惊吓鹈鹕</span>
+            </div>
+            
+            <div class="control-group slider-container">
+                <label for="speed-slider" style="font-size:12px; font-weight:bold;">速度控制</label>
+                <input type="range" id="speed-slider" min="0.5" max="5" step="0.5" value="1">
+                <span class="status-text" id="speed-val">巡航模式</span>
+            </div>
+
+            <div class="control-group">
+                <button class="btn btn-feed" id="btn-feed">🐟 投喂小鱼</button>
+                <span class="status-text">恢复体力</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心状态 ---
+        const state = {
+            speed: 1,
+            isHonking: false,
+            audioCtx: null
+        };
+
+        // --- DOM 元素 ---
+        const els = {
+            slider: document.getElementById('speed-slider'),
+            speedVal: document.getElementById('speed-val'),
+            btnHonk: document.getElementById('btn-honk'),
+            btnFeed: document.getElementById('btn-feed'),
+            characters: document.getElementById('characters'),
+            bgClouds: document.getElementById('bg-clouds'),
+            bgWaves: document.getElementById('bg-waves'),
+            bgGround: document.getElementById('bg-ground'),
+            stage: document.getElementById('stage'),
+            fish: document.getElementById('fish')
+        };
+
+        // --- 1. 速度控制逻辑 ---
+        els.slider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state.speed = val;
+            
+            // 更新 CSS 变量控制动画速度
+            document.documentElement.style.setProperty('--anim-speed', `${1 / val}s`);
+            
+            // 更新文字
+            if (val > 2.5) {
+                els.speedVal.innerText = "🔥 冲刺模式!";
+                els.speedVal.style.color = "#D32F2F";
+            } else {
+                els.speedVal.innerText = "🚴 巡航模式";
+                els.speedVal.style.color = "#666";
+            }
+
+            // 视差速度倍率
+            updateParallaxSpeed();
+        });
+
+        // --- 2. 按车铃逻辑 (Web Audio API) ---
+        els.btnHonk.addEventListener('click', () => {
+            // 初始化 AudioContext (浏览器策略要求用户交互后初始化)
+            if (!state.audioCtx) {
+                state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (state.audioCtx.state === 'suspended') {
+                state.audioCtx.resume();
+            }
+
+            // 播放铃声
+            playBellSound();
+
+            // 视觉反馈
+            els.characters.classList.add('honking');
+            setTimeout(() => els.characters.classList.remove('honking'), 500);
+
+            // 鹈鹕受惊加速一小会儿
+            const originalVal = els.slider.value;
+            els.slider.value = 4;
+            els.slider.dispatchEvent(new Event('input'));
+            setTimeout(() => {
+                els.slider.value = originalVal;
+                els.slider.dispatchEvent(new Event('input'));
+            }, 1000);
+        });
+
+        function playBellSound() {
+            if (!state.audioCtx) return;
+            const osc = state.audioCtx.createOscillator();
+            const gainNode = state.audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, state.audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, state.audioCtx.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.3, state.audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, state.audioCtx.currentTime + 0.5);
+
+            osc.connect(gainNode);
+            gainNode.connect(state.audioCtx.destination);
+
+            osc.start();
+            osc.stop(state.audioCtx.currentTime + 0.5);
+        }
+
+        // --- 3. 投喂逻辑 ---
+        els.btnFeed.addEventListener('click', () => {
+            // 移除旧动画类
+            els.stage.classList.remove('feeding');
+            // 强制重绘
+            void els.stage.offsetWidth;
+            // 添加动画类
+            els.stage.classList.add('feeding');
+
+            // 鹈鹕反应：停顿并开心
+            els.characters.style.animationPlayState = 'paused';
+            
+            setTimeout(() => {
+                els.characters.style.animationPlayState = 'running';
+                // 恢复速度为正常
+                els.slider.value = 1;
+                els.slider.dispatchEvent(new Event('input'));
+            }, 1500);
+        });
+
+        // --- 视差滚动与粒子系统 ---
+        let bgOffset = 0;
+        let particleOffset = 0;
+
+        function updateParallaxSpeed() {
+            // 速度倍率
+        }
+
+        // 粒子系统 (Canvas)
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * -2 - 0.5; // 向左飞
+                this.speedY = Math.random() * 2 - 1;
+                this.color = `rgba(255, 255, 255, ${Math.random() * 0.5 + 0.3})`;
+            }
+            update() {
+                // 速度受全局速度影响
+                this.x += this.speedX * state.speed * 2;
+                this.y += this.speedY;
+                if (this.x < 0) this.x = canvas.width;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 初始化粒子
+        for(let i=0; i<50; i++) particles.push(new Particle());
+
+        // 动画循环
+        function animate() {
+            // 1. 背景视差
+            bgOffset -= 0.5 * state.speed;
+            els.bgClouds.style.transform = `translateX(${bgOffset}px)`;
+            els.bgWaves.style.transform = `translateX(${bgOffset * 0.5}px)`;
+            els.bgGround.style.transform = `translateX(${bgOffset * 1.5}px)`;
+
+            // 2. 粒子更新
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // 启动
+        animate();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一辆自行车正在骑着一只鹈鹕</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        #canvas {
+            width: 100%;
+            height: 100vh;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // 鹈鹕
+    let pelican = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        vx: 0,
+        vy: 0,
+        width: 100,
+        height: 100,
+        speed: 0,
+        throttle: 0,
+        maxSpeed: 5,
+        acceleration: 0.1,
+        jump: -5,
+        gravity: 0.1,
+        animation: 0,
+        frame: 0,
+    };
+
+    // 自行车
+    let bicycle = {
+        x: pelican.x,
+        y: pelican.y - 50,
+        width: 50,
+        height: 30,
+        angle: 0,
+        rotationSpeed: 0.01,
+    };
+
+    // 背景
+    let background = {
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height,
+        speed: 0.1,
+    };
+
+    // 音效
+    let audio = new AudioContext();
+    let bell = audio.createOscillator();
+    bell.type = 'sine';
+    bell.frequency.value = 800;
+    bell.connect(audio.destination);
+
+    // 交互控件
+    let controls = {
+        bell: document.createElement('button'),
+        speed: document.createElement('input'),
+        feed: document.createElement('button'),
+    };
+
+    // 初始化
+    function init() {
+        controls.bell.textContent = '按车铃';
+        controls.speed.type = 'range';
+        controls.speed.min = 0;
+        controls.speed.max = 10;
+        controls.speed.value = 5;
+        controls.feed.textContent = '投喂小鱼';
+
+        document.body.appendChild(controls.bell);
+        document.body.appendChild(controls.speed);
+        document.body.appendChild(controls.feed);
+
+        controls.bell.addEventListener('click', ringBell);
+        controls.speed.addEventListener('input', adjustSpeed);
+        controls.feed.addEventListener('click', feedPelican);
+
+        animate();
+    }
+
+    // 动画
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 背景
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 鹈鹕
+        ctx.save();
+        ctx.translate(pelican.x, pelican.y);
+        ctx.rotate(Math.PI / 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-pelican.width / 2, -pelican.height / 2, pelican.width, pelican.height);
+        ctx.restore();
+
+        // 自行车
+        ctx.save();
+        ctx.translate(bicycle.x, bicycle.y);
+        ctx.rotate(bicycle.angle);
+        ctx.fillStyle = '#808080';
+        ctx.fillRect(-bicycle.width / 2, -bicycle.height / 2, bicycle.width, bicycle.height);
+        ctx.restore();
+
+        // 更新位置
+        pelican.x += pelican.vx;
+        pelican.y += pelican.vy;
+
+        // 物理引擎
+        pelican.vy += pelican.gravity;
+        pelican.speed += pelican.throttle;
+        pelican.vx = Math.min(Math.max(pelican.speed, -pelican.maxSpeed), pelican.maxSpeed);
+
+        // 边界检测
+        if (pelican.y + pelican.height / 2 > canvas.height) {
+            pelican.y = canvas.height - pelican.height / 2;
+            pelican.vy = 0;
+        }
+
+        // 交互
+        bicycle.angle += bicycle.rotationSpeed;
+
+        requestAnimationFrame(animate);
+    }
+
+    // 按车铃
+    function ringBell() {
+        bell.start();
+        setTimeout(() => bell.stop(), 0.5);
+    }
+
+    // 调整速度
+    function adjustSpeed() {
+        pelican.throttle = (controls.speed.value - 5) / 10;
+    }
+
+    // 投喂小鱼
+    function feedPelican() {
+        pelican.speed += 2;
+    }
+
+    init();
+</script>
+</body>
+</html>

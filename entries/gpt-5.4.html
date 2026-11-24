@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>自行车骑鹈鹕</title>
+<style>
+  :root{
+    --sky1:#8fd3ff;
+    --sky2:#eaf8ff;
+    --sea:#66b6d8;
+    --sea2:#3b8dae;
+    --sand:#d8b47a;
+    --wood:#8c5a3c;
+    --wood2:#6e452d;
+    --ui:#ffffffcc;
+    --ui-border:#ffffff70;
+    --text:#173042;
+    --accent:#ffb703;
+    --accent2:#fb8500;
+    --shadow:0 10px 30px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    color:var(--text);
+    background:linear-gradient(180deg,var(--sky1),var(--sky2));
+  }
+  #app{
+    position:relative;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+  }
+  canvas{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .hud{
+    position:absolute;
+    left:18px;
+    top:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    z-index:2;
+    max-width:min(380px, calc(100vw - 32px));
+    pointer-events:none;
+  }
+  .panel{
+    pointer-events:auto;
+    background:var(--ui);
+    backdrop-filter: blur(10px);
+    border:1px solid var(--ui-border);
+    box-shadow:var(--shadow);
+    border-radius:18px;
+    padding:14px 16px;
+  }
+  .title{
+    font-weight:800;
+    font-size:18px;
+    letter-spacing:.02em;
+    margin:0 0 6px 0;
+  }
+  .subtitle{
+    margin:0;
+    opacity:.84;
+    line-height:1.4;
+    font-size:13px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  button, input[type="range"], select{
+    pointer-events:auto;
+  }
+  button, select{
+    appearance:none;
+    border:none;
+    border-radius:14px;
+    padding:10px 14px;
+    background:white;
+    color:var(--text);
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+    cursor:pointer;
+    font-weight:700;
+    transition:.18s ease;
+  }
+  button:hover, select:hover{transform:translateY(-1px)}
+  button:active{transform:translateY(1px) scale(.99)}
+  .primary{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;
+  }
+  .pill{
+    background:#ffffffee;
+    border-radius:999px;
+    padding:8px 12px;
+    font-size:13px;
+    font-weight:700;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+  }
+  .metric{
+    min-width:92px;
+    text-align:center;
+  }
+  .sliderWrap{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+  }
+  .sliderWrap label{
+    min-width:64px;
+    font-size:13px;
+    font-weight:700;
+  }
+  input[type="range"]{
+    width:180px;
+    accent-color:var(--accent2);
+  }
+  .footerHint{
+    position:absolute;
+    right:18px;
+    bottom:18px;
+    z-index:2;
+    pointer-events:none;
+  }
+  .footerHint .panel{
+    padding:10px 14px;
+    font-size:12px;
+    opacity:.92;
+  }
+  .badge{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#fff;
+    margin-right:6px;
+    font-weight:800;
+  }
+  @media (max-width: 720px){
+    .hud{max-width:calc(100vw - 20px); left:10px; top:10px}
+    .footerHint{right:10px; bottom:10px}
+    .title{font-size:16px}
+    .subtitle{font-size:12px}
+    .sliderWrap{flex-wrap:wrap}
+    input[type="range"]{width:100%}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <div class="hud">
+    <div class="panel">
+      <h1 class="title">自行车骑鹈鹕</h1>
+      <p class="subtitle">
+        注意主谓关系：<b>是自行车在骑鹈鹕</b>。按铃会吓得鹈鹕猛冲；喂小鱼能补体力；还能切换时段和路况。
+      </p>
+    </div>
+
+    <div class="panel controls">
+      <div class="row">
+        <button id="bellBtn" class="primary">🔔 按车铃</button>
+        <button id="sprintBtn">⚡ 冲刺</button>
+        <button id="feedBtn">🐟 投喂小鱼</button>
+      </div>
+
+      <div class="sliderWrap">
+        <label for="speedRange">速度</label>
+        <input id="speedRange" type="range" min="0" max="100" value="42" />
+        <div id="speedMetric" class="pill metric">42</div>
+      </div>
+
+      <div class="row">
+        <select id="timeSelect" aria-label="切换时段">
+          <option value="day">☀️ 晴天</option>
+          <option value="dusk">🌇 黄昏</option>
+          <option value="night">🌙 夜晚</option>
+        </select>
+        <select id="roadSelect" aria-label="切换路况">
+          <option value="boardwalk">🪵 木栈道</option>
+          <option value="pebble">🪨 石子路</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <div id="staminaMetric" class="pill metric">体力 100%</div>
+        <div id="moodMetric" class="pill metric">状态 悠着跑</div>
+        <div id="fpsMetric" class="pill metric">海风 顺畅</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footerHint">
+    <div class="panel">
+      <span class="badge">互动</span>
+      点击天空可撒小云，点击地面会惊起羽毛。
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+
+  const bellBtn = document.getElementById("bellBtn");
+  const sprintBtn = document.getElementById("sprintBtn");
+  const feedBtn = document.getElementById("feedBtn");
+  const speedRange = document.getElementById("speedRange");
+  const timeSelect = document.getElementById("timeSelect");
+  const roadSelect = document.getElementById("roadSelect");
+  const staminaMetric = document.getElementById("staminaMetric");
+  const moodMetric = document.getElementById("moodMetric");
+  const speedMetric = document.getElementById("speedMetric");
+  const fpsMetric = document.getElementById("fpsMetric");
+
+  let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  function resize(){
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const state = {
+    timeMode: "day",
+    roadMode: "boardwalk",
+    baseSpeed: Number(speedRange.value) / 100,
+    speed: 0.42,
+    speedBoost: 0,
+    stamina: 100,
+    mood: "悠着跑",
+    bellShake: 0,
+    bellCooldown: 0,
+    sprintTimer: 0,
+    fishPop: 0,
+    elapsed: 0,
+    distance: 0,
+    clickFlash: 0
+  };
+
+  const particles = [];
+  const clouds = [];
+  const feathers = [];
+  const sweats = [];
+  const fishies = [];
+  const boardPosts = [];
+
+  for(let i=0;i<10;i++){
+    clouds.push({
+      x: Math.random()*W,
+      y: 60 + Math.random()*H*0.25,
+      s: 0.6 + Math.random()*1.2,
+      v: 5 + Math.random()*12,
+      alpha: 0.4 + Math.random()*0.35
+    });
+  }
+  for(let i=0;i<22;i++){
+    boardPosts.push({ x:i*80 + Math.random()*20 });
+  }
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+  function addParticle(x,y,vx,vy,life,size,color,type="dot"){
+    particles.push({x,y,vx,vy,life,maxLife:life,size,color,type,rot:Math.random()*Math.PI*2});
+  }
+  function addFeather(x,y){
+    feathers.push({
+      x,y,
+      vx:(Math.random()*2-1)*1.2,
+      vy:-1.5-Math.random()*1.8,
+      life:70+Math.random()*30,
+      maxLife:100,
+      rot:Math.random()*Math.PI*2,
+      vr:(Math.random()*2-1)*0.08,
+      s:0.6+Math.random()*0.8
+    });
+  }
+  function addCloud(x,y){
+    clouds.push({
+      x, y,
+      s: 0.4 + Math.random()*0.9,
+      v: 6 + Math.random()*10,
+      alpha: 0.35 + Math.random()*0.35
+    });
+  }
+  function addFishArc(){
+    const groundY = H*0.78;
+    fishies.push({
+      x: W*0.15,
+      y: groundY-30,
+      vx: 5 + Math.random()*2,
+      vy: -8 - Math.random()*2,
+      life: 55,
+      maxLife:55,
+      caught:false
+    });
+  }
+  function addSweat(x,y,amount=4){
+    for(let i=0;i<amount;i++){
+      sweats.push({
+        x:x + (Math.random()*10-5),
+        y:y + (Math.random()*8-4),
+        vx:1 + Math.random()*2.2,
+        vy:-1.2 - Math.random()*1.2,
+        life:35+Math.random()*20,
+        maxLife:55,
+        s:2+Math.random()*3
+      });
+    }
+  }
+
+  class TinyAudio {
+    constructor(){
+      this.ctx = null;
+    }
+    ensure(){
+      if(!this.ctx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(AC) this.ctx = new AC();
+      }
+      if(this.ctx && this.ctx.state === "suspended"){
+        this.ctx.resume().catch(()=>{});
+      }
+    }
+    bell(){
+      this.ensure();
+      if(!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const out = this.ctx.createGain();
+      out.gain.value = 0.07;
+      out.connect(this.ctx.destination);
+
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const g1 = this.ctx.createGain();
+      const g2 = this.ctx.createGain();
+
+      osc1.type = "triangle";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(1900, now);
+      osc1.frequency.exponentialRampToValueAtTime(1200, now+0.18);
+      osc2.frequency.setValueAtTime(2400, now);
+      osc2.frequency.exponentialRampToValueAtTime(1500, now+0.16);
+
+      g1.gain.setValueAtTime(0.001, now);
+      g1.gain.exponentialRampToValueAtTime(0.22, now+0.01);
+      g1.gain.exponentialRampToValueAtTime(0.0001, now+0.35);
+
+      g2.gain.setValueAtTime(0.001, now);
+      g2.gain.exponentialRampToValueAtTime(0.12, now+0.005);
+      g2.gain.exponentialRampToValueAtTime(0.0001, now+0.22);
+
+      osc1.connect(g1).connect(out);
+      osc2.connect(g2).connect(out);
+      osc1.start(now); osc2.start(now);
+      osc1.stop(now+0.4); osc2.stop(now+0.3);
+
+      const click = this.ctx.createOscillator();
+      const clickGain = this.ctx.createGain();
+      click.type = "square";
+      click.frequency.setValueAtTime(900, now);
+      clickGain.gain.setValueAtTime(0.001, now);
+      clickGain.gain.exponentialRampToValueAtTime(0.05, now+0.002);
+      clickGain.gain.exponentialRampToValueAtTime(0.0001, now+0.03);
+      click.connect(clickGain).connect(out);
+      click.start(now); click.stop(now+0.04);
+    }
+  }
+  const audio = new TinyAudio();
+
+  function triggerBell(){
+    state.bellShake = 1;
+    state.bellCooldown = 18;
+    state.speedBoost = Math.max(state.speedBoost, 0.55);
+    state.sprintTimer = Math.max(state.sprintTimer, 0.35);
+    state.mood = "被铃声吓飞";
+    audio.bell();
+    for(let i=0;i<8;i++){
+      addParticle(W*0.55, H*0.42, Math.cos(i/8*Math.PI*2)*2.8, Math.sin(i/8*Math.PI*2)*2.8, 28, 3, "#fff7b2");
+    }
+  }
+
+  function triggerSprint(){
+    state.speedBoost = Math.max(state.speedBoost, 0.9);
+    state.sprintTimer = 1.4;
+    state.stamina = clamp(state.stamina - 8, 0, 100);
+    state.mood = "冲刺中";
+    for(let i=0;i<10;i++) addFeather(W*0.48 + Math.random()*80, H*0.58 + Math.random()*40);
+  }
+
+  function feedFish(){
+    state.fishPop = 1;
+    addFishArc();
+    state.mood = "等鱼入口";
+  }
+
+  bellBtn.addEventListener("click", triggerBell);
+  sprintBtn.addEventListener("click", triggerSprint);
+  feedBtn.addEventListener("click", feedFish);
+
+  speedRange.addEventListener("input", () => {
+    state.baseSpeed = Number(speedRange.value)/100;
+    speedMetric.textContent = String(Math.round(state.baseSpeed*100));
+  });
+  timeSelect.addEventListener("change", () => state.timeMode = timeSelect.value);
+  roadSelect.addEventListener("change", () => state.roadMode = roadSelect.value);
+
+  canvas.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    state.clickFlash = 1;
+    if(y < H*0.5){
+      addCloud(x,y);
+    }else{
+      for(let i=0;i<7;i++) addFeather(x,y);
+    }
+  });
+
+  function update(dt){
+    state.elapsed += dt;
+    state.bellShake = Math.max(0, state.bellShake - dt*2.8);
+    state.bellCooldown = Math.max(0, state.bellCooldown - dt*60);
+    state.speedBoost = Math.max(0, state.speedBoost - dt*0.4);
+    state.sprintTimer = Math.max(0, state.sprintTimer - dt);
+    state.fishPop = Math.max(0, state.fishPop - dt*1.7);
+    state.clickFlash = Math.max(0, state.clickFlash - dt*2);
+
+    const staminaFactor = 0.45 + state.stamina/180;
+    const roughPenalty = state.roadMode === "pebble" ? 0.08 : 0;
+    const targetSpeed = clamp(state.baseSpeed * staminaFactor + state.speedBoost - roughPenalty, 0.08, 1.4);
+    state.speed = lerp(state.speed, targetSpeed, 0.06);
+    state.distance += state.speed * 230 * dt;
+
+    const drain = (0.7 + state.baseSpeed*1.1 + state.speedBoost*1.8 + (state.roadMode==="pebble"?0.5:0)) * dt;
+    state.stamina = clamp(state.stamina - drain, 0, 100);
+    if(state.speed < 0.3) state.stamina = clamp(state.stamina + 0.7*dt*8, 0, 100);
+
+    if(state.stamina < 22){
+      state.mood = "气喘吁吁";
+      if(Math.random() < 0.18) addSweat(W*0.53, H*0.54, 2);
+    }else if(state.sprintTimer > 0.15){
+      state.mood = "冲刺中";
+    }else if(state.speedBoost > 0.2){
+      state.mood = "受惊狂奔";
+    }else if(state.baseSpeed > 0.7){
+      state.mood = "卖力奔跑";
+    }else{
+      state.mood = "悠着跑";
+    }
+
+    clouds.forEach(c => {
+      c.x -= (c.v + state.speed*8) * dt;
+      if(c.x < -140*c.s){
+        c.x = W + Math.random()*120;
+        c.y = 40 + Math.random()*H*0.28;
+      }
+    });
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 1;
+      p.vy += 0.02;
+      p.rot += 0.04;
+    });
+    for(let i=particles.length-1;i>=0;i--) if(particles[i].life<=0) particles.splice(i,1);
+
+    feathers.forEach(f => {
+      f.x += f.vx - state.speed*1.2;
+      f.y += f.vy;
+      f.vy += 0.04;
+      f.rot += f.vr;
+      f.life -= 1;
+    });
+    for(let i=feathers.length-1;i>=0;i--) if(feathers[i].life<=0 || feathers[i].y > H+40) feathers.splice(i,1);
+
+    sweats.forEach(s => {
+      s.x += s.vx - state.speed*0.8;
+      s.y += s.vy;
+      s.vy += 0.03;
+      s.life -= 1;
+    });
+    for(let i=sweats.length-1;i>=0;i--) if(sweats[i].life<=0) sweats.splice(i,1);
+
+    fishies.forEach(f => {
+      f.x += f.vx;
+      f.y += f.vy;
+      f.vy += 0.32;
+      f.life -= 1;
+      const pelicanMouthX = W*0.525;
+      const pelicanMouthY = H*0.57;
+      if(!f.caught && Math.abs(f.x-pelicanMouthX)<28 && Math.abs(f.y-pelicanMouthY)<26){
+        f.caught = true;
+        state.stamina = clamp(state.stamina + 22, 0, 100);
+        state.mood = "吃到小鱼";
+        for(let i=0;i<7;i++) addParticle(f.x,f.y,(Math.random()*2-1)*2,(Math.random()*2-1)*2,25,3,"#9be7ff");
+      }
+    });
+    for(let i=fishies.length-1;i>=0;i--) if(fishies[i].life<=0 || fishies[i].x>W+80 || fishies[i].y>H+80) fishies.splice(i,1);
+
+    if(Math.random() < (0.04 + state.speed*0.035)){
+      addFeather(W*0.42 + Math.random()*160, H*0.6 + Math.random()*40);
+    }
+    if(Math.random() < (state.stamina < 30 ? 0.08 : 0.02)){
+      addSweat(W*0.54, H*0.56, 1);
+    }
+
+    staminaMetric.textContent = `体力 ${Math.round(state.stamina)}%`;
+    moodMetric.textContent = `状态 ${state.mood}`;
+  }
+
+  function paletteByTime(){
+    if(state.timeMode === "dusk"){
+      return {
+        skyTop:"#ffb07a",
+        skyBottom:"#ffe9c9",
+        sea:"#6ca1c4",
+        sea2:"#476f95",
+        sun:"#ff7b54",
+        glow:"rgba(255,140,80,.24)",
+        cloud:"#fff2e6",
+        board:"#9a6543",
+        board2:"#75492f",
+        foam:"rgba(255,255,255,.55)"
+      };
+    }
+    if(state.timeMode === "night"){
+      return {
+        skyTop:"#10213d",
+        skyBottom:"#2f4d73",
+        sea:"#204e70",
+        sea2:"#17374c",
+        sun:"#dfe9ff",
+        glow:"rgba(190,210,255,.16)",
+        cloud:"rgba(240,245,255,.65)",
+        board:"#6b4b3f",
+        board2:"#50372f",
+        foam:"rgba(220,235,255,.35)"
+      };
+    }
+    return {
+      skyTop:"#8fd3ff",
+      skyBottom:"#f1fbff",
+      sea:"#69bcdc",
+      sea2:"#3f8fb0",
+      sun:"#ffe082",
+      glow:"rgba(255,224,130,.22)",
+      cloud:"rgba(255,255,255,.85)",
+      board:"#8c5a3c",
+      board2:"#6e452d",
+      foam:"rgba(255,255,255,.55)"
+    };
+  }
+
+  function drawBackground(t){
+    const pal = paletteByTime();
+
+    const bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,pal.skyTop);
+    bg.addColorStop(1,pal.skyBottom);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
+
+    const sunX = state.timeMode === "dusk" ? W*0.75 : (state.timeMode === "night" ? W*0.8 : W*0.15);
+    const sunY = state.timeMode === "dusk" ? H*0.23 : (state.timeMode === "night" ? H*0.18 : H*0.17);
+    const sunR = state.timeMode === "night" ? 24 : 42;
+    const rg = ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,sunR*2.8);
+    rg.addColorStop(0,pal.glow);
+    rg.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(sunX,sunY,sunR*2.8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = pal.sun;
+    ctx.beginPath(); ctx.arc(sunX,sunY,sunR,0,Math.PI*2); ctx.fill();
+
+    clouds.forEach(c => drawCloud(c.x, c.y, c.s, c.alpha, pal.cloud));
+
+    const horizon = H*0.56;
+    const seaG = ctx.createLinearGradient(0,horizon,0,H*0.76);
+    seaG.addColorStop(0,pal.sea);
+    seaG.addColorStop(1,pal.sea2);
+    ctx.fillStyle = seaG;
+    ctx.fillRect(0,horizon,W,H*0.2);
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    for(let i=0;i<8;i++){
+      const y = horizon + 16 + i*14;
+      ctx.strokeStyle = pal.foam;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let x=-20;x<=W+20;x+=18){
+        const yy = y + Math.sin((x*0.02)+(t*1.1)+i)*2;
+        if(x===-20) ctx.moveTo(x,yy); else ctx.lineTo(x,yy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    drawDistantBoardwalk(horizon, pal);
+  }
+
+  function drawCloud(x,y,s,a,color){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0,0,22,0,Math.PI*2);
+    ctx.arc(24,-10,28,0,Math.PI*2);
+    ctx.arc(54,0,24,0,Math.PI*2);
+    ctx.arc(28,8,30,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawDistantBoardwalk(horizon, pal){
+    const y = H*0.76;
+    ctx.fillStyle = "#d9c28f";
+    ctx.fillRect(0,y,W,H-y);
+
+    if(state.roadMode === "boardwalk"){
+      ctx.fillStyle = pal.board;
+      ctx.fillRect(0,y+8,W,H-y);
+      ctx.strokeStyle = pal.board2;
+      ctx.lineWidth = 2;
+      for(let x=-((state.distance*0.8)%60); x<W+60; x+=60){
+        ctx.beginPath();
+        ctx.moveTo(x,y+8);
+        ctx.lineTo(x,H);
+        ctx.stroke();
+      }
+      for(let i=0;i<boardPosts.length;i++){
+        const px = (boardPosts[i].x - (state.distance*0.9)%160 + 160) % (W+160) - 80;
+        ctx.fillStyle = pal.board2;
+        ctx.fillRect(px, y-10, 12, 24);
+        ctx.fillRect(px+26, y-10, 12, 24);
+        ctx.strokeStyle = "rgba(255,255,255,.18)";
+        ctx.beginPath();
+        ctx.moveTo(px+6,y-4); ctx.lineTo(px+32,y-4); ctx.stroke();
+      }
+    }else{
+      ctx.fillStyle = "#b89563";
+      ctx.fillRect(0,y+8,W,H-y);
+      for(let i=0;i<130;i++){
+        const px = ((i*37) - (state.distance*3.6)%W + W) % W;
+        const py = y + 16 + (i*17)%Math.max(20, H-y-20);
+        const r = 1 + (i*7)%4;
+        ctx.fillStyle = i%3===0 ? "#8b7a67" : i%3===1 ? "#6f6255" : "#a69783";
+        ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  function drawPelicanAndBike(t){
+    const groundY = H*0.78;
+    const cx = W*0.52;
+    const cy = H*0.60;
+
+    const speedPhase = t * (3.5 + state.speed*4.2);
+    const rough = state.roadMode === "pebble" ? 1.7 : 0.8;
+    const bounce = Math.sin(speedPhase*2.0)*7*rough + Math.sin(speedPhase*4.2)*2.5;
+    const bob = Math.sin(speedPhase)*5 + bounce;
+    const tilt = Math.sin(speedPhase)*0.05 + (state.speedBoost>0.2 ? 0.04 : 0);
+    const wingFlap = Math.sin(t*8 + state.speed*3)*0.55;
+    const throatSwing = Math.sin(t*6 + 0.8)*7 + Math.sin(speedPhase*2.2)*4;
+    const stride = Math.sin(speedPhase);
+    const stride2 = Math.sin(speedPhase + Math.PI);
+
+    const bodyX = cx;
+    const bodyY = cy + bob;
+    const bodyW = 220;
+    const bodyH = 92;
+
+    // Shadow
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(bodyX+12, groundY+26, 130 + state.speed*20, 20 + Math.abs(bob)*0.2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // Pelican legs behind body
+    drawPelicanLeg(bodyX-28, bodyY+44, stride, groundY, false);
+    drawPelicanLeg(bodyX+20, bodyY+48, stride2, groundY, true);
+
+    // Pelican body
+    ctx.save();
+    ctx.translate(bodyX, bodyY);
+    ctx.rotate(tilt*0.6);
+
+    // tail
+    ctx.fillStyle = "#d6d8db";
+    ctx.beginPath();
+    ctx.moveTo(-118,4);
+    ctx.lineTo(-152,-10);
+    ctx.lineTo(-145,13);
+    ctx.lineTo(-164,7);
+    ctx.lineTo(-142,28);
+    ctx.closePath();
+    ctx.fill();
+
+    // wings
+    ctx.save();
+    ctx.translate(-10,-10);
+    ctx.rotate(-0.35 + wingFlap*0.15);
+    ctx.fillStyle = "#cfd4da";
+    ctx.beginPath();
+    ctx.moveTo(-22,10);
+    ctx.quadraticCurveTo(-64,-72,-8,-90);
+    ctx.quadraticCurveTo(32,-48,24,4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(8,-6);
+    ctx.rotate(0.18 - wingFlap*0.08);
+    ctx.fillStyle = "#e0e3e8";
+    ctx.beginPath();
+    ctx.moveTo(-8,6);
+    ctx.quadraticCurveTo(48,-30,86,-12);
+    ctx.quadraticCurveTo(52,24,4,18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // body main
+    ctx.fillStyle = "#f1f2f4";
+    ctx.beginPath();
+    ctx.ellipse(0,0,115,56,0,0,Math.PI*2);
+    ctx.fill();
+
+    // belly shade
+    const belly = ctx.createLinearGradient(0,-20,0,56);
+    belly.addColorStop(0,"rgba(255,255,255,0)");
+    belly.addColorStop(1,"rgba(0,0,0,.09)");
+    ctx.fillStyle = belly;
+    ctx.beginPath();
+    ctx.ellipse(0,6,108,50,0,0,Math.PI*2);
+    ctx.fill();
+
+    // neck
+    ctx.fillStyle = "#f2f3f5";
+    ctx.beginPath();
+    ctx.moveTo(60,-16);
+    ctx.quadraticCurveTo(92,-52,112,-42);
+    ctx.quadraticCurveTo(95,-8,70,8);
+    ctx.closePath();
+    ctx.fill();
+
+    // head
+    ctx.beginPath();
+    ctx.ellipse(128,-50,28,22,-0.2,0,Math.PI*2);
+    ctx.fill();
+
+    // beak upper
+    ctx.fillStyle = "#e7b66b";
+    ctx.beginPath();
+    ctx.moveTo(142,-52);
+    ctx.lineTo(228,-44);
+    ctx.lineTo(146,-34);
+    ctx.closePath();
+    ctx.fill();
+
+    // throat pouch lower
+    ctx.fillStyle = "#f3c888";
+    ctx.beginPath();
+    ctx.moveTo(138,-35);
+    ctx.quadraticCurveTo(205,-18 + throatSwing*0.08, 184,18 + throatSwing*0.2);
+    ctx.quadraticCurveTo(150,6,132,-8);
+    ctx.closePath();
+    ctx.fill();
+
+    // beak line
+    ctx.strokeStyle = "#8d6b40";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(144,-43);
+    ctx.lineTo(226,-44);
+    ctx.stroke();
+
+    // eye
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(128,-54,3.3,0,Math.PI*2);
+    ctx.fill();
+
+    // eyebrow expression
+    ctx.strokeStyle = state.speedBoost>0.2 ? "#6b3d2e" : "#444";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(119,-61);
+    ctx.lineTo(133,-64 + (state.speedBoost>0.2 ? 2 : 0));
+    ctx.stroke();
+
+    // blush / effort
+    if(state.stamina < 35){
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#ff8a80";
+      ctx.beginPath(); ctx.arc(114,-44,8,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // saddle blanket to show bike is riding it
+    ctx.fillStyle = "#4a7bb5";
+    roundRect(ctx,-45,-58,92,26,12,true,false);
+    ctx.fillStyle = "#d9e7ff";
+    roundRect(ctx,-39,-52,80,14,8,true,false);
+
+    // reins attached to bike handlebar
+    ctx.strokeStyle = "#7c4f2f";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(42,-50);
+    ctx.quadraticCurveTo(86,-72,135,-58);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(40,-42);
+    ctx.quadraticCurveTo(86,-56,138,-44);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Bicycle sitting on top of pelican
+    drawBicycle(bodyX-2, bodyY-70 + Math.sin(speedPhase*2.4)*3, tilt, t, speedPhase);
+
+    // ground contact kicks
+    for(let i=0;i<2;i++){
+      const kx = i===0 ? bodyX-28 + stride*10 : bodyX+20 + stride2*10;
+      const ky = groundY + 4;
+      if((i===0 ? stride : stride2) > 0.78 && Math.random()<0.28){
+        for(let j=0;j<2;j++) addParticle(kx,ky,Math.random()*2-2,-Math.random()*1.5,18,2,state.roadMode==="pebble"?"#bba17e":"#e2c78e");
+      }
+    }
+  }
+
+  function drawPelicanLeg(x, y, phase, groundY, front){
+    const lift = Math.max(0, phase) * 18;
+    const footX = x + phase * 18;
+    const kneeY = y + 24 - lift;
+    const footY = groundY - Math.max(0, -phase)*3;
+
+    ctx.strokeStyle = "#c78f51";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + phase*5, kneeY);
+    ctx.lineTo(footX, footY);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#d79d5f";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(footX, footY);
+    ctx.lineTo(footX+10, footY+4);
+    ctx.moveTo(footX, footY);
+    ctx.lineTo(footX-8, footY+5);
+    ctx.moveTo(footX, footY);
+    ctx.lineTo(footX+2, footY+7);
+    ctx.stroke();
+  }
+
+  function drawBicycle(x,y,tilt,t,speedPhase){
+    const bikeTilt = tilt + Math.sin(t*7)*0.02 + (state.roadMode==="pebble" ? Math.sin(t*18)*0.01 : 0);
+    const wheelSpin = state.distance * 0.08;
+    const pedalSpin = wheelSpin * 0.75;
+    const ring = state.bellShake;
+
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(bikeTilt);
+
+    // bike shadow on blanket
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(0,32,86,14,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    const rear = {x:-58,y:14,r:28};
+    const front = {x:56,y:14,r:28};
+    const crank = {x:-4,y:12};
+
+    drawWheel(rear.x,rear.y,rear.r,wheelSpin);
+    drawWheel(front.x,front.y,front.r,wheelSpin+0.8);
+
+    // frame
+    ctx.strokeStyle = "#2c4a63";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(rear.x, rear.y);
+    ctx.lineTo(-12,-10);
+    ctx.lineTo(18,12);
+    ctx.lineTo(rear.x, rear.y);
+
+    ctx.moveTo(-12,-10);
+    ctx.lineTo(34,-16);
+    ctx.lineTo(18,12);
+
+    ctx.moveTo(34,-16);
+    ctx.lineTo(front.x, front.y);
+    ctx.moveTo(18,12);
+    ctx.lineTo(front.x, front.y);
+    ctx.stroke();
+
+    // fork
+    ctx.beginPath();
+    ctx.moveTo(34,-16);
+    ctx.lineTo(49,10);
+    ctx.stroke();
+
+    // handlebar as rider's "hands"
+    ctx.save();
+    ctx.translate(34,-16);
+    ctx.rotate(-0.1 + ring*Math.sin(t*60)*0.18);
+    ctx.strokeStyle = "#334";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(10,-14);
+    ctx.lineTo(24,-10);
+    ctx.moveTo(10,-14);
+    ctx.lineTo(-2,-17);
+    ctx.stroke();
+
+    // bell
+    ctx.save();
+    ctx.translate(20,-12);
+    ctx.rotate(ring*Math.sin(t*70)*0.35);
+    ctx.fillStyle = "#ffd54f";
+    ctx.beginPath(); ctx.arc(0,0,6,Math.PI,0); ctx.fill();
+    ctx.fillRect(-1,-1,2,7);
+    ctx.restore();
+    ctx.restore();
+
+    // seat
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-12,-10);
+    ctx.lineTo(-20,-22);
+    ctx.stroke();
+    ctx.fillStyle = "#444";
+    roundRect(ctx,-34,-30,24,8,5,true,false);
+
+    // straps to imply bicycle is mounted and "riding"
+    ctx.strokeStyle = "#7a4a2b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-10,0); ctx.quadraticCurveTo(-8,28,-24,34);
+    ctx.moveTo(12,0); ctx.quadraticCurveTo(8,26,26,32);
+    ctx.stroke();
+
+    // crank & pedals
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(crank.x, crank.y, 10, 0, Math.PI*2);
+    ctx.stroke();
+
+    const p1x = crank.x + Math.cos(pedalSpin)*16;
+    const p1y = crank.y + Math.sin(pedalSpin)*16;
+    const p2x = crank.x + Math.cos(pedalSpin + Math.PI)*16;
+    const p2y = crank.y + Math.sin(pedalSpin + Math.PI)*16;
+
+    ctx.beginPath();
+    ctx.moveTo(crank.x, crank.y);
+    ctx.lineTo(p1x,p1y);
+    ctx.moveTo(crank.x, crank.y);
+    ctx.lineTo(p2x,p2y);
+    ctx.stroke();
+
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(p1x-5,p1y); ctx.lineTo(p1x+5,p1y);
+    ctx.moveTo(p2x-5,p2y); ctx.lineTo(p2x+5,p2y);
+    ctx.stroke();
+
+    // chain
+    ctx.strokeStyle = "#777";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(crank.x+10,crank.y);
+    ctx.lineTo(rear.x+10,rear.y);
+    ctx.moveTo(crank.x-10,crank.y);
+    ctx.lineTo(rear.x-6,rear.y);
+    ctx.stroke();
+
+    // little anthropomorphic flourish: determined headlight-eye
+    ctx.fillStyle = "#f5f1d2";
+    ctx.beginPath(); ctx.arc(front.x+4, front.y-20, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath(); ctx.arc(front.x+6, front.y-20, 2, 0, Math.PI*2); ctx.fill();
+
+    // tiny smile
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(front.x-2, front.y-12, 6, 0.2, 2.6);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawWheel(x,y,r,spin){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.strokeStyle = "#1f2d3a";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#95a5b0";
+    ctx.lineWidth = 1.5;
+    for(let i=0;i<12;i++){
+      const a = spin + i*Math.PI*2/12;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(a)*(r-3), Math.sin(a)*(r-3));
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#d6dde2";
+    ctx.beginPath();
+    ctx.arc(0,0,4,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(c,x,y,w,h,r,fill,stroke){
+    c.beginPath();
+    c.moveTo(x+r,y);
+    c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);
+    c.arcTo(x,y,x+w,y,r);
+    if(fill) c.fill();
+    if(stroke) c.stroke();
+  }
+
+  function drawParticles(){
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      if(p.type==="ring"){
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.stroke();
+      }else{
+        ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    feathers.forEach(f => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, f.life/f.maxLife);
+      ctx.translate(f.x,f.y);
+      ctx.rotate(f.rot);
+      ctx.scale(f.s,f.s);
+      ctx.fillStyle = "#f5fbff";
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(10,-4,18,0);
+      ctx.quadraticCurveTo(10,6,0,0);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(190,210,230,.9)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(1,0); ctx.lineTo(16,0); ctx.stroke();
+      ctx.restore();
+    });
+
+    sweats.forEach(s => {
+      ctx.save();
+      ctx.globalAlpha = s.life/s.maxLife;
+      ctx.fillStyle = "#8fe7ff";
+      ctx.beginPath();
+      ctx.moveTo(s.x,s.y);
+      ctx.quadraticCurveTo(s.x+s.s,s.y+s.s*1.5,s.x,s.y+s.s*2.4);
+      ctx.quadraticCurveTo(s.x-s.s,s.y+s.s*1.5,s.x,s.y);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    fishies.forEach(f => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, f.life/f.maxLife);
+      ctx.translate(f.x,f.y);
+      ctx.rotate(Math.atan2(f.vy,f.vx));
+      ctx.fillStyle = "#7ec8e3";
+      ctx.beginPath();
+      ctx.ellipse(0,0,10,5,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-8,0);
+      ctx.lineTo(-16,-6);
+      ctx.lineTo(-16,6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(4,-1,1.5,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  let last = performance.now();
+  let fpsAccum = 0, fpsCount = 0, fpsTimer = 0;
+  function frame(now){
+    const dt = Math.min(0.033, (now-last)/1000);
+    last = now;
+    update(dt);
+    render(now/1000);
+
+    fpsAccum += 1/dt;
+    fpsCount++;
+    fpsTimer += dt;
+    if(fpsTimer > 0.5){
+      const fps = Math.round(fpsAccum / fpsCount);
+      fpsMetric.textContent = fps > 50 ? "海风 顺畅" : fps > 35 ? "步频 稳定" : "翅膀 还行";
+      fpsAccum = 0; fpsCount = 0; fpsTimer = 0;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function render(t){
+    ctx.clearRect(0,0,W,H);
+    drawBackground(t);
+    drawPelicanAndBike(t);
+    drawForegroundEffects(t);
+    drawParticles();
+  }
+
+  function drawForegroundEffects(t){
+    if(state.clickFlash > 0){
+      ctx.save();
+      ctx.globalAlpha = state.clickFlash*0.08;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
+
+    // Speed lines
+    if(state.speed > 0.75 || state.speedBoost > 0.2){
+      ctx.save();
+      ctx.globalAlpha = clamp((state.speed-0.65)*0.5 + state.speedBoost*0.2, 0, 0.25);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      for(let i=0;i<10;i++){
+        const y = H*0.44 + i*22;
+        const len = 20 + i*6;
+        const x = (i*120 - (state.distance*6)%160 + W)%W;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x-len,y+2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Tiny board edge highlight
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0,H*0.767,W,2);
+    ctx.restore();
+
+    // Bell shock rings
+    if(state.bellShake > 0){
+      const x = W*0.57;
+      const y = H*0.50;
+      for(let i=0;i<3;i++){
+        const p = 1 - state.bellShake + i*0.08;
+        const r = 12 + p*30;
+        ctx.save();
+        ctx.globalAlpha = clamp(0.32 - i*0.08 - (1-state.bellShake)*0.2, 0, 1);
+        ctx.strokeStyle = "#fff6a8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x,y,r, -0.4, 0.7);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

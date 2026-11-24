@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>自行车骑鹈鹕</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Arial","PingFang SC",sans-serif;}
+  #scene{
+    position:relative;width:100%;height:100%;
+    background:linear-gradient(#8fd3ff,#e9f7ff 60%,#b6e3ff);
+    transition:background 1s;
+  }
+  body.night #scene{
+    background:linear-gradient(#091931,#163a63 60%,#0b2a4a);
+  }
+  .layer{
+    position:absolute;left:0;top:0;width:200%;height:100%;pointer-events:none;
+  }
+  #clouds{
+    opacity:.8;
+    background:
+      radial-gradient(circle at 50px 50px, rgba(255,255,255,.9) 0 30px, transparent 31px),
+      radial-gradient(circle at 120px 60px, rgba(255,255,255,.8) 0 26px, transparent 27px),
+      radial-gradient(circle at 190px 40px, rgba(255,255,255,.85) 0 32px, transparent 33px);
+    background-size:260px 130px;
+    animation:cloudMove 60s linear infinite;
+  }
+  body.night #clouds{opacity:.3;filter:blur(0.5px);}
+  #sea{
+    position:absolute;bottom:100px;height:180px;width:200%;
+    background:linear-gradient(#4cc3f0,#2e7fc2);
+    background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.15) 0 10px, transparent 10px 30px);
+    animation:seaMove 20s linear infinite;
+  }
+  body.night #sea{background:linear-gradient(#1b5b8c,#0b345f);}
+  #ground{
+    position:absolute;bottom:0;height:110px;width:200%;
+    background:repeating-linear-gradient(90deg,#d7b07a 0 40px,#c79b63 40px 80px);
+    animation:groundMove 8s linear infinite;
+    box-shadow:0 -6px 12px rgba(0,0,0,.12) inset;
+  }
+  body.night #ground{background:repeating-linear-gradient(90deg,#7e6238 0 40px,#6a512f 40px 80px);}
+  @keyframes cloudMove { from {transform:translateX(0);} to {transform:translateX(-50%);} }
+  @keyframes seaMove   { from {transform:translateX(0);} to {transform:translateX(-50%);} }
+  @keyframes groundMove{ from {transform:translateX(0);} to {transform:translateX(-50%);} }
+
+  #art{position:absolute;left:0;top:0;width:100%;height:100%;}
+  #ui{
+    position:absolute;right:20px;top:20px;z-index:10;
+    background:rgba(255,255,255,.85);backdrop-filter:blur(4px);
+    padding:12px 14px;border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,.15);
+    display:flex;flex-direction:column;gap:8px;min-width:180px;
+    font-size:14px;
+  }
+  body.night #ui{background:rgba(15,24,45,.8);color:#e3eaff;}
+  #ui button{
+    border:none;padding:6px 10px;border-radius:10px;
+    background:#4c9bff;color:white;cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  #ui button:hover{transform:translateY(-1px);}
+  #ui input[type=range]{width:160px;}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  #stamina{height:8px;background:#eee;border-radius:5px;overflow:hidden;}
+  #staminaBar{
+    height:100%;width:100%;
+    background:linear-gradient(90deg,#5dd874,#f2d450,#ff7f7f);
+    transition:width .2s;
+  }
+
+  /* SVG styles */
+  .wheel circle{fill:#fdfdfd;stroke:#444;stroke-width:4;}
+  .wheel .rim{fill:none;stroke:#222;stroke-width:2;}
+  .frame{stroke:#444;stroke-width:6;stroke-linecap:round;}
+  #bell{fill:#ffd84c;stroke:#c79b36;stroke-width:3;transform-box:fill-box;transform-origin:center;}
+  #bell.ring{animation:ring .6s ease;}
+  @keyframes ring{0%{transform:rotate(0)}25%{transform:rotate(25deg)}50%{transform:rotate(-20deg)}75%{transform:rotate(10deg)}100%{transform:rotate(0)}}
+  #surprise{font-size:28px;fill:#ff4b4b;opacity:0;transition:opacity .2s;}
+  #fish{opacity:0;transform-box:fill-box;transform-origin:center;}
+  #fish.feed{animation:fishFly 1s ease;}
+  @keyframes fishFly{
+    0%{transform:translate(80px,140px) scale(.2) rotate(20deg);opacity:0;}
+    20%{opacity:1;}
+    100%{transform:translate(-20px,-60px) scale(1) rotate(-20deg);opacity:0;}
+  }
+  .tired #mouth{opacity:1;}
+  #mouth{opacity:0;transition:opacity .3s;}
+</style>
+</head>
+<body>
+<div id="scene">
+  <div id="clouds" class="layer"></div>
+  <div id="sea" class="layer"></div>
+  <div id="ground" class="layer"></div>
+
+  <svg id="art" viewBox="0 0 800 450">
+    <!-- 鱼动画 -->
+    <g id="fish">
+      <ellipse cx="670" cy="380" rx="14" ry="8" fill="#6ad1ff" stroke="#2a6f9f" stroke-width="2"/>
+      <polygon points="656,380 640,370 640,390" fill="#6ad1ff" stroke="#2a6f9f" stroke-width="2"/>
+      <circle cx="676" cy="377" r="2" fill="#234"/>
+    </g>
+
+    <!-- 鹈鹕 -->
+    <g id="pelicanGroup" class="pelican">
+      <ellipse cx="400" cy="260" rx="170" ry="70" fill="#f6f1e6" stroke="#d9cdb2" stroke-width="4"/>
+      <path id="tail" d="M235 250 L190 235 L200 270 Z" fill="#f6f1e6" stroke="#d9cdb2" stroke-width="3"/>
+      <path id="wingBack" d="M330 255 Q250 210 260 170 Q325 180 360 230 Z" fill="#e7dfc9" stroke="#d1c4a4" stroke-width="3"/>
+      <path id="wingFront" d="M380 255 Q470 210 520 230 Q460 275 380 255 Z" fill="#efe6d2" stroke="#d1c4a4" stroke-width="3"/>
+      <path id="neck" d="M510 255 Q550 220 570 210 Q580 205 590 205 Q565 235 540 265 Z" fill="#f6f1e6" stroke="#d9cdb2" stroke-width="3"/>
+      <circle id="head" cx="590" cy="205" r="28" fill="#f6f1e6" stroke="#d9cdb2" stroke-width="3"/>
+      <circle id="eye" cx="595" cy="200" r="5" fill="#333"/>
+      <path id="beakUpper" d="M608 198 L690 190 L690 210 Z" fill="#f3b14b" stroke="#c48b2d" stroke-width="3"/>
+      <path id="pouch" d="M606 208 Q650 245 690 230 Q650 260 610 250 Z" fill="#f7d4a8" stroke="#d1a070" stroke-width="3"/>
+      <path id="mouth" d="M608 212 Q640 228 690 225" stroke="#c55757" stroke-width="5" fill="none"/>
+
+      <!-- 腿 -->
+      <g id="legL">
+        <rect x="-5" y="0" width="10" height="38" fill="#e0914f"/>
+        <rect x="-4" y="34" width="8" height="28" fill="#e0914f"/>
+        <path d="M-12 60 Q0 72 12 60 L8 76 Q0 84 -8 76 Z" fill="#e0914f"/>
+      </g>
+      <g id="legR">
+        <rect x="-5" y="0" width="10" height="38" fill="#e0914f"/>
+        <rect x="-4" y="34" width="8" height="28" fill="#e0914f"/>
+        <path d="M-12 60 Q0 72 12 60 L8 76 Q0 84 -8 76 Z" fill="#e0914f"/>
+      </g>
+    </g>
+
+    <!-- 自行车 -->
+    <g id="bikeGroup">
+      <g id="wheelBack" class="wheel">
+        <circle cx="300" cy="190" r="45"/>
+        <circle class="rim" cx="300" cy="190" r="36"/>
+        <line x1="300" y1="190" x2="300" y2="145" stroke="#333" stroke-width="2"/>
+        <line x1="300" y1="190" x2="300" y2="235" stroke="#333" stroke-width="2"/>
+        <line x1="300" y1="190" x2="255" y2="190" stroke="#333" stroke-width="2"/>
+        <line x1="300" y1="190" x2="345" y2="190" stroke="#333" stroke-width="2"/>
+      </g>
+      <g id="wheelFront" class="wheel">
+        <circle cx="500" cy="190" r="45"/>
+        <circle class="rim" cx="500" cy="190" r="36"/>
+        <line x1="500" y1="190" x2="500" y2="145" stroke="#333" stroke-width="2"/>
+        <line x1="500" y1="190" x2="500" y2="235" stroke="#333" stroke-width="2"/>
+        <line x1="500" y1="190" x2="455" y2="190" stroke="#333" stroke-width="2"/>
+        <line x1="500" y1="190" x2="545" y2="190" stroke="#333" stroke-width="2"/>
+      </g>
+      <line class="frame" x1="300" y1="190" x2="380" y2="190"/>
+      <line class="frame" x1="380" y1="190" x2="500" y2="190"/>
+      <line class="frame" x1="380" y1="190" x2="340" y2="145"/>
+      <line class="frame" x1="340" y1="145" x2="520" y2="145"/>
+      <line class="frame" x1="520" y1="145" x2="500" y2="190"/>
+      <line class="frame" x1="340" y1="145" x2="300" y2="190"/>
+      <line class="frame" x1="520" y1="145" x2="545" y2="135"/>
+      <line class="frame" x1="520" y1="145" x2="530" y2="165"/>
+
+      <rect x="325" y="130" width="40" height="10" rx="4" fill="#444"/>
+      <g id="crank">
+        <circle cx="380" cy="190" r="14" fill="#333"/>
+        <rect x="395" y="185" width="30" height="8" rx="4" fill="#555"/>
+        <rect x="335" y="185" width="30" height="8" rx="4" fill="#555"/>
+      </g>
+      <line class="frame" x1="380" y1="190" x2="340" y2="190"/>
+      <circle id="bell" cx="510" cy="130" r="10"/>
+      <line id="reins" x1="520" y1="130" x2="620" y2="210" stroke="#8b5e2f" stroke-width="3" stroke-dasharray="4 4"/>
+
+      <text id="surprise" x="545" y="120">!</text>
+    </g>
+  </svg>
+
+  <div id="ui">
+    <button id="bellBtn">按车铃</button>
+    <div class="row">
+      <label>速度</label>
+      <input id="speedSlider" type="range" min="0.5" max="2.5" step="0.1" value="1.2">
+    </div>
+    <div class="row">
+      <span>当前</span><span id="speedValue">1.2</span>
+    </div>
+    <button id="sprintBtn">冲刺</button>
+    <button id="feedBtn">投喂小鱼</button>
+    <button id="toggleBtn">切换黄昏/夜晚</button>
+    <div id="stamina"><div id="staminaBar"></div></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const wheelBack = document.getElementById('wheelBack');
+  const wheelFront = document.getElementById('wheelFront');
+  const crank = document.getElementById('crank');
+  const legL = document.getElementById('legL');
+  const legR = document.getElementById('legR');
+  const wingF = document.getElementById('wingFront');
+  const wingB = document.getElementById('wingBack');
+  const pouch = document.getElementById('pouch');
+  const pelican = document.getElementById('pelicanGroup');
+  const bike = document.getElementById('bikeGroup');
+  const staminaBar = document.getElementById('staminaBar');
+  const speedValue = document.getElementById('speedValue');
+  const fish = document.getElementById('fish');
+  const bell = document.getElementById('bell');
+  const surprise = document.getElementById('surprise');
+
+  const clouds = document.getElementById('clouds');
+  const sea = document.getElementById('sea');
+  const ground = document.getElementById('ground');
+
+  const speedSlider = document.getElementById('speedSlider');
+  const bellBtn = document.getElementById('bellBtn');
+  const sprintBtn = document.getElementById('sprintBtn');
+  const feedBtn = document.getElementById('feedBtn');
+  const toggleBtn = document.getElementById('toggleBtn');
+
+  let speedBase = parseFloat(speedSlider.value);
+  let boost = 0, boostTimer = 0;
+  let stamina = 100;
+  let wheelAngle = 0, crankAngle = 0;
+  let lastTime = 0;
+  let audioCtx = null;
+
+  function updateParallax(sp){
+    clouds.style.animationDuration = (70/sp) + "s";
+    sea.style.animationDuration = (20/sp) + "s";
+    ground.style.animationDuration = (8/sp) + "s";
+  }
+
+  function playBell(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc1.type = "sine"; osc2.type="sine";
+    osc1.frequency.setValueAtTime(880, now);
+    osc2.frequency.setValueAtTime(1320, now);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.4, now+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now+0.6);
+    osc1.connect(gain); osc2.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc1.start(now); osc2.start(now);
+    osc1.stop(now+0.6); osc2.stop(now+0.6);
+  }
+
+  bellBtn.onclick = () => {
+    playBell();
+    bell.classList.remove('ring'); void bell.offsetWidth; bell.classList.add('ring');
+    surprise.style.opacity = 1;
+    boost = 0.9; boostTimer = 1.3;
+    setTimeout(()=> surprise.style.opacity = 0, 600);
+  };
+
+  sprintBtn.onclick = () => {
+    boost = 1.4; boostTimer = 1.8;
+    stamina = Math.max(0, stamina - 10);
+  };
+
+  feedBtn.onclick = () => {
+    stamina = Math.min(100, stamina + 30);
+    fish.classList.remove('feed'); void fish.offsetWidth; fish.classList.add('feed');
+  };
+
+  toggleBtn.onclick = () => {
+    document.body.classList.toggle('night');
+  };
+
+  speedSlider.oninput = (e) => {
+    speedBase = parseFloat(e.target.value);
+  };
+
+  function animate(ts){
+    if(!lastTime) lastTime = ts;
+    const dt = (ts - lastTime)/1000;
+    lastTime = ts;
+    const t = ts/1000;
+
+    if(boostTimer>0){ boostTimer -= dt; if(boostTimer<=0) boost = 0; }
+
+    let effectiveSpeed = speedBase + boost;
+    effectiveSpeed *= (0.5 + stamina/200); // stamina 0-100 -> 0.5~1.0
+    stamina -= dt * effectiveSpeed * 4;
+    stamina = Math.max(0, Math.min(100, stamina));
+    staminaBar.style.width = stamina + "%";
+    if(stamina < 20) pelican.classList.add('tired');
+    else pelican.classList.remove('tired');
+
+    const cycle = t * effectiveSpeed * 6;
+    const legAngle = Math.sin(cycle) * 30;
+    legL.setAttribute('transform', `translate(360 310) rotate(${legAngle})`);
+    legR.setAttribute('transform', `translate(430 310) rotate(${-legAngle})`);
+
+    const wingAngle = Math.sin(t*effectiveSpeed*4) * 15;
+    wingF.setAttribute('transform', `rotate(${wingAngle} 390 235)`);
+    wingB.setAttribute('transform', `rotate(${wingAngle*0.7} 360 235)`);
+    const pouchW = Math.sin(t*effectiveSpeed*3+1) * 6;
+    pouch.setAttribute('transform', `rotate(${pouchW} 620 225)`);
+
+    const bob = Math.sin(cycle) * 4;
+    pelican.setAttribute('transform', `translate(0 ${bob})`);
+    const bikeBob = Math.sin(cycle+1) * 3;
+    const tilt = Math.sin(cycle) * 2;
+    bike.setAttribute('transform', `translate(0 ${bikeBob}) rotate(${tilt} 400 170)`);
+
+    wheelAngle += dt * effectiveSpeed * 300;
+    crankAngle += dt * effectiveSpeed * 360;
+    wheelBack.setAttribute('transform', `rotate(${wheelAngle} 300 190)`);
+    wheelFront.setAttribute('transform', `rotate(${wheelAngle} 500 190)`);
+    crank.setAttribute('transform', `rotate(${crankAngle} 380 190)`);
+
+    updateParallax(effectiveSpeed);
+    speedValue.textContent = effectiveSpeed.toFixed(2);
+
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

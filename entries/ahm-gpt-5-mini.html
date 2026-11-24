@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>一辆自行车正在骑着一只鹈鹕 — 交互动画</title>
+<style>
+  :root{
+    --panel-bg: rgba(255,255,255,0.85);
+    --accent: #FF8C42;
+    --muted: #556;
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(#cfe8ff,#f7fbff);
+    overflow:hidden;
+  }
+  #stage{
+    width:100%;
+    height:100vh;
+    display:block;
+    background:linear-gradient(180deg,#bfe8ff 0%, #e9f6ff 50%, #fff7ef 100%);
+  }
+  /* Controls panel */
+  .controls{
+    position:fixed;
+    top:18px;
+    left:18px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    padding:10px;
+    border-radius:12px;
+    background:var(--panel-bg);
+    box-shadow:0 6px 20px rgba(30,40,60,0.12);
+    backdrop-filter: blur(6px);
+  }
+  .control-block{display:flex;flex-direction:column;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+  .btn{
+    appearance:none;border:0;background:linear-gradient(180deg,#fff 0%,#f2f6ff 100%);padding:8px 12px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,0.08);cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  }
+  .icon{
+    width:22px;height:22px;display:inline-block;
+  }
+  .bellBtn{background:linear-gradient(180deg,#fffef7,#fff1e7);border:1px solid #ffe6c9}
+  .feedBtn{background:linear-gradient(180deg,#eafff1,#dbffdf);border:1px solid #c9f8d1}
+  .toggleBtn{background:linear-gradient(180deg,#f5f7ff,#eef3ff);border:1px solid #dde8ff}
+  input[type="range"]{width:150px}
+  .stat{
+    min-width:150px;
+  }
+  .bar{
+    width:140px;height:9px;border-radius:6px;background:linear-gradient(90deg,#f2f2f2,#edf7ff);overflow:hidden;border:1px solid rgba(0,0,0,0.06)
+  }
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#FFD48A,#FF8C42);width:60%}
+  .small{font-size:12px;color:#445}
+  /* bottom-right info */
+  .credits{
+    position:fixed;right:16px;bottom:16px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.85);font-size:12px;color:#445;box-shadow:0 6px 18px rgba(30,40,60,0.08)
+  }
+  /* responsive */
+  @media (max-width:640px){
+    .controls{left:10px;top:10px;padding:8px;gap:8px;}
+    input[type="range"]{width:110px}
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="controls" aria-hidden="false">
+  <div class="control-block">
+    <div class="small">车铃（按）</div>
+    <button id="bell" class="btn bellBtn" title="按车铃">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v.29A6.5 6.5 0 0 0 6.5 12v3l-1.5 2h14l-1.5-2v-3A6.5 6.5 0 0 0 15 5.29V5a3 3 0 0 0-3-3z" fill="#FFB86B"/></svg>
+      <span class="small">叮铃</span>
+    </button>
+  </div>
+
+  <div class="control-block stat">
+    <div class="small">速度</div>
+    <input id="speed" type="range" min="0" max="3" step="0.01" value="1">
+    <div class="small" style="width:100%;display:flex;justify-content:space-between">
+      <span id="speedVal">正常</span><span id="staminaText">体力</span>
+    </div>
+    <div class="bar" title="体力">
+      <i id="staminaBar"></i>
+    </div>
+  </div>
+
+  <div class="control-block">
+    <div class="small">互动</div>
+    <button id="feed" class="btn feedBtn" title="投喂小鱼 - 恢复体力">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M5 12c0-3.866 3.134-7 7-7 1.306 0 2.522.354 3.586.964L20 3l1 1-2.036 2.036A8.965 8.965 0 0 1 22 11c0 4.962-4.038 9-9 9-4.962 0-9-4.038-9-9z" fill="#7dd3a6"/></svg>
+      <span class="small">投喂小鱼</span>
+    </button>
+    <button id="env" class="btn toggleBtn" title="切换日间/黄昏/夜间">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 4a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V5a1 1 0 0 1 1-1zM4.222 5.222a1 1 0 0 1 1.415 0L6.95 6.536a1 1 0 0 1-1.415 1.415L4.222 6.636a1 1 0 0 1 0-1.414zM20.778 5.222a1 1 0 0 1 0 1.414l-1.313 1.313a1 1 0 1 1-1.414-1.414l1.314-1.313a1 1 0 0 1 1.413 0z" fill="#9aa7ff"/></svg>
+      <span class="small">日/黄昏/夜</span>
+    </button>
+  </div>
+</div>
+
+<div class="credits">创意：A Bicycle Riding a Pelican — 点击车铃 / 投喂 / 调速</div>
+
+<script>
+(() => {
+  // Canvas setup
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d', {alpha:false});
+  let DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  function resize(){
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(innerWidth * DPR);
+    canvas.height = Math.floor(innerHeight * DPR);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // UI elements
+  const bellBtn = document.getElementById('bell');
+  const speedIn = document.getElementById('speed');
+  const speedVal = document.getElementById('speedVal');
+  const feedBtn = document.getElementById('feed');
+  const envBtn = document.getElementById('env');
+  const staminaBar = document.getElementById('staminaBar');
+
+  // State
+  let envMode = 0; // 0 day, 1 dusk, 2 night
+  const envPalettes = [
+    {skyTop:'#bfe8ff', skyBottom:'#e9f6ff', sun:'#ffd36b', cloud:'#fff'},
+    {skyTop:'#ffd9b3', skyBottom:'#f3e7ff', sun:'#ffb86b', cloud:'#fff2eb'},
+    {skyTop:'#08121f', skyBottom:'#051428', sun:'#e7f0ff', cloud:'#2b3b4b'}
+  ];
+
+  let t0 = performance.now();
+  let last = t0;
+  let acc = 0; // acceleration timer for bell startled
+  let particles = [];
+
+  // World scroll
+  let worldX = 0;
+
+  // Pelican parameters
+  const pelican = {
+    x: 220,
+    baseY: null, // computed based on canvas height
+    y: 0,
+    speed: 180, // px/sec nominal
+    runPhase: 0,
+    wingPhase: 0,
+    throat: 1.0,
+    stamina: 1.0, // 0..1
+    tired: false,
+    blinking: 0,
+    carrying: true,
+    shocked: 0
+  };
+
+  // Bike parameters
+  const bike = {
+    offsetX: 10, offsetY: -60,
+    wheelR: 34,
+    wheelAngle: 0,
+    pedalAngle: 0,
+    bounce: 0
+  };
+
+  // Background layers
+  const clouds = [];
+  function spawnCloud(x, y, s, speed){
+    clouds.push({x,y,s,speed});
+  }
+  for(let i=0;i<8;i++){
+    spawnCloud(Math.random()*canvas.width, Math.random()*canvas.height*0.4, 0.6+Math.random()*1.4, 10+Math.random()*30);
+  }
+
+  // Boardwalk planks positions generate
+  const planks = [];
+  function genPlanks(){
+    planks.length = 0;
+    const w = 140;
+    for(let i=-3;i<200;i++){
+      planks.push({x:i*w, w: w - (Math.random()*20), yOffset: (Math.random()*18-8)});
+    }
+  }
+  genPlanks();
+
+  // WebAudio bell
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      try{
+        audioCtx = new AudioCtx();
+      }catch(e){ audioCtx=null; }
+    }
+  }
+  function playBell(){
+    ensureAudio();
+    if(!audioCtx) return;
+    const now = audioCtx.currentTime;
+    // create bell-like sound: two oscillators with inharmonic ratios + fm-ish
+    const g = audioCtx.createGain();
+    g.gain.value = 0.0001;
+    g.connect(audioCtx.destination);
+
+    const osc1 = audioCtx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 880; // base
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = 1320; // +1.5x
+    const env = audioCtx.createGain();
+    env.gain.value = 0.0001;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1000;
+    filter.Q.value = 6;
+
+    osc1.connect(env);
+    osc2.connect(env);
+    env.connect(filter);
+    filter.connect(g);
+
+    // amplitude envelope
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.8, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 1.8);
+    osc2.stop(now + 1.8);
+  }
+
+  // Particles for feathers/sweat
+  function spawnParticle(x,y,color, vx,vy, life, size){
+    particles.push({x,y,vx,vy,age:0,life,size,color});
+  }
+
+  // Controls events
+  bellBtn.addEventListener('click', ()=>{
+    // trigger bell and startled acceleration
+    playBell();
+    acc = 0.25; // 250ms extra acceleration
+    pelican.shocked = 1.0;
+    // spawn feathers
+    for(let i=0;i<8;i++){
+      spawnParticle(pelican.x + 20 + Math.random()*60, pelican.y - 10 + Math.random()*30,
+        'rgba(255,255,255,0.9)',
+        -100 + Math.random()*200, -20 - Math.random()*120,
+        1200 + Math.random()*600, 4 + Math.random()*8);
+    }
+  });
+
+  // Speed control
+  speedIn.addEventListener('input', ()=>{
+    const v = parseFloat(speedIn.value);
+    if(v < 0.4) speedVal.textContent = '慢速';
+    else if(v < 1.3) speedVal.textContent = '正常';
+    else if(v < 2.0) speedVal.textContent = '快';
+    else speedVal.textContent = '冲刺';
+  });
+
+  // Feed fish
+  feedBtn.addEventListener('click', ()=>{
+    // restore stamina and spawn small fish particles
+    pelican.stamina = Math.min(1, pelican.stamina + 0.35);
+    for(let i=0;i<12;i++){
+      spawnParticle(pelican.x - 10 + Math.random()*120, pelican.y + 10 + Math.random()*20,
+        'rgba(126, 211, 33, 0.9)',
+        -40 + Math.random()*80, -40 + Math.random()*-10,
+        800 + Math.random()*800, 5 + Math.random()*6);
+    }
+  });
+
+  // Environment toggle cycles 0->1->2
+  envBtn.addEventListener('click', ()=>{
+    envMode = (envMode+1)%3;
+  });
+
+  // Utility draw helpers
+  function roundedRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // Main draw functions
+  function drawBackground(now, dt){
+    // sky gradient
+    const pal = envPalettes[envMode];
+    const g = ctx.createLinearGradient(0,0,0,canvas.height);
+    g.addColorStop(0, pal.skyTop);
+    g.addColorStop(0.6, pal.skyBottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // sun / moon
+    const sunX = canvas.width - 160;
+    const sunY = 120;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, envMode===2?28:36, 0, Math.PI*2);
+    ctx.fillStyle = envMode===2 ? '#f0f7ff' : pal.sun;
+    ctx.fill();
+
+    // distant ocean
+    const seaH = canvas.height*0.48;
+    ctx.fillStyle = envMode===2 ? '#031427' : '#7ad0ff';
+    ctx.fillRect(0, canvas.height - seaH, canvas.width, seaH);
+    // slight wave lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<6;i++){
+      ctx.beginPath();
+      const y = canvas.height - seaH + 30 + i*16 + Math.sin(now/1000 + i)*4;
+      ctx.moveTo(0,y);
+      ctx.quadraticCurveTo(canvas.width*0.5, y+4*Math.sin(now/700 + i), canvas.width, y);
+      ctx.stroke();
+    }
+
+    // clouds parallax
+    clouds.forEach(c=>{
+      c.x -= c.speed * dt * 0.03 * (1 + envMode*0.1);
+      if(c.x < -200) c.x = canvas.width + 200;
+      const x=c.x, y=c.y* (envMode===2?0.6:1) + 40;
+      ctx.save();
+      ctx.globalAlpha = envMode===2?0.5:0.95;
+      ctx.fillStyle = envMode===2 ? '#2b3b4b' : pal.cloud;
+      // soft cloud using overlapping circles
+      ctx.beginPath();
+      ctx.arc(x, y, 18*c.s, 0, Math.PI*2);
+      ctx.arc(x+22*c.s, y+6*c.s, 22*c.s, 0, Math.PI*2);
+      ctx.arc(x+46*c.s, y, 18*c.s, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // distant cliffs / shapes
+    ctx.fillStyle = envMode===2 ? '#022235' : '#bfe3ff';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height*0.6 + 20);
+    ctx.quadraticCurveTo(canvas.width*0.25, canvas.height*0.55, canvas.width*0.45, canvas.height*0.6);
+    ctx.quadraticCurveTo(canvas.width*0.65, canvas.height*0.65, canvas.width, canvas.height*0.62);
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
+    ctx.closePath();
+    ctx.globalAlpha = envMode===2?0.6:0.2;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBoardwalk(now, dt){
+    // foreground boardwalk planks moving with worldX
+    const baseY = canvas.height*0.75;
+    ctx.save();
+    // shadow for ground
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0, baseY+40, canvas.width, canvas.height-baseY-40);
+    ctx.restore();
+
+    // planks
+    ctx.save();
+    ctx.translate(- (worldX % 140), 0);
+    for(let i=-5;i<220;i++){
+      const p = planks[(i + 1000)%planks.length] || {w:120,yOffset:0};
+      const x = i*140 + p.x;
+      const w = p.w;
+      const y = baseY + p.yOffset + 0;
+      // wood gradient
+      const g = ctx.createLinearGradient(x, y, x, y+80);
+      g.addColorStop(0, '#edd9c3'); g.addColorStop(1, '#d6b99a');
+      ctx.fillStyle = g;
+      roundedRect(ctx, x, y, w, 80, 8);
+      ctx.fill();
+      // plank outlines
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // nails
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.beginPath(); ctx.arc(x+12, y+12, 2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+w-12, y+12, 2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    // some boardwalk edges
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.03)';
+    ctx.fillRect(0, baseY+80, canvas.width, 10);
+    ctx.restore();
+  }
+
+  // Draw pelican with bike on its back
+  function drawPelicanAndBike(now, dt){
+    // compute pelican pos
+    const baseY = canvas.height*0.6;
+    pelican.baseY = baseY;
+    // speed factor from slider
+    const speedSlider = parseFloat(speedIn.value);
+    const sprintBoost = acc > 0 ? 1.6 : (speedSlider > 2 ? 1.6 : 1.0);
+    // stamina reduces max speed
+    const staminaFactor = 0.5 + pelican.stamina*0.5; // min 0.5
+    const curSpeed = pelican.speed * speedSlider * sprintBoost * staminaFactor;
+    worldX += curSpeed * dt * 0.3; // background scroll
+    // update run/wings
+    pelican.runPhase += dt * (curSpeed/120);
+    pelican.wingPhase += dt * (1.6 + (curSpeed/300));
+    pelican.throat = 0.9 + 0.15 * Math.sin(pelican.runPhase*2.0 + Math.sin(now/400)*0.5);
+    // vertical bob due to run
+    const bob = Math.sin(pelican.runPhase*2.0) * 6 * (1 + pelican.shocked*0.8);
+    pelican.y = pelican.baseY + bob;
+    // stamina drain if speed high or shocked
+    if((speedSlider > 1.6 || acc > 0) && pelican.stamina > 0){
+      pelican.stamina -= dt * 0.00055 * (speedSlider*1.4);
+      if(pelican.stamina < 0) pelican.stamina = 0;
+    } else {
+      // recover small when not sprinting
+      pelican.stamina += dt * 0.0002;
+      if(pelican.stamina > 1) pelican.stamina = 1;
+    }
+    // shock decays
+    pelican.shocked = Math.max(0, pelican.shocked - dt*0.002);
+    // blinking
+    if(Math.random() < 0.002) pelican.blinking = 0.15 + Math.random()*0.8;
+    pelican.blinking = Math.max(0, pelican.blinking - dt*0.0015);
+
+    // body position
+    const px = pelican.x;
+    const py = pelican.y;
+
+    // legs movement
+    const legPhase = pelican.runPhase;
+    const leftLegY = py + 26 + Math.sin(legPhase*2.5)*8;
+    const rightLegY = py + 26 + Math.sin(legPhase*2.5 + Math.PI)*8;
+
+    // draw pelican shadow
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    const shadowW = 120 + Math.abs(Math.sin(pelican.runPhase))*30;
+    ctx.beginPath();
+    ctx.ellipse(px+20 - 20*Math.sin(pelican.runPhase*0.4), baseY+64, shadowW, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // draw body
+    ctx.save();
+    ctx.translate(px, py);
+    // body main
+    ctx.fillStyle = '#fff';
+    if(envMode===2) ctx.fillStyle = '#f7fbff';
+    roundedRect(ctx, -40, -10, 110, 60, 30);
+    ctx.fill();
+    // wing (flapping)
+    const wingAngle = Math.sin(pelican.wingPhase)*0.8;
+    ctx.save();
+    ctx.translate(20, 10);
+    ctx.rotate(-0.2 + wingAngle*0.3);
+    ctx.fillStyle = '#f0f4ff';
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 90, 28, 0, 0, Math.PI*2);
+    ctx.fill();
+    // wing feathers
+    ctx.fillStyle = '#fff';
+    for(let i=0;i<6;i++){
+      ctx.beginPath();
+      ctx.ellipse(-10 + i*12, -6 + i*2, 18 - i*2, 8 - i*1.1, Math.PI*0.1*i, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // throat / pouch
+    ctx.save();
+    ctx.translate(60, 18);
+    const pouchScale = 1.0 + 0.15 * Math.sin(pelican.runPhase*2.6) * (1 + pelican.shocked*0.9);
+    ctx.fillStyle = '#ffd9ae';
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(40 * pouchScale, 40 * pouchScale, 0, 72 * pouchScale);
+    ctx.quadraticCurveTo(-45*pouchScale, 40*pouchScale, 0, 0);
+    ctx.fill();
+    // pouch shine
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(12, 20, 14, 6, -0.4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // head
+    ctx.save();
+    ctx.translate(-10, -18);
+    // neck stroke
+    ctx.fillStyle = '#fff';
+    roundedRect(ctx, -10, -8, 42, 22, 12);
+    ctx.fill();
+    // beak
+    const beakLen = 70 + (pelican.shocked*8);
+    ctx.fillStyle = '#ffca69';
+    ctx.beginPath();
+    ctx.moveTo(30, -10);
+    ctx.quadraticCurveTo(60, 0, 30 + beakLen*0.6, 8);
+    ctx.quadraticCurveTo(10, 6, 30, -10);
+    ctx.fill();
+    // lower beak
+    ctx.fillStyle = '#ffb84d';
+    ctx.beginPath();
+    ctx.moveTo(30, -2);
+    ctx.quadraticCurveTo(35 + beakLen*0.3, 8, 20 + beakLen*0.45, 14);
+    ctx.quadraticCurveTo(12, 12, 30, -2);
+    ctx.fill();
+    // eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(12, -4, 8, 6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#2b2b2b';
+    ctx.beginPath(); ctx.ellipse(14 + Math.sin(now/300)*0.6, -4, 3, 3, 0, 0, Math.PI*2); ctx.fill();
+    // blinking cap
+    if(pelican.blinking > 0){
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(8,-8,10,Math.max(1,8*pelican.blinking*2));
+    }
+    ctx.restore();
+
+    // tail
+    ctx.save();
+    ctx.translate(-10, 20);
+    ctx.rotate(0.1);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(-10,10);
+    ctx.quadraticCurveTo(-40, 20 - 6*Math.sin(pelican.runPhase*3), -46, 38);
+    ctx.quadraticCurveTo(-30, 22, -10,10);
+    ctx.fill();
+    ctx.restore();
+
+    // legs (webbed feet)
+    ctx.save();
+    // left
+    ctx.beginPath();
+    ctx.strokeStyle = '#f2b1a3';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.moveTo(px -10, py + 6);
+    ctx.lineTo(px -6, leftLegY);
+    ctx.stroke();
+    // foot
+    ctx.fillStyle = '#ffb36b';
+    ctx.beginPath();
+    ctx.ellipse(px -6, leftLegY+8, 12,6,0,0,Math.PI*2);
+    ctx.fill();
+    // right
+    ctx.beginPath();
+    ctx.moveTo(px + 18, py + 6);
+    ctx.lineTo(px + 22, rightLegY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(px + 22, rightLegY+8, 12,6,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore(); // pelican group
+
+    // draw bike on back (position relative to pelican)
+    ctx.save();
+    const bx = px + bike.offsetX + Math.sin(pelican.runPhase*2.2)*2;
+    const by = py - 30 + Math.sin(pelican.runPhase*2.5)*3 + bike.offsetY + bike.bounce;
+    ctx.translate(bx, by);
+    // slight tilt based on shock/stamina
+    ctx.rotate((pelican.shocked*0.15 + (1-pelican.stamina)*0.08) * Math.sin(pelican.runPhase));
+
+    // draw frame
+    ctx.strokeStyle = '#455a64';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // frame triangle
+    ctx.beginPath();
+    ctx.moveTo(-22, 8);
+    ctx.lineTo(18, -6);
+    ctx.lineTo(36, 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-22,8);
+    ctx.lineTo(-6, -20);
+    ctx.lineTo(18, -6);
+    ctx.stroke();
+    // handlebar
+    ctx.beginPath();
+    ctx.moveTo(36, 10);
+    ctx.lineTo(54, -6);
+    ctx.moveTo(54, -6);
+    ctx.lineTo(62, -6);
+    ctx.stroke();
+    // seat
+    ctx.fillStyle = '#2f3b45';
+    ctx.fillRect(2, -22, 22, 6);
+    // chainstay and crank
+    ctx.beginPath();
+    ctx.moveTo(-2,4);
+    ctx.lineTo(10,18);
+    ctx.stroke();
+
+    // wheels
+    const wheelSpeed = (curSpeed/30 + (acc>0?6:0)) * (envMode===2?0.9:1);
+    bike.wheelAngle -= wheelSpeed * dt * 0.05;
+    bike.pedalAngle -= wheelSpeed * dt * 0.12;
+
+    // rear wheel
+    ctx.save();
+    ctx.translate(-22, 26);
+    drawWheel(ctx, bike.wheelR, bike.wheelAngle);
+    ctx.restore();
+
+    // front wheel
+    ctx.save();
+    ctx.translate(36, 26);
+    drawWheel(ctx, bike.wheelR, bike.wheelAngle);
+    ctx.restore();
+
+    // pedals
+    ctx.save();
+    ctx.translate(10, 12);
+    ctx.rotate(bike.pedalAngle);
+    // crank
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(12,8); ctx.stroke();
+    ctx.fillStyle = '#3a3a3a';
+    roundedRect(ctx, 12-3,8-5,6,10,2); ctx.fill();
+    ctx.restore();
+
+    // rope reins from handlebar to beak area to imply bike controlling pelican
+    ctx.save();
+    ctx.strokeStyle = '#9a6b3c';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + 56, by - 6);
+    ctx.quadraticCurveTo(bx + 120, by - 20, pelican.x + 35, pelican.y - 6);
+    ctx.stroke();
+    // small loop/holding
+    ctx.restore();
+
+    ctx.restore(); // bike group
+
+    // small sweat particles when tired
+    if(pelican.stamina < 0.35 && Math.random() < 0.12){
+      spawnParticle(px + 10 + Math.random()*30, py - 30, 'rgba(255,200,200,0.85)', -30 + Math.random()*60, -80 - Math.random()*40, 800 + Math.random()*400, 3 + Math.random()*4);
+    }
+    // tails of motion
+    if(acc > 0.01){
+      for(let i=0;i<3;i++){
+        spawnParticle(px - 10 - i*10, py - 10 + i*6, 'rgba(255,255,255,0.8)', -200 - Math.random()*80, -40 + Math.random()*40, 700 + Math.random()*400, 2 + Math.random()*4);
+      }
+    }
+  }
+
+  // wheel draw helper
+  function drawWheel(ctx, r, angle){
+    ctx.save();
+    // tire
+    ctx.fillStyle = '#1c1c1c';
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+    // rim
+    ctx.fillStyle = '#e6eefc';
+    ctx.beginPath(); ctx.arc(0,0,r-6,0,Math.PI*2); ctx.fill();
+    // spokes
+    ctx.strokeStyle = 'rgba(80,90,110,0.9)';
+    ctx.lineWidth = 1.6;
+    for(let i=0;i<8;i++){
+      ctx.beginPath();
+      const a = angle + i*(Math.PI*2/8);
+      ctx.moveTo(0,0);
+      ctx.lineTo((r-8)*Math.cos(a), (r-8)*Math.sin(a));
+      ctx.stroke();
+    }
+    // hub
+    ctx.fillStyle = '#ccd8ea';
+    ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // particles update/draw
+  function updateParticles(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.age += dt*1000;
+      if(p.age > p.life){ particles.splice(i,1); continue; }
+      p.vy += 200 * dt * 0.2;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      // draw
+      ctx.save();
+      ctx.globalAlpha = 1 - (p.age / p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.size, p.size*0.7, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Main loop
+  function frame(now){
+    const dt = Math.min(40, now - last) / 1000; // seconds cap
+    last = now;
+
+    // clear
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // big background
+    drawBackground(now, dt);
+
+    // move clouds maybe
+    // draw boardwalk
+    drawBoardwalk(now, dt);
+
+    // draw pelican and bike
+    drawPelicanAndBike(now, dt);
+
+    // particles
+    updateParticles(dt);
+
+    // stamina UI update
+    staminaBar.style.width = Math.max(0, Math.floor(pelican.stamina*100)) + '%';
+    staminaBar.style.background = `linear-gradient(90deg, ${shadeColor('#FF8C42', -10)}, ${shadeColor('#FFD48A', 0)})`;
+
+    // acc decay
+    acc = Math.max(0, acc - dt*1.8);
+
+    requestAnimationFrame(frame);
+  }
+
+  // small util
+  function shadeColor(col, percent) {
+    // col like #RRGGBB
+    const num = parseInt(col.slice(1),16);
+    const amt = Math.round(2.55 * percent);
+    let R = (num >> 16) + amt;
+    let B = ((num >> 8) & 0x00FF) + amt;
+    let G = (num & 0x0000FF) + amt;
+    R = Math.min(255, Math.max(0,R)); B = Math.min(255, Math.max(0,B)); G = Math.min(255, Math.max(0,G));
+    return '#' + (G | (B<<8) | (R<<16)).toString(16).padStart(6,'0');
+  }
+
+  // start animation
+  requestAnimationFrame((t)=>{ last = t; requestAnimationFrame(frame) });
+
+  // Accessibility: play audio context on user gesture if required
+  document.addEventListener('click', function initAudio(){
+    ensureAudio();
+    if(audioCtx && audioCtx.state === 'suspended'){
+      audioCtx.resume().catch(()=>{});
+    }
+    document.removeEventListener('click', initAudio);
+  });
+
+  // ensure canvas resizes on orientation change
+  addEventListener('orientationchange', resize);
+
+  // Console-safe: no further global leaks.
+})();
+</script>
+</body>
+</html>

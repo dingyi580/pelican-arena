@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>自行车骑鹈鹕</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(to top, #001f3f, #39CCCC);
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto 0 auto;
+      background: #7FDBFF;
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      color: white;
+      z-index: 10;
+    }
+    .control-group {
+      margin-top: 15px;
+    }
+    .control-group button {
+      background-color: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid white;
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 16px;
+      margin: 5px;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+    }
+    .control-group button:hover {
+      background-color: rgba(255,255,255,0.2);
+    }
+    .control-group input[type="range"] {
+      width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div class="control-group">
+      <button id="bell">按车铃</button>
+      <button id="speed-up">加速</button>
+      <button id="feed">喂食小鱼</button>
+    </div>
+    <div class="control-group">
+      <label>背景音乐 <input type="range" id="music-volume" max="1" step="0.01" value="0.5"></label>
+    </div>
+    <div class="control-group">
+      <select id="time-of-day">
+        <option value="day">白天</option>
+        <option value="sunset">日落</option>
+        <option value="night">夜晚</option>
+      </select>
+    </div>
+  </div>
+  <canvas id="canvas"></canvas>
+  <audio id="bird-chorus">
+    <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YXfaM04iAAADAAVzYVFhYnJpdAoAAAA"
+      type="audio/wav">
+  </audio>
+  <script>
+    // 获取canvas和音频元素
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const bellBtn = document.getElementById('bell');
+    const speedUpBtn = document.getElementById('speed-up');
+    const feedBtn = document.getElementById('feed');
+    const musicVolume = document.getElementById('music-volume');
+    const timeOfDaySelect = document.getElementById('timeOfDay');
+    const birdChorus = document.getElementById('bird-chorus');
+
+    // 设置canvas大小
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // 处理窗口大小变化
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // 动画变量
+    let birdX, birdY, birdLegs, pelicanRotate, pelicanSpeed, pelicanBellyFactor, pelicanRunState, frame;
+    let pelicanSoundInterval;
+    let isBiking = true;
+    let timeOfDay = "day";
+
+    const colors = {
+      water: { day: [123, 228, 255], sunset: [255,123,0], night: [0, 0, 30] },
+      wood: [139, 69, 19],
+      sand: [237, 201, 175],
+      pelican: { body: [255, 255, 204], belly: [255, 204, 0] },
+      bird: { body: [255, 255, 153], belly: [255, 153, 51] },
+      bikeFrame: [51, 32, 20],
+      bikeWheel: [0, 0, 0],
+      bikeBell: [204, 51, 0]
+    };
+
+    const assets = {
+      fishBowl: {
+        path: "M10,10 C15,10 18,5 18,0 C18,-5 15,-10 10,-10 C5,-10 2,-5 2,0 C2,5 5,10 10,10 Z",
+        count: 30,
+        fishes: []
+      }
+    };
+
+    // 鱼碗数组
+    function createFishBowls() {
+      for (let i = 0; i < assets.fishBowl.count; i++) {
+        assets.fishBowl.fishes.push({
+          x: Math.random() * (canvas.width - 40) + 20,
+          y: Math.random() * (canvas.height - 80) + 40,
+          angle: Math.random() * Math.PI * 2,
+          speed: 0.2 + Math.random() * 1.5,
+          spinSpeed: 0.01 + Math.random() * 0.15,
+          lifeTime: 0
+        });
+      }
+    }
+
+    // 处理鹈鹕状态初始化
+    function initPelican() {
+      birdX = canvas.width / 2;
+      birdY = canvas.height - 100;
+      birdLegs = 0;
+      pelicanRotate = 0;
+      pelicanSpeed = 0.1;
+      pelicanBellyFactor = 1;
+      pelicanRunState = "normal";
+      frame = 0;
+    }
+
+    // 初始化鹈鹕和自行车
+    function initialize() {
+      initPelican();
+      createFishBowls();
+      setupBike();
+    }
+
+    // 自行车元素和状态
+    let currentBikeDirection = "right"; // 初始方向
+    let currentBikeSpeed = 0;
+    let currentBikeAngle = 0;
+
+    function setupBike() {
+      currentBikeDirection = "right";
+      // 不加任何限制
+    }
+
+    // 动画帧处理
+    let previousTime = 0;
+
+    function animate(currentTime) {
+      const deltaTime = currentTime - previousTime;
+      previousTime = currentTime;
+      
+      // 背景色
+      ctx.fillStyle = 
+        timeOfDay === "day" ? 
+        `rgba(${colors.water.day.join(',')})` : 
+        (timeOfDay === "sunset" ? `hsl(25, 100%, 100%)` : 
+          `rgba(${colors.water.night.join(',')})`);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 其他动画组件
+      drawPelican(birdX, birdY);
+      drawBike(birdX, birdY);
+      drawFishes();
+
+      requestAnimationFrame(animate);
+    }
+
+    // 鹈鹕绘制函数
+    function drawPelican(x, y) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-pelicanRotate); // 让鹈鹕转头
+
+      // 绘制鹈鹕身体
+      ctx.fillStyle = `rgba(${colors_pelican.body[0]}, ${colors_pelican.body[1]}, ${colors_pelican.body[2]}, 0.85)`;
+      ctx.strokeStyle = "rgba(0,0,0,0.2)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(30, -40, 60, 0);
+      ctx.quadraticCurveTo(50, 30, 0, 30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 背景管理
+      ctx.restore();
+    }
+
+    // 自行车绘制函数
+    function drawBike(x, y) {
+      // 绘制自行车架
+      ctx.fillStyle = `rgba(${colors_bikeFrame.join(',')})`;
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      // 这应该是自行车的前叉，并连通鞍座
+      // 需要一个复杂的路径或者形状
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    drawAllPelicanAndBike() { // 动态运行自行车和鹈鹕部分
+      // 复合自行车道路，行走整齐地上点头
+      // 鹈鹕身体震动，嘴里喊叫，翅膀摆动，汗液喷淋
+      // 鸟的尾羽震颤
+      // 鸟的喙张开，跟车铃密切相关
+    }
+
+    // 画所有鱼
+    const drawFish = () => {
+      // 动画中跟鸟里程换取鱼水珠飞溅
+    }
+
+    // 控件事件绑定
+    bellBtn.addEventListener('click', () => {});
+    speedUpBtn.addEventListener("click", () => {
+      // 鸟加速，鸟嘴叽噪不止
+    });
+    feedBtn.addEventListener('click', () => {
+      // 鹈鹕体会供氧不足，投喂恢复状态反馈
+    });
+
+    // 时间变化响应
+    function updateBackgroundOfDay() {
+      timeOfDay = timeOfDaySelect.value;
+      // 背景color更新
+      // 变化背景维度
+    }
+
+    // 调整音乐音量
+    function setMusicVolume() {
+      birdChorus.volume = musicVolume.value;
+    }
+
+    initialize();
+    animate(performance.now());
+
+    // 勾勒脚踝部调节的河流的水波线
+    function drawWaterWaves() {
+      // 任意小波浪边缘景色反馈
+      // 漏斗来切换白天夜晚
+    }
+
+    // 调整山脉和天空的层次
+    // 投影和移动沙滩标志线
+    function drawBackgroundScene() {
+      // 木栈道动态伸展
+      // 实现云朵慢背景
+    }
+
+    // 自行车急刹视觉表现（车轮跳动、车主头左右晃动）
+    function drawBikeEmergencies() {
+      // 若触发加速，尤其是过度加速，自行车表现受控与不能控的比率
+    }
+
+    // 鹈鹕接受鱼回馈的设计
+    function processFeed() {
+      // 每次投喂减缓当前湍急运行，或令其体力上升
+    }
+
+    // 自行车铃声模块化合成
+    function playBellSound() {
+      // 清铃程序合成
+    }
+
+    // 自行车的方向控制与时间对应
+    function updateBikeControls(dt) {
+      let val = dt / 1000; 
+      if (pelicanRunState === "turbo") val *= 1.5;
+
+      currentBikeAngle += (val * 0.05) - (currentBikeAngle / 100); // 抖动
+      currentBikeDirection = val > 0 ? (currentBikeDirection) : (currentBikeDirection === "right" ? "left" : "right");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单车驭鹈鹕 - A Bicycle Riding a Pelican</title>
+    <style>
+        :root {
+            /* 昼夜主题变量 */
+            --sky-top: #87CEEB;
+            --sky-bottom: #E0F6FF;
+            --ocean-top: #1CA3EC;
+            --ocean-bottom: #0F5E9C;
+            --cloud-opacity: 0.8;
+            
+            /* 动画速度基准 */
+            --speed-multiplier: 1;
+            --base-run: 0.6s;
+            --base-scroll: 5s;
+            --tire-spin: 1s;
+
+            /* 状态变量 */
+            --pouch-color: #FFA07A;
+            --pelican-eye: #000;
+        }
+
+        body.night {
+            --sky-top: #0b1a30;
+            --sky-bottom: #2b193d;
+            --ocean-top: #0a2e5c;
+            --ocean-bottom: #031124;
+            --cloud-opacity: 0.2;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--sky-bottom);
+        }
+
+        /* 视差背景层 */
+        .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            will-change: transform;
+        }
+
+        #sky {
+            width: 100%;
+            background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 60%);
+            transition: background 1s ease;
+        }
+
+        #sun-moon {
+            position: absolute;
+            top: 10%;
+            left: 70%;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #FFD700;
+            box-shadow: 0 0 40px #FFD700;
+            transition: all 1s ease;
+        }
+        body.night #sun-moon {
+            background: #F4F6F0;
+            box-shadow: 0 0 20px #F4F6F0, inset -15px -10px 0 0 #D0D5CE;
+        }
+
+        #clouds {
+            background-image: 
+                radial-gradient(circle at 50px 50px, rgba(255,255,255,var(--cloud-opacity)) 30px, transparent 31px),
+                radial-gradient(circle at 90px 60px, rgba(255,255,255,var(--cloud-opacity)) 40px, transparent 41px),
+                radial-gradient(circle at 130px 50px, rgba(255,255,255,var(--cloud-opacity)) 30px, transparent 31px);
+            background-size: 400px 200px;
+            background-repeat: repeat-x;
+            animation: scroll linear infinite;
+            animation-duration: calc(var(--base-scroll) * 3 / var(--speed-multiplier));
+        }
+
+        #ocean {
+            top: 60%;
+            height: 40%;
+            background: linear-gradient(to bottom, var(--ocean-top) 0%, var(--ocean-bottom) 100%);
+            border-top: 2px solid rgba(255,255,255,0.3);
+            transition: background 1s ease;
+        }
+
+        #boardwalk {
+            top: 80%;
+            height: 20%;
+            background: linear-gradient(to right, #8b5a2b 48%, #6b4423 50%, #8b5a2b 52%);
+            background-size: 100px 100%;
+            border-top: 10px solid #5c3a21;
+            box-shadow: inset 0 20px 20px rgba(0,0,0,0.3);
+            animation: scroll linear infinite;
+            animation-duration: calc(var(--base-scroll) * 0.5 / var(--speed-multiplier));
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* 舞台与角色容器 */
+        #stage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+        }
+
+        /* 整体颠簸动画 */
+        .group-bob {
+            animation: bob linear infinite;
+            animation-duration: calc(var(--base-run) / var(--speed-multiplier));
+            transform-origin: center bottom;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-15px) rotate(-1deg); }
+            50% { transform: translateY(0) rotate(0deg); }
+            75% { transform: translateY(-10px) rotate(1deg); }
+        }
+
+        /* 鹈鹕动画细节 */
+        .leg {
+            transform-origin: 300px 480px;
+            animation: run linear infinite;
+            animation-duration: calc(var(--base-run) / var(--speed-multiplier));
+        }
+        .leg-back {
+            animation-delay: calc(var(--base-run) / var(--speed-multiplier) * -0.5);
+        }
+        @keyframes run {
+            0% { transform: rotate(30deg); }
+            50% { transform: rotate(-40deg); }
+            100% { transform: rotate(30deg); }
+        }
+
+        .wing {
+            transform-origin: 270px 330px;
+            animation: flap linear infinite;
+            animation-duration: calc(var(--base-run) / var(--speed-multiplier));
+        }
+        @keyframes flap {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-30deg); }
+        }
+
+        .pouch {
+            fill: var(--pouch-color);
+            transition: fill 0.3s;
+            animation: pouch-wobble linear infinite;
+            animation-duration: calc(var(--base-run) / var(--speed-multiplier));
+        }
+        @keyframes pouch-wobble {
+            0%, 100% { d: path('M 370 230 Q 430 330 340 330 Q 320 280 320 230 Z'); }
+            50% { d: path('M 370 230 Q 410 350 330 350 Q 320 280 320 230 Z'); }
+        }
+
+        /* 自行车动画细节 */
+        .wheel {
+            transform-origin: center;
+            animation: spin linear infinite;
+            animation-duration: calc(var(--tire-spin) / var(--speed-multiplier));
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+        .bike-tilt {
+            transform-origin: 300px 250px;
+            animation: tilt linear infinite;
+            animation-duration: calc(var(--base-run) / var(--speed-multiplier));
+        }
+        @keyframes tilt {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-2deg); }
+            75% { transform: rotate(2deg); }
+        }
+
+        /* UI 控件层 */
+        #ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            z-index: 100;
+        }
+
+        body.night #ui-panel {
+            background: rgba(20, 30, 50, 0.85);
+            color: white;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button {
+            appearance: none;
+            border: none;
+            background: #FF6B6B;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(255, 107, 107, 0.4);
+            transition: transform 0.1s, background 0.3s;
+        }
+        button:active { transform: scale(0.95); }
+        button.btn-blue { background: #4D96FF; box-shadow: 0 4px 10px rgba(77, 150, 255, 0.4); }
+        button.btn-green { background: #6BCB77; box-shadow: 0 4px 10px rgba(107, 203, 119, 0.4); }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 120px;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #4D96FF;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #ddd;
+            border-radius: 4px;
+        }
+
+        /* 状态条 */
+        #stamina-bar-container {
+            width: 100%;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        #stamina-bar {
+            width: 100%;
+            height: 100%;
+            background: #6BCB77;
+            transition: width 0.1s linear, background-color 0.3s;
+        }
+
+        /* 粒子容器 */
+        #particles {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .particle {
+            position: absolute;
+            font-size: 24px;
+            animation: fall 1s ease-in forwards;
+        }
+        .bell-wave {
+            position: absolute;
+            border: 2px solid #FFD700;
+            border-radius: 50%;
+            animation: ripple 0.6s ease-out forwards;
+        }
+
+        @keyframes fall {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) rotate(360deg); opacity: 0; }
+        }
+        @keyframes ripple {
+            0% { width: 10px; height: 10px; opacity: 1; transform: translate(-50%, -50%); }
+            100% { width: 100px; height: 100px; opacity: 0; transform: translate(-50%, -50%); }
+        }
+
+        /* 车铃震动特效 */
+        .ringing {
+            animation: shake 0.2s infinite;
+        }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            25% { transform: translate(-1px, -2px) rotate(-2deg); }
+            50% { transform: translate(-3px, 0px) rotate(2deg); }
+            75% { transform: translate(3px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -1px) rotate(-1deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 视差背景 -->
+    <div id="sky" class="layer"></div>
+    <div id="sun-moon"></div>
+    <div id="clouds" class="layer"></div>
+    <div id="ocean" class="layer"></div>
+    <div id="boardwalk" class="layer"></div>
+
+    <!-- 粒子特效容器 -->
+    <div id="particles"></div>
+
+    <!-- 核心舞台：SVG 绘制的单车骑鹈鹕 -->
+    <div id="stage">
+        <svg viewBox="0 0 600 600" width="100%" height="100%">
+            <!-- 定义可复用组件 -->
+            <defs>
+                <!-- 自行车轮子 -->
+                <g id="bike-wheel">
+                    <circle cx="0" cy="0" r="45" fill="none" stroke="#222" stroke-width="6"/>
+                    <circle cx="0" cy="0" r="40" fill="none" stroke="#ccc" stroke-width="2"/>
+                    <circle cx="0" cy="0" r="5" fill="#555"/>
+                    <!-- 辐条 -->
+                    <line x1="-40" y1="0" x2="40" y2="0" stroke="#888" stroke-width="1.5"/>
+                    <line x1="0" y1="-40" x2="0" y2="40" stroke="#888" stroke-width="1.5"/>
+                    <line x1="-28" y1="-28" x2="28" y2="28" stroke="#888" stroke-width="1.5"/>
+                    <line x1="-28" y1="28" x2="28" y2="-28" stroke="#888" stroke-width="1.5"/>
+                </g>
+                <!-- 脚踏板系统 -->
+                <g id="pedal-system">
+                    <circle cx="0" cy="0" r="15" fill="none" stroke="#333" stroke-width="3"/>
+                    <line x1="0" y1="-15" x2="0" y2="15" stroke="#333" stroke-width="4"/>
+                    <rect x="-8" y="-18" width="16" height="6" fill="#111" rx="2"/>
+                    <rect x="-8" y="12" width="16" height="6" fill="#111" rx="2"/>
+                </g>
+                <!-- 鹈鹕脚 -->
+                <g id="pelican-leg">
+                    <!-- 大腿 -->
+                    <line x1="0" y1="0" x2="-10" y2="40" stroke="#FF8C00" stroke-width="8" stroke-linecap="round"/>
+                    <!-- 小腿 -->
+                    <line x1="-10" y1="40" x2="5" y2="80" stroke="#FF8C00" stroke-width="6" stroke-linecap="round"/>
+                    <!-- 蹼足 -->
+                    <path d="M 5 80 L 25 85 L 20 95 L 0 95 Z" fill="#FF8C00"/>
+                </g>
+            </defs>
+
+            <!-- 组合：骑手与坐骑同步颠簸 -->
+            <g class="group-bob" id="main-character">
+                
+                <!-- ====== 坐骑层：鹈鹕 ====== -->
+                <g id="pelican">
+                    <!-- 后腿 -->
+                    <use href="#pelican-leg" x="300" y="470" class="leg leg-back"/>
+                    
+                    <!-- 尾羽 -->
+                    <path d="M 170 350 Q 130 360 140 400 Q 180 390 190 370 Z" fill="#FFF"/>
+                    <path d="M 180 340 Q 140 330 130 370 Q 170 380 190 350 Z" fill="#F0F0F0"/>
+
+                    <!-- 身体 -->
+                    <ellipse cx="260" cy="380" rx="80" ry="60" fill="#FFF"/>
+                    <path d="M 190 350 Q 250 280 320 350 Q 320 440 220 420 Z" fill="#FFF"/>
+
+                    <!-- 前腿 -->
+                    <use href="#pelican-leg" x="280" y="480" class="leg"/>
+
+                    <!-- 脖子与头部 -->
+                    <path d="M 290 350 Q 350 200 320 180 Q 280 180 260 350 Z" fill="#FFF"/>
+                    <circle cx="310" cy="180" r="30" fill="#FFF"/>
+
+                    <!-- 大喉囊 (独立动画) -->
+                    <path class="pouch" d="M 370 230 Q 430 330 340 330 Q 320 280 320 230 Z"/>
+                    
+                    <!-- 上喙 -->
+                    <path d="M 330 170 L 460 210 Q 470 220 450 230 L 330 200 Z" fill="#FFA500"/>
+                    
+                    <!-- 眼睛 -->
+                    <circle cx="320" cy="170" r="5" fill="var(--pelican-eye)" id="p-eye"/>
+                    <circle cx="322" cy="168" r="2" fill="#FFF"/>
+
+                    <!-- 翅膀 (独立动画) -->
+                    <g class="wing">
+                        <path d="M 270 330 Q 350 350 380 400 Q 300 420 240 380 Z" fill="#F8F8F8" stroke="#E0E0E0" stroke-width="2"/>
+                        <path d="M 270 340 Q 330 360 350 400 Q 280 410 245 385 Z" fill="#FFF"/>
+                    </g>
+
+                    <!-- 自行车底座支撑 (幽默感：固定在鹈鹕背上和脖子上的专属鞍座) -->
+                    <rect x="230" y="325" width="40" height="10" fill="#8B4513" rx="5"/>
+                    <path d="M 300 240 L 320 240 L 315 250 L 305 250 Z" fill="#8B4513"/>
+                </g>
+
+                <!-- ====== 骑手层：自行车 (微倾斜动画) ====== -->
+                <g class="bike-tilt" id="bicycle">
+                    <!-- 后轮 (卡在鹈鹕背部鞍座) -->
+                    <g transform="translate(200, 270)" class="wheel">
+                        <use href="#bike-wheel"/>
+                    </g>
+                    <!-- 前轮 (卡在鹈鹕脖子鞍座) -->
+                    <g transform="translate(370, 270)" class="wheel">
+                        <use href="#bike-wheel"/>
+                    </g>
+                    
+                    <!-- 链条 -->
+                    <path d="M 200 270 L 280 290" stroke="#555" stroke-width="3" fill="none"/>
+                    <path d="M 200 280 L 280 300" stroke="#555" stroke-width="3" fill="none"/>
+
+                    <!-- 车架 (经典菱形) -->
+                    <polygon points="200,270 260,180 340,180 280,290" fill="none" stroke="#E63946" stroke-width="6" stroke-linejoin="round"/>
+                    <line x1="280" y1="290" x2="370" y2="270" stroke="#E63946" stroke-width="6"/>
+                    <line x1="340" y1="180" x2="370" y2="270" stroke="#E63946" stroke-width="6"/>
+                    
+                    <!-- 前叉与车把 -->
+                    <line x1="370" y1="270" x2="330" y2="130" stroke="#E63946" stroke-width="6"/>
+                    <!-- 车把手 -->
+                    <path d="M 310 130 Q 330 110 350 130" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round"/>
+                    
+                    <!-- 车铃 -->
+                    <circle id="bike-bell" cx="340" cy="120" r="8" fill="#FFD700" stroke="#B8860B" stroke-width="2"/>
+                    <circle cx="340" cy="115" r="2" fill="#B8860B"/>
+
+                    <!-- 座管与车座 -->
+                    <line x1="260" y1="180" x2="250" y2="140" stroke="#333" stroke-width="6"/>
+                    <path d="M 230 140 Q 250 130 280 140" fill="#222" stroke="#111" stroke-width="8" stroke-linecap="round"/>
+
+                    <!-- 牙盘与脚踏板 (转动) -->
+                    <g transform="translate(280, 290)" class="wheel">
+                        <use href="#pedal-system"/>
+                    </g>
+
+                    <!-- 创意细节：连接车把与鹈鹕嘴的“缰绳” -->
+                    <path id="reins" d="M 350 130 Q 400 150 430 200" fill="none" stroke="#8B4513" stroke-width="3" stroke-dasharray="5,5"/>
+                </g>
+            </g>
+        </svg>
+    </div>
+
+    <!-- UI 交互面板 -->
+    <div id="ui-panel">
+        <!-- 交互 1：按车铃 -->
+        <div class="control-group">
+            <button id="btn-bell" title="警告鹈鹕！">🛎️ 按车铃</button>
+            <span style="font-size: 12px; font-weight:bold; color:#666;" id="ui-msg">鹈鹕会受惊加速</span>
+        </div>
+
+        <!-- 交互 2：速度拉杆与体力条 -->
+        <div class="control-group" style="width: 150px;">
+            <label style="font-size: 14px; font-weight: bold; color: #333;" id="speed-label">速度调节</label>
+            <input type="range" id="speed-slider" min="0.5" max="3" step="0.1" value="1">
+            <div id="stamina-bar-container">
+                <div id="stamina-bar"></div>
+            </div>
+        </div>
+
+        <!-- 交互 3：投喂小鱼 -->
+        <div class="control-group">
+            <button id="btn-feed" class="btn-blue">🐟 喂小鱼</button>
+            <span style="font-size: 12px; font-weight:bold; color:#666;">恢复体力</span>
+        </div>
+
+        <!-- 交互 4：昼夜切换 -->
+        <div class="control-group">
+            <button id="btn-theme" class="btn-green">🌙 切夜晚</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心逻辑与状态管理 ---
+        const state = {
+            speed: 1,
+            stamina: 100,
+            isNight: false,
+            bellCooldown: false
+        };
+
+        // DOM 元素引用
+        const root = document.documentElement;
+        const speedSlider = document.getElementById('speed-slider');
+        const staminaBar = document.getElementById('stamina-bar');
+        const mainChar = document.getElementById('main-character');
+        const bikeBell = document.getElementById('bike-bell');
+        const particlesContainer = document.getElementById('particles');
+        const btnBell = document.getElementById('btn-bell');
+        const btnFeed = document.getElementById('btn-feed');
+        const btnTheme = document.getElementById('btn-theme');
+
+        // Web Audio API 上下文 (用于合成车铃声)
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // --- 交互 1：纯代码合成车铃声 & 受惊加速 ---
+        function playBellSound() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // 使用两个高频振荡器模拟清脆金属铃声的复合音色
+            function createDing(timeOffset) {
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'triangle';
+                osc1.frequency.setValueAtTime(1200, t + timeOffset);
+                osc2.frequency.setValueAtTime(1800, t + timeOffset);
+
+                // 包络线：急促的起音和自然的衰减
+                gain.gain.setValueAtTime(0, t + timeOffset);
+                gain.gain.linearRampToValueAtTime(0.5, t + timeOffset + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + timeOffset + 0.5);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc1.start(t + timeOffset);
+                osc2.start(t + timeOffset);
+                osc1.stop(t + timeOffset + 0.6);
+                osc2.stop(t + timeOffset + 0.6);
+            }
+
+            // 叮-铃 连续两声
+            createDing(0);
+            createDing(0.1);
+
+            // 视觉特效：铃铛震动与声波
+            mainChar.classList.add('ringing');
+            setTimeout(() => mainChar.classList.remove('ringing'), 300);
+            createBellWave();
+
+            // 游戏逻辑：鹈鹕受惊，短暂强制加速冲刺，消耗大量体力
+            if (!state.bellCooldown && state.stamina > 20) {
+                state.bellCooldown = true;
+                const oldSpeed = parseFloat(speedSlider.value);
+                setSpeed(3.5); // 极速
+                root.style.setProperty('--pelican-eye', '#E63946'); // 惊恐红眼
+                
+                // 生成惊恐汗滴
+                for(let i=0; i<5; i++) createParticle('💧', 50, 40);
+
+                setTimeout(() => {
+                    setSpeed(oldSpeed);
+                    root.style.setProperty('--pelican-eye', '#000');
+                    state.bellCooldown = false;
+                }, 1500);
+                
+                state.stamina -= 20; // 吓一跳消耗体力
+            }
+        }
+
+        // --- 交互 2：速度控制与体力循环 ---
+        function setSpeed(val) {
+            state.speed = val;
+            speedSlider.value = val;
+            root.style.setProperty('--speed-multiplier', val);
+            
+            // 速度越快，喉囊颜色越红（充血）
+            if (val > 2) {
+                root.style.setProperty('--pouch-color', '#FF6347');
+            } else {
+                root.style.setProperty('--pouch-color', '#FFA07A');
+            }
+        }
+
+        speedSlider.addEventListener('input', (e) => {
+            if(state.stamina <= 0) return; // 没体力不能加速
+            setSpeed(e.target.value);
+        });
+
+        // 游戏主循环：体力消耗与恢复
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            if (dt > 0 && dt < 100) {
+                // 速度大于 1.5 消耗体力，小于 1 恢复体力
+                if (state.speed > 1.5) {
+                    state.stamina -= (state.speed * 0.05);
+                } else if (state.speed <= 1.2) {
+                    state.stamina += 0.02;
+                }
+
+                // 边界限制
+                state.stamina = Math.max(0, Math.min(100, state.stamina));
+                
+                // 更新 UI
+                staminaBar.style.width = state.stamina + '%';
+
+                // 体力状态反馈
+                if (state.stamina <= 0) {
+                    staminaBar.style.background = '#E63946';
+                    setSpeed(0.2); // 强制累趴减速
+                    root.style.setProperty('--pelican-eye', 'url(#tired-eye)'); // 待实现，用半闭眼替代简单变色
+                    if(Math.random() < 0.05) createParticle('💤', 50, 30);
+                } else if (state.stamina < 30) {
+                    staminaBar.style.background = '#FFA500';
+                    if(Math.random() < 0.02) createParticle('💦', 50, 40);
+                } else {
+                    staminaBar.style.background = '#6BCB77';
+                }
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        requestAnimationFrame(gameLoop);
+
+
+        // --- 交互 3：喂鱼恢复体力 ---
+        btnFeed.addEventListener('click', () => {
+            // 生成小鱼抛物线粒子
+            createParticle('🐟', 50, 80, true);
+            state.stamina = Math.min(100, state.stamina + 30);
+            
+            // 鹈鹕开心反馈
+            root.style.setProperty('--pouch-color', '#FFD700');
+            setTimeout(() => setSpeed(speedSlider.value), 300); // 恢复原速
+            setTimeout(() => root.style.setProperty('--pouch-color', '#FFA07A'), 500);
+        });
+
+        // --- 交互 4：昼夜切换 ---
+        btnTheme.addEventListener('click', () => {
+            state.isNight = !state.isNight;
+            if (state.isNight) {
+                document.body.classList.add('night');
+                btnTheme.innerHTML = '☀️ 切白天';
+                btnTheme.style.background = '#FFD700';
+                btnTheme.style.color = '#333';
+            } else {
+                document.body.classList.remove('night');
+                btnTheme.innerHTML = '🌙 切夜晚';
+                btnTheme.style.background = '#6BCB77';
+                btnTheme.style.color = '#FFF';
+            }
+        });
+
+        // --- 粒子系统 ---
+        function createParticle(emoji, startXvw, startYvh, isArc = false) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.innerText = emoji;
+            
+            // 定位在 UI 按钮附近或鹈鹕头部附近
+            p.style.left = startXvw + 'vw';
+            p.style.top = startYvh + 'vh';
+            
+            // 随机散落方向
+            const dx = (Math.random() - 0.5) * 200 + 'px';
+            let dy = (Math.random() * -100 - 50) + 'px';
+            
+            if (isArc) {
+                // 喂鱼特制抛物线 (向舞台中心丢)
+                p.style.left = '50vw';
+                p.style.top = '80vh';
+                p.style.setProperty('--dx', (Math.random() * 50 - 25) + 'px');
+                p.style.setProperty('--dy', '-400px'); // 往上抛到嘴里
+            } else {
+                p.style.setProperty('--dx', dx);
+                p.style.setProperty('--dy', dy);
+            }
+
+            particlesContainer.appendChild(p);
+            setTimeout(() => p.remove(), 1000);
+        }
+
+        function createBellWave() {
+            const wave = document.createElement('div');
+            wave.className = 'bell-wave';
+            // 精确计算车铃在屏幕上的近似绝对位置
+            const stageRect = document.getElementById('stage').getBoundingClientRect();
+            // 车铃在 SVG 中的比例位置大概是 (340, 120) / 600
+            wave.style.left = (stageRect.left + stageRect.width * (340/600)) + 'px';
+            wave.style.top = (stageRect.top + stageRect.height * (120/600)) + 'px';
+            particlesContainer.appendChild(wave);
+            setTimeout(() => wave.remove(), 600);
+        }
+
+        // 绑定铃铛按钮
+        btnBell.addEventListener('click', playBellSound);
+        // 也允许直接点击 SVG 里的铃铛
+        bikeBell.style.cursor = 'pointer';
+        bikeBell.addEventListener('click', playBellSound);
+
+    </script>
+</body>
+</html>

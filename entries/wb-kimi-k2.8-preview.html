@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自行车骑鹈鹕 · A Bicycle Riding a Pelican</title>
+<style>
+  :root{
+    --sky1:#aee3ff; --sky2:#eaf7ff; --sun:#ffd94d; --sea1:#5fb7d9; --sea2:#2f7ea6;
+    --deck:#c98d5a; --deck2:#a96f3f; --ui-bg:rgba(255,255,255,.72); --ui-br:rgba(255,255,255,.9);
+    --txt:#234; --pel-body:#f4f1e8; --pel-wing:#e8e2d2; --beak:#f2a541; --pouch:#f7b96a;
+    --bike:#d84f4f; --metal:#5a6570;
+  }
+  body.dusk{
+    --sky1:#ff9e6d; --sky2:#ffd9b0; --sun:#ff7b54; --sea1:#e08a63; --sea2:#8a4a6e;
+    --deck:#9a5f3c; --deck2:#7c4a2c; --ui-bg:rgba(60,30,40,.55); --ui-br:rgba(255,220,200,.5);
+    --txt:#fff4ea;
+  }
+  body.night{
+    --sky1:#141c3a; --sky2:#2b3a6e; --sun:#f4f1e0; --sea1:#2c4a7a; --sea2:#16264a;
+    --deck:#5a4636; --deck2:#40321f; --ui-bg:rgba(10,15,35,.6); --ui-br:rgba(200,220,255,.35);
+    --txt:#dfe8ff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  #stage{position:fixed;inset:0;display:block}
+  svg text{user-select:none}
+  .ui{
+    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;
+    background:var(--ui-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid var(--ui-br);border-radius:18px;padding:10px 16px;z-index:10;
+    box-shadow:0 8px 30px rgba(0,0,0,.15);transition:background .6s,border-color .6s;
+    max-width:94vw;
+  }
+  .ui button{
+    cursor:pointer;border:none;border-radius:12px;padding:9px 14px;font-size:14px;
+    background:var(--txt);color:var(--sky2);font-weight:600;letter-spacing:.5px;
+    transition:transform .12s,box-shadow .12s;display:flex;align-items:center;gap:6px;
+  }
+  .ui button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.2)}
+  .ui button:active{transform:translateY(0) scale(.95)}
+  .ui label{font-size:13px;color:var(--txt);display:flex;align-items:center;gap:6px;transition:color .6s}
+  .ui input[type=range]{width:110px;accent-color:#d84f4f}
+  .seg{display:flex;border-radius:12px;overflow:hidden;border:1px solid var(--ui-br)}
+  .seg button{border-radius:0;background:transparent;color:var(--txt);padding:7px 10px;font-size:13px}
+  .seg button.on{background:var(--txt);color:var(--sky2)}
+  #status{
+    position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10;
+    display:flex;gap:12px;align-items:center;background:var(--ui-bg);backdrop-filter:blur(12px);
+    border:1px solid var(--ui-br);border-radius:16px;padding:8px 16px;color:var(--txt);
+    font-size:14px;transition:background .6s;box-shadow:0 6px 20px rgba(0,0,0,.12);white-space:nowrap;
+  }
+  .bar{width:120px;height:8px;border-radius:6px;background:rgba(120,120,120,.3);overflow:hidden}
+  .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffb347,#ff6b6b);border-radius:6px;transition:width .3s}
+  #speech{
+    position:fixed;z-index:9;background:#fff;color:#333;border-radius:14px;padding:8px 14px;
+    font-size:14px;font-weight:600;box-shadow:0 6px 16px rgba(0,0,0,.2);opacity:0;
+    transform:translate(-50%,-100%) scale(.8);transition:opacity .25s,transform .25s;pointer-events:none;
+  }
+  #speech.show{opacity:1;transform:translate(-50%,-100%) scale(1)}
+  #speech::after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);
+    border:8px solid transparent;border-top-color:#fff;border-bottom:none}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div id="status">
+  <span>🐟 体力</span><div class="bar"><i id="stamBar"></i></div>
+  <span id="speedTxt">速度 0 km/h</span>
+</div>
+
+<div class="ui">
+  <button id="bellBtn">🔔 按车铃</button>
+  <button id="feedBtn">🐟 投喂小鱼</button>
+  <label>速度 <input id="speedCtl" type="range" min="0.4" max="2.2" step="0.05" value="1"></label>
+  <button id="dashBtn">⚡ 冲刺</button>
+  <div class="seg" id="timeSeg">
+    <button data-t="" class="on">☀️ 晴天</button>
+    <button data-t="dusk">🌇 黄昏</button>
+    <button data-t="night">🌙 夜晚</button>
+  </div>
+  <div class="seg" id="roadSeg">
+    <button data-r="0" class="on">🛣️ 平路</button>
+    <button data-r="1">🪨 石子路</button>
+  </div>
+</div>
+
+<div id="speech">叮铃铃！</div>
+
+<script>
+"use strict";
+/* ================= 全局状态 ================= */
+const cv = document.getElementById('stage'), cx = cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR = Math.min(devicePixelRatio||1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener('resize', resize); resize();
+
+const S = {
+  dist:0, speed:1, targetSpeed:1, dash:0,
+  stamina:100, road:0, // 0 flat 1 bumpy
+  bob:0, bobV:0, runPhase:0, blink:0, blinkT:2,
+  wings:0.35, // wing spread
+  wheelSpin:0, pedalAngle:0, surprised:0, sweat:[],
+  feathers:[], fish:[], bellShake:0, flap:0,
+  theme:''
+};
+
+/* ================= 音频（Web Audio 纯代码合成） ================= */
+let AC=null;
+function ac(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function bell(){
+  const a=ac(), t=a.currentTime;
+  [[1567,.5],[2093,.35],[2637,.22]].forEach(([f,v])=>{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type='sine'; o.frequency.value=f;
+    g.gain.setValueAtTime(v*.28, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t+1.1);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t+1.2);
+  });
+  // 震铃噪声
+  const n=a.createBufferSource(), buf=a.createBuffer(1,a.sampleRate*.15,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+  n.buffer=buf;
+  const g=a.createGain(); g.gain.value=.12;
+  const f=a.createBiquadFilter(); f.type='highpass'; f.frequency.value=3000;
+  n.connect(f).connect(g).connect(a.destination); n.start(t);
+}
+function splash(){
+  const a=ac(), t=a.currentTime;
+  const n=a.createBufferSource(), buf=a.createBuffer(1,a.sampleRate*.2,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  n.buffer=buf;
+  const f=a.createBiquadFilter(); f.type='bandpass'; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(2400,t+.15);
+  const g=a.createGain(); g.gain.value=.3;
+  n.connect(f).connect(g).connect(a.destination); n.start(t);
+}
+
+/* ================= 工具 ================= */
+function css(v){ return getComputedStyle(document.body).getPropertyValue(v).trim(); }
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ================= 场景绘制 ================= */
+function drawSky(){
+  const g=cx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,css('--sky1')); g.addColorStop(1,css('--sky2'));
+  cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  // 太阳/月亮
+  const sunX=W*.78, sunY=H*.2, r=Math.min(W,H)*.07;
+  cx.save(); cx.shadowColor=css('--sun'); cx.shadowBlur=60;
+  cx.fillStyle=css('--sun'); cx.beginPath(); cx.arc(sunX,sunY,r,0,7); cx.fill(); cx.restore();
+  if(S.theme==='night'){
+    cx.fillStyle='rgba(255,255,255,.9)';
+    for(let i=0;i<60;i++){
+      const x=(i*97.3)%W, y=(i*53.7)%(H*.55), tw=.4+.6*Math.abs(Math.sin(Date.now()/900+i));
+      cx.globalAlpha=tw*.8; cx.beginPath(); cx.arc(x,y,(i%3)*.6+.6,0,7); cx.fill();
+    }
+    cx.globalAlpha=1;
+    cx.fillStyle='rgba(240,238,220,.95)';
+    cx.beginPath(); cx.arc(sunX-6,sunY-4,r*.5,0,7); cx.fill();
+  }
+}
+function drawClouds(off){
+  cx.fillStyle='rgba(255,255,255,'+(S.theme==='night'?'.12':'.85')+')';
+  const t=Date.now()/1000;
+  for(let i=0;i<5;i++){
+    const sp=.06+.03*i;
+    let x=((i*W*.31 - off*sp)%(W+300)); if(x<-150)x+=W+300;
+    const y=H*(.08+.06*(i%3)) + Math.sin(t*.4+i)*4;
+    const s=.8+.25*(i%2);
+    cx.beginPath();
+    cx.arc(x,y,22*s,0,7); cx.arc(x+26*s,y+4,17*s,0,7); cx.arc(x-26*s,y+5,15*s,0,7);
+    cx.fill();
+  }
+}
+function drawSea(off){
+  const y0=H*.55;
+  const g=cx.createLinearGradient(0,y0,0,H);
+  g.addColorStop(0,css('--sea1')); g.addColorStop(1,css('--sea2'));
+  cx.fillStyle=g; cx.fillRect(0,y0,W,H-y0);
+  // 波浪
+  cx.strokeStyle='rgba(255,255,255,.35)'; cx.lineWidth=2;
+  for(let l=0;l<3;l++){
+    const yy=y0+18+l*22, sp=.3+.15*l;
+    cx.beginPath();
+    for(let x=0;x<=W;x+=8){
+      const y=yy+Math.sin(x*.02 + off*.02*sp + l*2)*4;
+      x?cx.lineTo(x,y):cx.moveTo(x,y);
+    }
+    cx.stroke();
+  }
+}
+function drawBoardwalk(off){
+  const y=H*.78, deckH=H-y;
+  cx.fillStyle=css('--deck'); cx.fillRect(0,y,W,deckH);
+  cx.fillStyle=css('--deck2');
+  const bw=90, gap=14;
+  for(let x=-((off*bw/180)%bw)-bw; x<W+bw; x+=bw){
+    cx.fillRect(x,y+deckH*.15,2,deckH*.85);
+  }
+  cx.strokeStyle='rgba(0,0,0,.18)'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(0,y+deckH*.15); cx.lineTo(W,y+deckH*.15); cx.stroke();
+  // 石子路上的石子
+  if(S.road){
+    cx.fillStyle='rgba(90,90,100,.55)';
+    const sw=46;
+    for(let i=0;i<Math.ceil(W/sw)+2;i++){
+      const x=i*sw - (off*sw/60)%sw;
+      const yy=y+deckH*.55+((i*37)%3-1)*deckH*.16;
+      cx.beginPath(); cx.ellipse(x,yy,7+(i%3)*2,4+(i%2)*2,0,0,7); cx.fill();
+    }
+  }
+  // 栏杆
+  cx.strokeStyle=css('--deck2'); cx.lineWidth=5;
+  const pw=220, ph=(off*pw/60)%pw;
+  cx.beginPath(); cx.moveTo(0,y-46); cx.lineTo(W,y-46); cx.stroke();
+  cx.lineWidth=8;
+  for(let x=-ph; x<W+pw; x+=pw){
+    cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x,y-52); cx.stroke();
+  }
+}
+
+/* ================= 鹈鹕 & 自行车 ================= */
+function drawWheel(x,y,r,rot,color,thick){
+  cx.save(); cx.translate(x,y); cx.rotate(rot);
+  cx.strokeStyle=color; cx.lineWidth=thick;
+  cx.beginPath(); cx.arc(0,0,r,0,7); cx.stroke();
+  cx.lineWidth=thick*.35;
+  for(let i=0;i<12;i++){
+    cx.save(); cx.rotate(i*Math.PI/6);
+    cx.beginPath(); cx.moveTo(0,0); cx.lineTo(r-2,0); cx.stroke();
+    cx.restore();
+  }
+  // 轮胎高光
+  cx.strokeStyle='rgba(255,255,255,.25)'; cx.lineWidth=1.5;
+  cx.beginPath(); cx.arc(0,0,r-thick*.6,0,7); cx.stroke();
+  cx.restore();
+}
+
+function drawPelican(px,py,sc,t){
+  cx.save(); cx.translate(px,py); cx.scale(sc,sc);
+  const ph=S.runPhase;
+  const tired = S.stamina<30;
+
+  // ---- 腿与蹼足（奔跑）----
+  cx.strokeStyle='#e8a13c'; cx.lineWidth=7; cx.lineCap='round';
+  const legSwing = Math.sin(ph)*28, legSwing2=Math.sin(ph+Math.PI)*28;
+  const lift = Math.abs(Math.sin(ph))*10;
+  // 后腿
+  cx.beginPath(); cx.moveTo(-30,10); cx.lineTo(-30+legSwing2*.6, 55); cx.lineTo(-30+legSwing2*.9, 88-lift); cx.stroke();
+  // 前腿
+  cx.beginPath(); cx.moveTo(10,12); cx.lineTo(10+legSwing*.6, 55); cx.lineTo(10+legSwing*.9, 90-lift); cx.stroke();
+  // 蹼足
+  cx.fillStyle='#f2a541';
+  [[-30+legSwing2*.9,88-lift],[10+legSwing*.9,90-lift]].forEach(([fx,fy])=>{
+    cx.beginPath(); cx.ellipse(fx+8,fy,16,6,-.15,0,7); cx.fill();
+  });
+
+  // ---- 身体 ----
+  const bodyC = css('--pel-body');
+  cx.fillStyle=bodyC;
+  cx.beginPath(); cx.ellipse(0,0,85,55,-.08,0,7); cx.fill();
+  // 尾羽
+  cx.fillStyle=css('--pel-wing');
+  cx.beginPath(); cx.moveTo(-80,-8); cx.quadraticCurveTo(-120,-4,-118,16); cx.quadraticCurveTo(-95,26,-72,20); cx.fill();
+
+  // ---- 翅膀（扑腾）----
+  const wing = S.wings + Math.sin(t*6)*S.flap*.8;
+  cx.fillStyle=css('--pel-wing');
+  cx.save(); cx.translate(-10,-30); cx.rotate(-.5-wing*.9);
+  cx.beginPath(); cx.ellipse(-15,-38,26,62,-.25,0,7); cx.fill();
+  cx.strokeStyle='rgba(120,110,90,.35)'; cx.lineWidth=2;
+  for(let i=-1;i<=1;i++){
+    cx.beginPath(); cx.moveTo(i*10,-8); cx.quadraticCurveTo(i*16,-40,i*20,-88); cx.stroke();
+  }
+  cx.restore();
+  // 远侧翅膀（暗一点）
+  cx.save(); cx.globalAlpha=.55; cx.translate(14,-22); cx.rotate(-.35-wing*.7);
+  cx.beginPath(); cx.ellipse(-10,-30,20,50,-.2,0,7); cx.fill(); cx.restore();
+  cx.globalAlpha=1;
+
+  // ---- 脖子 + 头 ----
+  cx.strokeStyle=bodyC; cx.lineWidth=26; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(55,-28); cx.quadraticCurveTo(92,-58,118,-72); cx.stroke();
+  cx.fillStyle=bodyC;
+  cx.beginPath(); cx.arc(124,-78,22,0,7); cx.fill();
+  // 冠羽
+  cx.strokeStyle=css('--pel-wing'); cx.lineWidth=3;
+  cx.beginPath(); cx.moveTo(112,-94); cx.quadraticCurveTo(100,-104,92,-100); cx.stroke();
+
+  // ---- 眼睛 & 表情 ----
+  S.blinkT-=1/60; if(S.blinkT<0){S.blink=6; S.blinkT=2+Math.random()*3;}
+  if(S.blink>0)S.blink--;
+  cx.fillStyle='#222';
+  if(S.blink>0){
+    cx.strokeStyle='#222'; cx.lineWidth=2.5;
+    cx.beginPath(); cx.moveTo(128,-82); cx.lineTo(140,-82); cx.stroke();
+  }else{
+    cx.beginPath(); cx.arc(134,-82,4.2,0,7); cx.fill();
+    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(135.5,-83.5,1.4,0,7); cx.fill();
+  }
+  // 受惊眉毛
+  if(S.surprised>0){
+    cx.strokeStyle='#222'; cx.lineWidth=3;
+    cx.beginPath(); cx.moveTo(126,-92); cx.lineTo(140,-96); cx.stroke();
+  }
+  // 喘气嘴
+  if(tired && Math.sin(t*10)>0){
+    cx.fillStyle='#a33';
+    cx.beginPath(); cx.ellipse(160,-52,7,4+Math.sin(t*10)*2,0,0,7); cx.fill();
+  }
+
+  // ---- 长喙 + 大喉囊（晃动）----
+  const pouchSwing = Math.sin(t*4+1)*.06 + S.flap*.1;
+  cx.save(); cx.translate(140,-70); cx.rotate(pouchSwing);
+  // 上喙
+  cx.fillStyle=css('--beak');
+  cx.beginPath(); cx.moveTo(0,-6); cx.quadraticCurveTo(46,-12,64,-2); cx.quadraticCurveTo(44,4,0,6); cx.fill();
+  // 喉囊
+  const pouchP = 1+Math.sin(t*5)*.07 + S.flap*.15;
+  cx.fillStyle=css('--pouch');
+  cx.beginPath(); cx.moveTo(0,6);
+  cx.quadraticCurveTo(30,34*pouchP,58,12*pouchP);
+  cx.quadraticCurveTo(30,2,0,-2); cx.fill();
+  cx.strokeStyle='rgba(160,90,20,.4)'; cx.lineWidth=1.5;
+  cx.beginPath(); cx.moveTo(4,10); cx.quadraticCurveTo(28,28*pouchP,52,10*pouchP); cx.stroke();
+  cx.restore();
+
+  // ---- 汗珠 ----
+  S.sweat.forEach(sw=>{
+    cx.fillStyle='rgba(120,190,255,'+sw.a+')';
+    cx.beginPath(); cx.arc(sw.x,sw.y,3,0,7); cx.fill();
+  });
+
+  // ---- 鞍具（自行车“骑”鹈鹕的机关：缰绳+鞍座+踏板卡位）----
+  cx.strokeStyle='#8a5a2b'; cx.lineWidth=4;
+  // 缰绳绕到喙上
+  cx.beginPath(); cx.moveTo(30,-52); cx.quadraticCurveTo(100,-70,150,-58); cx.stroke();
+  cx.fillStyle='#8a5a2b';
+  cx.beginPath(); cx.ellipse(150,-58,6,4,0,0,7); cx.fill(); // 嘴套
+  // 鞍垫
+  cx.fillStyle='#6b4226';
+  cx.beginPath(); cx.ellipse(-6,-52,30,12,-.1,0,7); cx.fill();
+  cx.strokeStyle='#4a2d17'; cx.lineWidth=3;
+  cx.beginPath(); cx.moveTo(-30,-48); cx.quadraticCurveTo(-6,-30,20,-48); cx.stroke(); // 腹带
+  cx.restore();
+}
+
+function drawBike(px,py,sc,t){
+  cx.save(); cx.translate(px,py); cx.scale(sc,sc);
+  cx.rotate(Math.sin(S.runPhase*.5)*.05 + S.bob*.004); // 车身微倾
+
+  const frame = css('--bike'), metal = css('--metal');
+  const wr = 30, wheelY = 42;
+  const bx1=-62, bx2=62; // 前后轮心
+
+  // 车轮
+  drawWheel(bx1,wheelY,wr,S.wheelSpin,metal,4);
+  drawWheel(bx2,wheelY,wr,S.wheelSpin,metal,4);
+
+  cx.strokeStyle=frame; cx.lineWidth=5; cx.lineCap='round'; cx.lineJoin='round';
+  const bb=[0,18]; // 中轴
+  const seatTop=[-22,-34], headTube=[44,-30];
+  // 车架三角
+  cx.beginPath();
+  cx.moveTo(bx1,wheelY); cx.lineTo(seatTop[0],seatTop[1]);
+  cx.lineTo(bb[0],bb[1]); cx.moveTo(seatTop[0],seatTop[1]);
+  cx.lineTo(headTube[0],headTube[1]); cx.lineTo(bb[0],bb[1]);
+  cx.moveTo(headTube[0],headTube[1]); cx.lineTo(bx2,wheelY);
+  cx.moveTo(bb[0],bb[1]); cx.lineTo(bx1,wheelY);
+  cx.stroke();
+
+  // 链条
+  cx.strokeStyle=metal; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(bb[0],bb[1],8,0,7); cx.stroke();
+  cx.beginPath(); cx.moveTo(bb[0]+8,bb[1]); cx.lineTo(bx1+4,wheelY-6); cx.moveTo(bb[0]+8,bb[1]+2); cx.lineTo(bx1+4,wheelY+6); cx.stroke();
+
+  // 脚踏（联动旋转）
+  const pa=S.pedalAngle;
+  [[Math.cos(pa),Math.sin(pa)],[Math.cos(pa+Math.PI),Math.sin(pa+Math.PI)]].forEach(([c,s],i)=>{
+    const px_=bb[0]+c*14, py_=bb[1]+s*14;
+    cx.strokeStyle=metal; cx.lineWidth=3.5;
+    cx.beginPath(); cx.moveTo(bb[0],bb[1]); cx.lineTo(px_,py_); cx.stroke();
+    cx.fillStyle='#333'; cx.fillRect(px_-7,py_-3,14,5);
+  });
+
+  // 车座
+  cx.fillStyle='#333';
+  cx.beginPath(); cx.ellipse(seatTop[0],seatTop[1]-5,15,6,0,0,7); cx.fill();
+
+  // 车把 + 车铃
+  cx.save();
+  cx.translate(headTube[0],headTube[1]); cx.rotate(Math.sin(t*30)*S.bellShake*.25);
+  cx.strokeStyle=metal; cx.lineWidth=4;
+  cx.beginPath(); cx.moveTo(0,0); cx.lineTo(4,-16); cx.stroke();
+  cx.beginPath(); cx.moveTo(-14,-16); cx.quadraticCurveTo(4,-24,22,-16); cx.stroke();
+  // 握把
+  cx.fillStyle='#222'; cx.fillRect(-18,-19,7,7); cx.fillRect(16,-19,7,7);
+  // 铃铛
+  cx.fillStyle='#f4c430';
+  cx.beginPath(); cx.arc(10,-22,6,Math.PI,0); cx.fill();
+  cx.restore();
+
+  // 前灯（夜晚发光）
+  if(S.theme==='night'){
+    const g=cx.createRadialGradient(headTube[0]+8,headTube[1]+4,2,headTube[0]+8,headTube[1]+4,60);
+    g.addColorStop(0,'rgba(255,240,180,.5)'); g.addColorStop(1,'rgba(255,240,180,0)');
+    cx.fillStyle=g; cx.beginPath(); cx.arc(headTube[0]+8,headTube[1]+4,60,0,7); cx.fill();
+  }
+  cx.fillStyle='#ffef9e';
+  cx.beginPath(); cx.arc(headTube[0]+8,headTube[1]+4,5,0,7); cx.fill();
+
+  cx.restore();
+}
+
+/* ================= 粒子 ================= */
+function spawnFeather(x,y){
+  S.feathers.push({x,y,vx:-S.speed*2-1,vy:-Math.random()*1.5-.5,rot:Math.random()*7,vr:(Math.random()-.5)*.2,a:.9});
+}
+function drawParticles(groundY){
+  S.feathers.forEach(f=>{
+    f.x+=f.vx; f.y+=f.vy+.4; f.rot+=f.vr; f.a-=.004;
+    cx.save(); cx.translate(f.x,f.y); cx.rotate(f.rot); cx.globalAlpha=Math.max(f.a,0);
+    cx.fillStyle='#fff'; cx.beginPath(); cx.ellipse(0,0,9,3.5,0,0,7); cx.fill();
+    cx.strokeStyle='rgba(200,190,160,.8)'; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(-8,0); cx.lineTo(8,0); cx.stroke();
+    cx.restore();
+  });
+  cx.globalAlpha=1;
+  S.feathers=S.feathers.filter(f=>f.a>0 && f.y<groundY+20);
+
+  S.sweat.forEach(sw=>{ sw.y+=sw.vy; sw.a-=.02; });
+  S.sweat=S.sweat.filter(sw=>sw.a>0);
+}
+
+/* ================= 主循环 ================= */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,.05); last=now;
+  const t=now/1000;
+
+  // 速度 & 体力
+  let sp=S.targetSpeed + S.dash;
+  if(S.stamina<=2 && S.dash>0){ S.dash=0; say("鹈鹕累瘫了……喂条鱼吧！"); }
+  S.speed=lerp(S.speed,sp,.06);
+  S.dash=Math.max(0,S.dash-dt*.5);
+  S.stamina=Math.max(0,Math.min(100,S.stamina + (S.speed>1.6?-dt*4: dt*1.2)));
+  S.dist += S.speed*dt*220;
+  S.runPhase += S.speed*dt*9;
+  S.wheelSpin += S.speed*dt*8;
+  S.pedalAngle += S.speed*dt*6;
+  S.flap=lerp(S.flap, S.speed>1.8?1:(S.road?.4:.15), .04);
+  S.bellShake*= .92;
+  S.surprised=Math.max(0,S.surprised-dt);
+  S.blinkT-=dt; if(S.blinkT<0){S.blink=.12; S.blinkT=2+Math.random()*3;}
+
+  // 颠簸
+  const bumpy = S.road?1:0;
+  S.bobV += (-S.bob*90 - S.bobV*6)*dt*10 + (Math.random()-.5)*bumpy*S.speed*260*dt;
+  S.bob += S.bobV*dt*10;
+
+  drawSky(); drawClouds(S.dist); drawSea(S.dist); drawBoardwalk(S.dist);
+
+  const groundY=H*.78;
+  const baseX=W*.42, baseY=groundY-120;
+  const bobY = Math.abs(Math.sin(S.runPhase)) * -8 * Math.min(S.speed,1.5) + S.bob*.5;
+  const u = .9+Math.min(W,H)/900*.4; // 缩放
+
+  drawPelican(baseX, baseY+bobY, u, t);
+  drawBike(baseX-10*u, baseY-95*u+bobY*.7, u, t);
+  drawParticles(groundY);
+
+  // 速度/汗/羽毛生成
+  if(Math.random()<S.speed*.012) spawnFeather(baseX-60*u+Math.random()*40, baseY-40*u);
+  if(S.stamina<40 && Math.random()<.06)
+    S.sweat.push({x:baseX+120*u,y:baseY-70*u+bobY,vy:1.5+S.speed,a:.9});
+
+  // HUD
+  document.getElementById('stamBar').style.width=S.stamina+'%';
+  document.getElementById('speedTxt').textContent='速度 '+(S.speed*12).toFixed(0)+' km/h';
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ================= 交互 ================= */
+const speechEl=document.getElementById('speech');
+let speechTimer=null;
+function say(txt,ms=1600){
+  speechEl.textContent=txt; speechEl.classList.add('show');
+  clearTimeout(speechTimer);
+  speechTimer=setTimeout(()=>speechEl.classList.remove('show'),ms);
+}
+
+document.getElementById('bellBtn').onclick=()=>{
+  ac(); bell();
+  S.bellShake=1; S.surprised=1.2; S.dash=Math.max(S.dash,.8);
+  say('叮铃铃——！鹈鹕受惊加速！');
+};
+document.getElementById('feedBtn').onclick=()=>{
+  ac(); splash();
+  S.stamina=Math.min(100,S.stamina+30);
+  S.flap=1;
+  say('鹈鹕：吧唧吧唧……满血复活！');
+};
+document.getElementById('dashBtn').onclick=()=>{
+  if(S.stamina>15){ S.dash=1.4; S.surprised=.8; say('冲鸭——！！'); }
+  else say('没力气冲刺了，先喂条鱼吧…');
+};
+document.getElementById('speedCtl').oninput=e=>{ S.targetSpeed=+e.target.value; };
+document.getElementById('timeSeg').onclick=e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#timeSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  S.theme=b.dataset.t;
+  document.body.className=S.theme;
+};
+document.getElementById('roadSeg').onclick=e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#roadSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  S.road=+b.dataset.r;
+  say(S.road?'咯噔咯噔……颠起来了！':'回到平稳的木栈道~');
+};
+</script>
+</body>
+</html>

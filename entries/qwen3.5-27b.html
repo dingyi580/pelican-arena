@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕：跨代模型前端擂台赛</title>
+    <style>
+        :root {
+            --sky-top: #87CEEB;
+            --sky-bottom: #E0F7FA;
+            --sun-color: #FFD700;
+            --ground-color: #DEB887;
+            --ui-bg: rgba(255, 255, 255, 0.9);
+            --accent: #FF6B6B;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+            transition: background 1s ease;
+        }
+
+        /* 场景容器 */
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* 背景层（视差） */
+        .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%; /* 双倍宽度用于循环滚动 */
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .bg-sun {
+            position: absolute;
+            top: 50px;
+            right: 10%;
+            width: 80px;
+            height: 80px;
+            background: var(--sun-color);
+            border-radius: 50%;
+            box-shadow: 0 0 40px var(--sun-color);
+            z-index: 0;
+        }
+
+        .bg-clouds {
+            top: 10%;
+            opacity: 0.8;
+            fill: white;
+        }
+
+        .bg-sea {
+            bottom: 15%;
+            height: 35%;
+            background: #4FC3F7;
+            z-index: 1;
+            transform-origin: center;
+        }
+
+        .bg-boardwalk {
+            bottom: 0;
+            height: 15%;
+            background: repeating-linear-gradient(
+                90deg,
+                #8D6E63 0px,
+                #8D6E63 40px,
+                #6D4C41 40px,
+                #6D4C41 42px
+            );
+            z-index: 2;
+            border-top: 5px solid #5D4037;
+        }
+
+        /* 角色容器 */
+        #character-container {
+            position: absolute;
+            bottom: 10%; /* 在栈道上 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 400px;
+            z-index: 10;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.2));
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* UI 控件面板 */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            background: var(--ui-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 5px 0;
+            color: #333;
+            text-align: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 按钮样式 */
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 4px 0 #D32F2F;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #D32F2F;
+        }
+
+        button.secondary {
+            background: #4DB6AC;
+            box-shadow: 0 4px 0 #00897B;
+        }
+        
+        button.secondary:active {
+            box-shadow: 0 0 0 #00897B;
+        }
+
+        /* 滑块样式 */
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        /* 状态条 */
+        .bar-container {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            background: #4CAF50;
+            width: 100%;
+            transition: width 0.2s, background 0.2s;
+        }
+
+        /* 动画类 */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translateX(-50%) rotate(-5deg); }
+            20%, 80% { transform: translateX(-50%) rotate(5deg); }
+            30%, 50%, 70% { transform: translateX(-50%) rotate(-5deg); }
+            40%, 60% { transform: translateX(-50%) rotate(5deg); }
+        }
+
+        /* 天气效果覆盖层 */
+        #weather-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            mix-blend-mode: multiply;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        /* 粒子特效 */
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: flyAway 1s forwards;
+        }
+
+        @keyframes flyAway {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        /* 提示文字 */
+        .toast {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="stage">
+    <!-- 背景层 -->
+    <div class="layer bg-sun"></div>
+    <svg class="layer bg-clouds" viewBox="0 0 800 200" preserveAspectRatio="none">
+        <path d="M100,100 Q150,50 200,100 T300,100 T400,100" fill="white" />
+        <path d="M500,80 Q550,30 600,80 T700,80" fill="white" />
+    </svg>
+    <div class="layer bg-sea"></div>
+    <div class="layer bg-boardwalk"></div>
+    
+    <!-- 天气遮罩 -->
+    <div id="weather-overlay"></div>
+
+    <!-- 主角舞台 -->
+    <div id="character-container">
+        <svg viewBox="0 0 400 400" id="main-svg">
+            <!-- 定义滤镜和渐变 -->
+            <defs>
+                <linearGradient id="pelican-feather" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#F5F5F5;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="bike-frame" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#FF5722;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#E64A19;stop-opacity:1" />
+                </linearGradient>
+                <filter id="shadow">
+                    <feDropShadow dx="2" dy="4" stdDeviation="3" floodOpacity="0.3"/>
+                </filter>
+            </defs>
+
+            <!-- 鹈鹕组 (坐骑) -->
+            <g id="pelican-group" transform-origin="200 300">
+                <!-- 后腿 -->
+                <g id="leg-back" transform-origin="220 320">
+                    <path d="M0,0 L-20,-60 L-40,-80" stroke="#FFCCBC" stroke-width="8" fill="none" stroke-linecap="round"/>
+                    <ellipse cx="-40" cy="-80" rx="15" ry="10" fill="#FFAB91" transform="rotate(-20)" />
+                </g>
+                
+                <!-- 身体 -->
+                <ellipse cx="200" cy="260" rx="90" ry="60" fill="url(#pelican-feather)" stroke="#ddd" stroke-width="2"/>
+                
+                <!-- 翅膀 (拍打) -->
+                <g id="wing" transform-origin="180 260">
+                    <path d="M0,0 C-40,-20 -80,-10 -90,20 C-80,40 -40,50 0,30 Z" fill="#FFF" stroke="#ccc" stroke-width="2"/>
+                </g>
+
+                <!-- 脖子与头 -->
+                <path d="M260,240 Q290,200 280,150" stroke="url(#pelican-feather)" stroke-width="35" fill="none" stroke-linecap="round"/>
+                <circle cx="280" cy="150" r="35" fill="url(#pelican-feather)" />
+                
+                <!-- 喙和喉囊 -->
+                <path d="M300,140 L380,145 L300,180 Z" fill="#FFCC80" stroke="#E65100" stroke-width="1"/> <!-- 上喙 -->
+                <path d="M300,180 Q340,230 380,180 L300,180" fill="#FFAB91" stroke="#E65100" stroke-width="1"/> <!-- 喉囊 -->
+                
+                <!-- 眼睛 -->
+                <circle cx="290" cy="145" r="3" fill="black" />
+                <path d="M295,140 Q305,135 310,140" stroke="black" fill="none" stroke-width="2"/> <!-- 眉毛 -->
+
+                <!-- 前腿 -->
+                <g id="leg-front" transform-origin="180 320">
+                    <path d="M0,0 L20,-60 L40,-80" stroke="#FFCCBC" stroke-width="8" fill="none" stroke-linecap="round"/>
+                    <ellipse cx="40" cy="-80" rx="15" ry="10" fill="#FFAB91" transform="rotate(20)" />
+                </g>
+            </g>
+
+            <!-- 自行车组 (骑手) -->
+            <g id="bike-group" transform-origin="200 200">
+                <!-- 缰绳 (把手到鸟嘴) -->
+                <path id="reins" d="M160,180 Q180,220 290,160 M240,180 Q260,220 290,160" stroke="#5D4037" stroke-width="3" fill="none" stroke-dasharray="5,2"/>
+
+                <!-- 后轮 -->
+                <g id="wheel-back" transform-origin="140 240">
+                    <circle cx="0" cy="0" r="35" fill="none" stroke="#333" stroke-width="6"/>
+                    <circle cx="0" cy="0" r="30" fill="none" stroke="#DDD" stroke-width="1"/>
+                    <g id="spokes-back">
+                        <line x1="0" y1="-35" x2="0" y2="35" stroke="#999" stroke-width="2"/>
+                        <line x1="-35" y1="0" x2="35" y2="0" stroke="#999" stroke-width="2"/>
+                        <line x1="-25" y1="-25" x2="25" y2="25" stroke="#999" stroke-width="2"/>
+                        <line x1="25" y1="-25" x2="-25" y2="25" stroke="#999" stroke-width="2"/>
+                    </g>
+                </g>
+
+                <!-- 车架 -->
+                <path d="M140,240 L180,240 L200,180 L140,240 Z" fill="none" stroke="url(#bike-frame)" stroke-width="8" stroke-linejoin="round"/> <!-- 三角架 -->
+                <path d="M180,240 L240,240" fill="none" stroke="url(#bike-frame)" stroke-width="8"/> <!-- 中轴管 -->
+                <path d="M200,180 L240,240" fill="none" stroke="url(#bike-frame)" stroke-width="8"/> <!-- 下叉 -->
+                <path d="M140,240 L120,180 L160,180" fill="none" stroke="url(#bike-frame)" stroke-width="6"/> <!-- 座管与立管 -->
+
+                <!-- 车座 -->
+                <path d="M120,180 Q130,170 150,180 L140,190 Z" fill="#333" />
+
+                <!-- 车把 -->
+                <path d="M200,180 L190,140 Q180,130 160,140" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round"/>
+                <circle cx="160" cy="140" r="5" fill="#333"/> <!-- 握把 -->
+
+                <!-- 脚踏板联动 -->
+                <g id="pedal-crank" transform-origin="180 240">
+                    <circle cx="0" cy="0" r="10" fill="#CCC" stroke="#333"/>
+                    <line x1="0" y1="0" x2="15" y2="15" stroke="#333" stroke-width="4"/>
+                    <rect x="12" y="10" width="10" height="6" fill="#333" rx="2"/>
+                    
+                    <line x1="0" y1="0" x2="-15" y2="-15" stroke="#333" stroke-width="4"/>
+                    <rect x="-22" y="-16" width="10" height="6" fill="#333" rx="2"/>
+                </g>
+
+                <!-- 链条 -->
+                <path d="M180,240 L240,240" stroke="#777" stroke-width="3" stroke-dasharray="2,2"/>
+
+                <!-- 前轮 -->
+                <g id="wheel-front" transform-origin="240 240">
+                    <circle cx="0" cy="0" r="35" fill="none" stroke="#333" stroke-width="6"/>
+                    <circle cx="0" cy="0" r="30" fill="none" stroke="#DDD" stroke-width="1"/>
+                    <g id="spokes-front">
+                        <line x1="0" y1="-35" x2="0" y2="35" stroke="#999" stroke-width="2"/>
+                        <line x1="-35" y1="0" x2="35" y2="0" stroke="#999" stroke-width="2"/>
+                        <line x1="-25" y1="-25" x2="25" y2="25" stroke="#999" stroke-width="2"/>
+                        <line x1="25" y1="-25" x2="-25" y2="25" stroke="#999" stroke-width="2"/>
+                    </g>
+                </g>
+                
+                <!-- 拟人化细节：车铃 -->
+                <circle id="bell" cx="180" cy="140" r="6" fill="#FFD700" stroke="#F57F17" stroke-width="2"/>
+            </g>
+        </svg>
+    </div>
+
+    <!-- UI 面板 -->
+    <div id="ui-panel">
+        <h1>🚲 骑乘控制 🦢</h1>
+        
+        <button id="btn-bell">🔔 按车铃 (惊吓)</button>
+        
+        <div class="control-group">
+            <label>速度 / 冲刺 <span id="speed-val">正常</span></label>
+            <input type="range" id="speed-slider" min="0" max="100" value="30">
+        </div>
+
+        <div class="control-group">
+            <label>体力值</label>
+            <div class="bar-container">
+                <div id="stamina-bar" class="bar-fill"></div>
+            </div>
+        </div>
+
+        <button id="btn-weather" class="secondary">☁️ 切换天气</button>
+    </div>
+
+    <div id="toast" class="toast">提示信息</div>
+</div>
+
+<script>
+/**
+ * 核心逻辑控制器
+ */
+class GameEngine {
+    constructor() {
+        // DOM Elements
+        this.ui = {
+            stage: document.getElementById('stage'),
+            speedSlider: document.getElementById('speed-slider'),
+            speedVal: document.getElementById('speed-val'),
+            staminaBar: document.getElementById('stamina-bar'),
+            btnBell: document.getElementById('btn-bell'),
+            btnWeather: document.getElementById('btn-weather'),
+            toast: document.getElementById('toast')
+        };
+
+        this.svg = {
+            pelicanGroup: document.getElementById('pelican-group'),
+            wing: document.getElementById('wing'),
+            legFront: document.getElementById('leg-front'),
+            legBack: document.getElementById('leg-back'),
+            bikeGroup: document.getElementById('bike-group'),
+            wheelFront: document.getElementById('wheel-front'),
+            wheelBack: document.getElementById('wheel-back'),
+            pedalCrank: document.getElementById('pedal-crank'),
+            reins: document.getElementById('reins'),
+            bell: document.getElementById('bell')
+        };
+
+        this.layers = {
+            clouds: document.querySelector('.bg-clouds'),
+            sea: document.querySelector('.bg-sea'),
+            boardwalk: document.querySelector('.bg-boardwalk')
+        };
+
+        // State
+        this.state = {
+            baseSpeed: 0.5,
+            sprintMultiplier: 1,
+            stamina: 100,
+            isSprinting: false,
+            weather: 'sunny', // sunny, dusk, night
+            lastTime: 0,
+            distance: 0
+        };
+
+        // Bindings
+        this.initEvents();
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Start Loop
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    initEvents() {
+        // 速度控制
+        this.ui.speedSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            this.state.baseSpeed = val / 100;
+            
+            if (val > 80) {
+                this.state.isSprinting = true;
+                this.ui.speedVal.textContent = "冲刺！";
+                this.ui.speedVal.style.color = "red";
+            } else {
+                this.state.isSprinting = false;
+                this.ui.speedVal.textContent = "巡航";
+                this.ui.speedVal.style.color = "#555";
+            }
+        });
+
+        // 车铃交互
+        this.ui.btnBell.addEventListener('click', () => {
+            this.ringBell();
+        });
+
+        // 天气交互
+        this.ui.btnWeather.addEventListener('click', () => {
+            this.toggleWeather();
+        });
+    }
+
+    ringBell() {
+        // 音效合成
+        const osc = this.audioCtx.createOscillator();
+        const gainNode = this.audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, this.audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, this.audioCtx.currentTime + 0.1);
+        
+        gainNode.gain.setValueAtTime(0.5, this.audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.5);
+        
+        osc.connect(gainNode);
+        gainNode.connect(this.audioCtx.destination);
+        osc.start();
+        osc.stop(this.audioCtx.currentTime + 0.5);
+
+        // 视觉反馈：震动
+        this.ui.stage.classList.add('shake');
+        setTimeout(() => this.ui.stage.classList.remove('shake'), 500);
+
+        // 鹈鹕受惊反应
+        this.showToast("鹈鹕吓了一跳！");
+        this.spawnParticles(200, 200, '#FFF', 10); // 羽毛飞溅
+        
+        // 临时加速
+        const oldSpeed = this.state.baseSpeed;
+        this.state.baseSpeed = 1.0;
+        setTimeout(() => this.state.baseSpeed = oldSpeed, 1000);
+    }
+
+    toggleWeather() {
+        const overlay = document.getElementById('weather-overlay');
+        const root = document.documentElement;
+        
+        if (this.state.weather === 'sunny') {
+            this.state.weather = 'dusk';
+            root.style.setProperty('--sky-top', '#FF7043');
+            root.style.setProperty('--sky-bottom', '#FFCCBC');
+            root.style.setProperty('--sun-color', '#FF5722');
+            overlay.style.backgroundColor = 'rgba(255, 100, 50, 0.2)';
+            overlay.style.opacity = '1';
+            this.showToast("黄昏降临，视线变暗...");
+        } else if (this.state.weather === 'dusk') {
+            this.state.weather = 'night';
+            root.style.setProperty('--sky-top', '#1A237E');
+            root.style.setProperty('--sky-bottom', '#311B92');
+            root.style.setProperty('--sun-color', '#FFF'); // Moon
+            overlay.style.backgroundColor = 'rgba(0, 0, 50, 0.6)';
+            overlay.style.opacity = '1';
+            this.showToast("夜晚模式开启");
+        } else {
+            this.state.weather = 'sunny';
+            root.style.setProperty('--sky-top', '#87CEEB');
+            root.style.setProperty('--sky-bottom', '#E0F7FA');
+            root.style.setProperty('--sun-color', '#FFD700');
+            overlay.style.opacity = '0';
+            this.showToast("阳光明媚的一天");
+        }
+    }
+
+    showToast(msg) {
+        this.ui.toast.textContent = msg;
+        this.ui.toast.style.opacity = 1;
+        setTimeout(() => this.ui.toast.style.opacity = 0, 2000);
+    }
+
+    spawnParticles(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+            p.style.width = Math.random() * 10 + 5 + 'px';
+            p.style.height = p.style.width;
+            p.style.background = color;
+            p.style.borderRadius = '50%';
+            
+            // Random direction
+            const tx = (Math.random() - 0.5) * 200 + 'px';
+            const ty = (Math.random() - 1) * 200 + 'px';
+            p.style.setProperty('--tx', tx);
+            p.style.setProperty('--ty', ty);
+            
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1000);
+        }
+    }
+
+    updatePhysics(dt) {
+        // 体力消耗
+        if (this.state.isSprinting && this.state.stamina > 0) {
+            this.state.stamina -= dt * 0.5;
+        } else if (!this.state.isSprinting && this.state.stamina < 100) {
+            this.state.stamina += dt * 0.2;
+        }
+        
+        // 强制减速如果没体力
+        if (this.state.isSprinting && this.state.stamina <= 0) {
+            this.state.isSprinting = false;
+            this.state.baseSpeed = 0.3;
+            this.ui.speedSlider.value = 30;
+            this.ui.speedVal.textContent = "力竭...";
+            this.spawnParticles(200, 300, '#999', 5); // 冒烟
+        }
+
+        // 更新 UI 条
+        this.ui.staminaBar.style.width = this.state.stamina + '%';
+        if (this.state.stamina < 20) this.ui.staminaBar.style.background = '#F44336';
+        else this.ui.staminaBar.style.background = '#4CAF50';
+
+        // 计算当前总速度因子
+        const speedFactor = this.state.baseSpeed * (this.state.isSprinting ? 2.5 : 1);
+        this.state.distance += speedFactor * dt;
+    }
+
+    loop(timestamp) {
+        const dt = timestamp - this.state.lastTime;
+        this.state.lastTime = timestamp;
+
+        this.updatePhysics(dt);
+        this.render(timestamp, dt);
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    render(time, dt) {
+        const dist = this.state.distance;
+        const speed = this.state.baseSpeed * (this.state.isSprinting ? 2.5 : 1);
+
+        // 1. 背景视差滚动
+        this.layers.clouds.style.transform = `translateX(-${dist * 20}px)`;
+        this.layers.sea.style.transform = `translateX(-${dist * 50}px)`;
+        this.layers.boardwalk.style.transform = `translateX(-${dist * 200}px)`;
+
+        // 2. 鹈鹕动画 (坐骑)
+        // 腿部摆动频率随速度增加
+        const runCycle = Math.sin(dist * 0.15); 
+        const flapCycle = Math.sin(dist * 0.2);
+        
+        // 身体颠簸
+        const bounce = Math.abs(Math.sin(dist * 0.1)) * 5;
+        
+        // 应用变换
+        this.svg.pelicanGroup.setAttribute('transform', `translate(0, ${bounce})`);
+        
+        // 腿部旋转
+        this.svg.legFront.setAttribute('transform', `rotate(${runCycle * 45})`);
+        this.svg.legBack.setAttribute('transform', `rotate(${-runCycle * 45})`);
+        
+        // 翅膀拍打
+        this.svg.wing.setAttribute('transform', `rotate(${flapCycle * 30})`);
+
+        // 3. 自行车动画 (骑手)
+        // 车身跟随鹈鹕颠簸，但稍微滞后一点产生惯性感
+        this.svg.bikeGroup.setAttribute('transform', `translate(0, ${bounce * 0.8}) rotate(${runCycle * 2})`);
+
+        // 车轮转动
+        const wheelRot = dist * 0.5;
+        this.svg.wheelFront.setAttribute('transform', `rotate(${wheelRot})`);
+        this.svg.wheelBack.setAttribute('transform', `rotate(${wheelRot})`);
+
+        // 踏板转动
+        this.svg.pedalCrank.setAttribute('transform', `rotate(${wheelRot})`);
+
+        // 缰绳动态 (贝塞尔曲线控制点微调)
+        const reinWiggle = Math.sin(dist * 0.3) * 5;
+        this.svg.reins.setAttribute('d', `M160,180 Q180,${220+reinWiggle} 290,160 M240,180 Q260,${220+reinWiggle} 290,160`);
+
+        // 4. 粒子生成 (根据速度生成尘土或羽毛)
+        if (speed > 0.8 && Math.random() > 0.8) {
+            this.spawnParticles(150 + Math.random()*100, 350, '#D7CCC8', 1);
+        }
+    }
+}
+
+// 启动游戏
+window.onload = () => {
+    const game = new GameEngine();
+};
+
+</script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>自行车骑鹈鹕 · 单文件互动动画</title>
+  <style>
+    :root{
+      --ui-bg: rgba(255,255,255,.72);
+      --ui-br: rgba(255,255,255,.35);
+      --text: #143047;
+      --accent: #ffb300;
+      --accent2:#4fc3f7;
+      --good:#43a047;
+      --warn:#ef6c00;
+      --danger:#e53935;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Noto Sans CJK SC,Microsoft YaHei,sans-serif;background:#9fd8ff;overflow:hidden}
+    #wrap{position:fixed;inset:0}
+    canvas{display:block;width:100%;height:100%}
+    .ui{
+      position:fixed;left:16px;top:16px;z-index:5;
+      backdrop-filter: blur(10px);
+      background:var(--ui-bg);
+      border:1px solid var(--ui-br);
+      border-radius:16px;
+      padding:12px 12px 10px;
+      width:min(360px,calc(100vw - 24px));
+      color:var(--text);
+      box-shadow:0 8px 30px rgba(11,54,89,.18);
+    }
+    .title{font-weight:800;font-size:15px;margin:0 0 8px;letter-spacing:.2px}
+    .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .row label{font-size:13px;min-width:72px;opacity:.9}
+    .pill{
+      border:none;border-radius:999px;padding:8px 12px;cursor:pointer;
+      background:white;color:#123;box-shadow:0 2px 8px rgba(0,0,0,.08);font-weight:700;font-size:12px
+    }
+    .pill:active{transform:translateY(1px)}
+    .ring{background:linear-gradient(180deg,#fff4c5,#ffd35f)}
+    .sprint{background:linear-gradient(180deg,#e6f7ff,#9ddcff)}
+    .feed{background:linear-gradient(180deg,#ecffeb,#b8f5b4)}
+    .seg{display:flex;gap:6px;flex-wrap:wrap}
+    .seg button{padding:7px 10px;font-size:12px}
+    input[type="range"]{width:100%}
+    .small{font-size:12px;opacity:.78}
+    .bar{
+      height:8px;background:rgba(0,0,0,.08);border-radius:99px;overflow:hidden;flex:1
+    }
+    .bar > i{display:block;height:100%;width:50%;background:linear-gradient(90deg,var(--good),#a5d6a7)}
+    .footer{font-size:11px;opacity:.66;margin-top:6px}
+  </style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+
+<div class="ui">
+  <p class="title">🚲 自行车骑鹈鹕（反常识正确版）</p>
+
+  <div class="row">
+    <button class="pill ring" id="ringBtn">🔔 按车铃</button>
+    <button class="pill sprint" id="sprintBtn">💨 冲刺</button>
+    <button class="pill feed" id="feedBtn">🐟 投喂小鱼</button>
+  </div>
+
+  <div class="row">
+    <label>速度</label>
+    <input id="speed" type="range" min="0" max="100" value="46"/>
+  </div>
+
+  <div class="row">
+    <label>时段</label>
+    <div class="seg">
+      <button class="pill" data-time="day">晴天</button>
+      <button class="pill" data-time="dusk">黄昏</button>
+      <button class="pill" data-time="night">夜晚</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <label>路况</label>
+    <div class="seg">
+      <button class="pill" data-road="smooth">平路</button>
+      <button class="pill" data-road="bumpy">石子路</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <label>体力</label>
+    <div class="bar"><i id="staminaFill"></i></div>
+    <span id="staminaTxt" class="small">100%</span>
+  </div>
+  <div class="footer">提示：按铃会让鹈鹕受惊加速；冲刺会消耗体力；投喂可恢复。</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let w=0,h=0,dpr=Math.min(2,window.devicePixelRatio||1);
+  function resize(){
+    w=innerWidth;h=innerHeight;
+    canvas.width = Math.floor(w*dpr);
+    canvas.height= Math.floor(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  addEventListener('resize',resize,{passive:true}); resize();
+
+  const state = {
+    t:0, speedN:0.46, speed:3.6, targetSpeed:3.6,
+    sprint:0, bellShake:0,
+    stamina:1,
+    time:'day',
+    road:'smooth',
+    accelKick:0,
+    fishPop:0,
+    breath:0,
+    particles:[]
+  };
+
+  const speedSlider = document.getElementById('speed');
+  const ringBtn = document.getElementById('ringBtn');
+  const sprintBtn = document.getElementById('sprintBtn');
+  const feedBtn = document.getElementById('feedBtn');
+  const staminaFill = document.getElementById('staminaFill');
+  const staminaTxt = document.getElementById('staminaTxt');
+
+  speedSlider.addEventListener('input', () => {
+    state.speedN = speedSlider.value / 100;
+    state.targetSpeed = 1.5 + state.speedN * 7.0;
+  });
+
+  document.querySelectorAll('[data-time]').forEach(b=>{
+    b.addEventListener('click',()=> state.time = b.dataset.time);
+  });
+  document.querySelectorAll('[data-road]').forEach(b=>{
+    b.addEventListener('click',()=> state.road = b.dataset.road);
+  });
+
+  function addParticle(x,y,vx,vy,life,size,color){
+    state.particles.push({x,y,vx,vy,life,max:life,size,color});
+  }
+
+  // WebAudio bell
+  let ac=null;
+  function ding(){
+    if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended') ac.resume();
+    const now = ac.currentTime;
+    const freqs=[1300,1900,2550];
+    freqs.forEach((f,i)=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,now);
+      g.gain.exponentialRampToValueAtTime(0.22/(i+1),now+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001,now+0.55 + i*0.06);
+      o.connect(g).connect(ac.destination);
+      o.start(now + i*0.008);
+      o.stop(now + 0.7 + i*0.06);
+    });
+  }
+
+  ringBtn.addEventListener('click',()=>{
+    ding();
+    state.bellShake = 1;
+    state.accelKick += 1.8;
+    for(let i=0;i<12;i++){
+      addParticle(w*0.53,h*0.43,(Math.random()-0.2)*3,-Math.random()*2-1,45,2+Math.random()*2,'#ffeb3b');
+    }
+  });
+
+  sprintBtn.addEventListener('click',()=>{
+    if(state.stamina>0.1){
+      state.sprint = Math.min(1,state.sprint+0.9);
+      state.accelKick += 2.5;
+    }
+  });
+
+  feedBtn.addEventListener('click',()=>{
+    state.stamina = Math.min(1,state.stamina+0.28);
+    state.fishPop = 1;
+    for(let i=0;i<18;i++){
+      addParticle(w*0.5,h*0.63,(Math.random()-0.5)*4,-Math.random()*3-1,55,2+Math.random()*3,'#80deea');
+    }
+  });
+
+  function sky(){
+    const grad = ctx.createLinearGradient(0,0,0,h);
+    if(state.time==='day'){
+      grad.addColorStop(0,'#87ceff'); grad.addColorStop(1,'#cdefff');
+    }else if(state.time==='dusk'){
+      grad.addColorStop(0,'#ffb47a'); grad.addColorStop(0.5,'#ff8aa1'); grad.addColorStop(1,'#7d9be6');
+    }else{
+      grad.addColorStop(0,'#0d1b3d'); grad.addColorStop(1,'#243b67');
+    }
+    ctx.fillStyle=grad; ctx.fillRect(0,0,w,h);
+  }
+
+  function loop(){
+    requestAnimationFrame(loop);
+    state.t += 0.016;
+    state.sprint *= 0.97;
+    state.bellShake *= 0.9;
+    state.fishPop *= 0.92;
+    state.accelKick *= 0.95;
+
+    const staminaUse = 0.0018*(state.speed/7) + 0.006*state.sprint;
+    state.stamina = Math.max(0, state.stamina - staminaUse);
+    state.stamina += 0.0008*(1-state.speedN);
+    state.stamina = Math.min(1,state.stamina);
+
+    const tiredPenalty = (1-state.stamina)*2.6;
+    state.targetSpeed = (1.5 + state.speedN*7) + state.accelKick + state.sprint*4.5 - tiredPenalty;
+    state.targetSpeed = Math.max(1.2, state.targetSpeed);
+    state.speed += (state.targetSpeed-state.speed)*0.05;
+
+    staminaFill.style.width = (state.stamina*100).toFixed(0)+'%';
+    staminaFill.style.background = state.stamina>0.5?'linear-gradient(90deg,#43a047,#a5d6a7)':state.stamina>0.25?'linear-gradient(90deg,#ef6c00,#ffcc80)':'linear-gradient(90deg,#e53935,#ef9a9a)';
+    staminaTxt.textContent = (state.stamina*100|0)+'%';
+
+    sky();
+
+    // distant sea
+    const seaY=h*0.62;
+    ctx.fillStyle= state.time==='night' ? '#17335d' : '#58bde6';
+    ctx.fillRect(0,seaY,w,h-seaY);
+
+    // parallax clouds / stars
+    if(state.time!=='night'){
+      ctx.globalAlpha=.65;
+      for(let i=0;i<6;i++){
+        const x=( (i*260 - (state.t*state.speed*8*(0.2+i*0.1))) % (w+320) ) -160;
+        const y=70+i*20%120;
+        ctx.fillStyle='#fff';
+        cloud(x,y,1+((i%3)*.2));
+      }
+      ctx.globalAlpha=1;
+    }else{
+      ctx.fillStyle='rgba(255,255,210,.9)';
+      for(let i=0;i<80;i++){
+        const sx=(i*137)%w, sy=(i*53)%Math.floor(h*0.5);
+        ctx.fillRect(sx,sy,1.5,1.5);
+      }
+    }
+
+    // boardwalk ground
+    const groundY = h*0.73;
+    ctx.fillStyle='#caa77f'; ctx.fillRect(0,groundY,w,h-groundY);
+    ctx.strokeStyle='rgba(120,75,34,.38)'; ctx.lineWidth=2;
+    const plankW=80;
+    const shift = (state.t*state.speed*22)%plankW;
+    for(let x=-plankW;x<w+plankW;x+=plankW){
+      ctx.beginPath(); ctx.moveTo(x-shift,groundY); ctx.lineTo(x-shift,h); ctx.stroke();
+    }
+    if(state.road==='bumpy'){
+      for(let i=0;i<30;i++){
+        const rx=((i*97 + state.t*state.speed*180)% (w+60))-30;
+        const ry=groundY+10+((i*37)%90);
+        ctx.fillStyle='rgba(90,80,70,.6)';
+        ctx.beginPath(); ctx.arc(rx,ry,2+(i%3),0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    // character
+    const cx=w*0.5, cy=h*0.62;
+    const bob = Math.sin(state.t*state.speed*0.95)* (state.road==='bumpy'?9:5) + state.sprint*4;
+    drawPelican(cx, cy+bob);
+    drawBicycle(cx+10, cy-72+bob*0.6);
+
+    // particles
+    for(let i=state.particles.length-1;i>=0;i--){
+      const p=state.particles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life--;
+      if(p.life<=0){state.particles.splice(i,1);continue;}
+      ctx.globalAlpha = p.life/p.max;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+
+  function cloud(x,y,s=1){
+    ctx.beginPath();
+    ctx.arc(x,y,22*s,0,Math.PI*2);
+    ctx.arc(x+20*s,y-10*s,28*s,0,Math.PI*2);
+    ctx.arc(x+48*s,y,24*s,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawPelican(x,y){
+    const run = state.t*state.speed*0.65;
+    const wing = Math.sin(run*2.3)*0.5 + state.sprint*0.4;
+    const leg = Math.sin(run*3.2);
+    const pant = 1-state.stamina;
+    ctx.save(); ctx.translate(x,y);
+
+    // body
+    ctx.fillStyle='#f2f0e9';
+    ellipse(0,0,130,58);
+
+    // tail
+    ctx.fillStyle='#d7d2c9';
+    poly([[-124,-8],[-156,-22],[-150,8]]);
+
+    // wing
+    ctx.save();
+    ctx.translate(-15,-20);
+    ctx.rotate(-0.35 + wing*0.6);
+    ctx.fillStyle='#cfc8bd';
+    ellipse(0,0,70,28);
+    ctx.restore();
+
+    // neck/head
+    ctx.strokeStyle='#f2f0e9'; ctx.lineWidth=22; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(78,-8); ctx.quadraticCurveTo(120,-22,126,-58); ctx.stroke();
+    ctx.fillStyle='#f2f0e9'; ellipse(130,-66,20,16);
+
+    // beak + pouch
+    ctx.fillStyle='#f4a259';
+    poly([[146,-66],[210,-57],[147,-48]]);
+    const pouchSwing = Math.sin(run*2.4+1.2)*(state.road==='bumpy'?6:3) + state.bellShake*6;
+    ctx.fillStyle='#ffd3a6';
+    poly([[148,-49],[195,-45+pouchSwing],[158,-26+pouchSwing*0.7]]);
+
+    // eye/expression
+    ctx.fillStyle='#1b2a3a'; ctx.beginPath(); ctx.arc(134,-70,2.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#1b2a3a'; ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(128,-76);
+    ctx.quadraticCurveTo(136,-80+pant*7,143,-75+pant*7);
+    ctx.stroke();
+
+    // legs
+    drawLeg(-25,46,leg,0.95);
+    drawLeg(20,48,-leg,1.02);
+
+    // sweat if tired
+    if(state.stamina<0.32){
+      ctx.fillStyle='rgba(100,181,246,.9)';
+      for(let i=0;i<3;i++){
+        const sx=90+i*10, sy=-26+i*8 + Math.sin(state.t*6+i)*4;
+        ctx.beginPath(); ctx.ellipse(sx,sy,2,4,0,0,Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawLeg(x,y,k,s){
+    ctx.save(); ctx.translate(x,y);
+    const a = k*0.7*s;
+    ctx.strokeStyle='#f4a259'; ctx.lineWidth=8; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(16*Math.cos(a),18+14*Math.sin(a)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16*Math.cos(a),18+14*Math.sin(a)); ctx.lineTo(4*Math.cos(-a),38-8*Math.sin(a)); ctx.stroke();
+    ctx.fillStyle='#f4a259';
+    poly([[ -8,38],[ 16,38],[ 10,46],[-12,46]]);
+    ctx.restore();
+  }
+
+  function drawBicycle(x,y){
+    const wheelR=36;
+    const rot = state.t*state.speed*0.9;
+    const wob = Math.sin(state.t*state.speed*1.4)*(state.road==='bumpy'?0.08:0.04) + state.bellShake*0.12;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(wob);
+
+    // saddle mount straps to pelican (show "riding")
+    ctx.strokeStyle='#7b4f2e'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(-8,40); ctx.quadraticCurveTo(-14,62,-26,86); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(42,32); ctx.quadraticCurveTo(44,57,50,80); ctx.stroke();
+
+    // wheels
+    wheel(-46,42,rot,wheelR);
+    wheel(70,42,rot,wheelR);
+
+    // frame
+    ctx.strokeStyle='#2c3e50'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.lineJoin='round';
+    line(-46,42,8,2); line(8,2,70,42); line(-46,42,22,42); line(22,42,8,2); line(22,42,45,10);
+
+    // fork + handle
+    line(70,42,84,-2);
+    line(74,-6,100,-4);
+    // bell
+    ctx.fillStyle='#ffca28'; ctx.beginPath(); ctx.arc(98,-8,6,0,Math.PI*2); ctx.fill();
+    if(state.bellShake>0.05){
+      ctx.strokeStyle='rgba(255,202,40,.7)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(98,-8,12+state.bellShake*12,0,Math.PI*2); ctx.stroke();
+    }
+
+    // seat
+    ctx.strokeStyle='#2c3e50'; line(8,2,4,-18);
+    ctx.fillStyle='#37474f'; roundRect(-8,-26,24,8,4,true);
+
+    // crank + pedal
+    const cx=22, cy=42, ca=rot*2.1;
+    ctx.strokeStyle='#263238'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(cx,cy,7,0,Math.PI*2); ctx.stroke();
+    line(cx,cy,cx+16*Math.cos(ca),cy+16*Math.sin(ca));
+    line(cx,cy,cx-16*Math.cos(ca),cy-16*Math.sin(ca));
+    ctx.fillStyle='#263238';
+    roundRect(cx+16*Math.cos(ca)-5,cy+16*Math.sin(ca)-2,10,4,2,true);
+    roundRect(cx-16*Math.cos(ca)-5,cy-16*Math.sin(ca)-2,10,4,2,true);
+
+    // chain
+    ctx.strokeStyle='#455a64'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(12,42); ctx.lineTo(62,42); ctx.stroke();
+
+    // reins from handle to pelican beak area (comic control)
+    ctx.strokeStyle='#8d6e63'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(98,-4); ctx.quadraticCurveTo(128,8,160,20); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function wheel(x,y,rot,r){
+    ctx.save(); ctx.translate(x,y);
+    ctx.strokeStyle='#263238'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='#607d8b'; ctx.lineWidth=1.5;
+    for(let i=0;i<12;i++){
+      const a=rot+i*Math.PI*2/12;
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); ctx.stroke();
+    }
+    ctx.fillStyle='#263238'; ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function ellipse(x,y,rx,ry){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fill();}
+  function line(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
+  function poly(p){ctx.beginPath();ctx.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);ctx.closePath();ctx.fill();}
+  function roundRect(x,y,w,h,r,fill){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);
+    if(fill)ctx.fill();else ctx.stroke();
+  }
+
+  loop();
+})();
+</script>
+</body>
+</html>

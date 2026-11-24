@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>自行车骑鹈鹕 · A Bicycle Riding a Pelican</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  overflow:hidden;background:#7fc9f5;color:#17202c;
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+#stage{position:fixed;inset:0;background:linear-gradient(#54bdf8,#e6f8ff 52%,#e9d1a6 68%,#bb7c4d 76%,#8a5330)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+#title{position:absolute;left:20px;top:18px;z-index:6;pointer-events:none;max-width:min(52vw,380px)}
+#title .card{background:rgba(255,255,255,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.8);border-radius:18px;padding:13px 17px;box-shadow:0 12px 34px rgba(15,40,70,.18)}
+#title .kicker{font-size:10px;letter-spacing:.28em;color:#e63946;font-weight:800;text-transform:uppercase}
+#title h1{margin:5px 0 2px;font-size:clamp(21px,2.7vw,31px);letter-spacing:.05em;line-height:1.15}
+#title .sub{margin:0;font-size:11.5px;opacity:.6;letter-spacing:.14em;text-transform:uppercase}
+#mood{margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  background:#17202c;color:#fff;padding:5px 12px;border-radius:999px;box-shadow:0 6px 16px rgba(15,30,50,.25)}
+
+#hint{position:absolute;right:18px;top:18px;z-index:6;pointer-events:none;font-size:11.5px;color:#31435c;
+  background:rgba(255,255,255,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.75);padding:9px 13px;border-radius:14px;letter-spacing:.05em;line-height:1.7;
+  box-shadow:0 8px 22px rgba(15,40,70,.14)}
+#hint b{color:#e63946}
+
+#panel{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:7;display:flex;flex-wrap:wrap;
+  gap:6px;justify-content:center;align-items:stretch;padding:12px 14px;max-width:calc(100vw - 24px);
+  background:rgba(255,255,255,.74);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.85);border-radius:22px;box-shadow:0 20px 46px rgba(12,32,58,.26)}
+.group{display:flex;flex-direction:column;gap:8px;justify-content:center;padding:4px 14px;
+  border-right:1px solid rgba(20,40,70,.12)}
+.group:last-child{border-right:none}
+.cap{font-size:10.5px;letter-spacing:.16em;color:#5d6d81;font-weight:800;text-transform:uppercase}
+.cap b{color:#e63946;font-size:13px;margin-left:4px}
+.row{display:flex;gap:8px;align-items:center}
+.btn{appearance:none;border:none;cursor:pointer;font:inherit;font-size:13.5px;font-weight:700;color:#17202c;
+  background:#fff;border:1px solid rgba(20,40,70,.16);padding:9px 15px;border-radius:13px;
+  box-shadow:0 3px 0 rgba(20,40,70,.14);transition:transform .12s,box-shadow .12s,background .2s,filter .2s;white-space:nowrap}
+.btn:hover{background:#f5f9fd;transform:translateY(-1px)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(20,40,70,.14)}
+.btn:focus-visible{outline:3px solid #2f6df0;outline-offset:2px}
+.btn.bell{background:linear-gradient(180deg,#ffeaa6,#ffc94d);border-color:#e0a41e;box-shadow:0 3px 0 #c5870f}
+.btn.hot{background:linear-gradient(180deg,#ff7a59,#ff4d6d);color:#fff;border-color:#e03a55;box-shadow:0 3px 0 #b32b41}
+.btn.hot:hover{filter:brightness(1.07);background:linear-gradient(180deg,#ff7a59,#ff4d6d)}
+.btn.ghost{background:rgba(255,255,255,.62);font-weight:600;font-size:12.5px;padding:8px 13px}
+.btn.done{background:linear-gradient(180deg,#8ef0c0,#2ed39a);border-color:#17b17c;color:#083b2b;box-shadow:0 3px 0 #109066}
+.slider{-webkit-appearance:none;appearance:none;width:152px;height:9px;border-radius:99px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,#4dd4ff,#4d7bff);box-shadow:inset 0 1px 3px rgba(0,0,0,.18)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:21px;height:21px;border-radius:50%;background:#fff;
+  border:3px solid #2f6df0;box-shadow:0 2px 7px rgba(0,0,0,.3);cursor:grab}
+.slider::-moz-range-thumb{width:18px;height:18px;border:3px solid #2f6df0;border-radius:50%;background:#fff}
+.bar{width:132px;height:11px;border-radius:99px;background:rgba(20,40,70,.16);overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.14)}
+.bar i{display:block;height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,#3ddc97,#0fbf7a);
+  transition:width .25s ease,background .35s ease}
+.shakeIt{animation:shk .55s}
+@keyframes shk{0%,100%{transform:translateX(0) rotate(0)}18%{transform:translateX(-5px) rotate(-7deg)}
+ 36%{transform:translateX(5px) rotate(7deg)}54%{transform:translateX(-4px) rotate(-5deg)}
+ 72%{transform:translateX(4px) rotate(4deg)}88%{transform:translateX(-2px) rotate(-2deg)}}
+@media (max-width:880px){
+  .slider{width:112px}.group{border-right:none;padding:4px 8px}#hint{display:none}
+  #title{max-width:64vw}#panel{bottom:10px;padding:10px}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+<svg id="scene" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet" aria-label="一辆自行车骑在奔跑的鹈鹕背上的动画插画">
+  <defs>
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop id="skyS1" offset="0" stop-color="#54bdf8"/><stop id="skyS2" offset="1" stop-color="#e6f8ff"/>
+    </linearGradient>
+    <radialGradient id="glowGrad">
+      <stop id="glowS1" offset="0" stop-color="#fff8cf" stop-opacity=".95"/>
+      <stop id="glowS2" offset="1" stop-color="#ffd15a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="seaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop id="seaS1" offset="0" stop-color="#2f96d6"/><stop id="seaS2" offset="1" stop-color="#8adef5"/>
+    </linearGradient>
+    <linearGradient id="sandGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop id="sandS1" offset="0" stop-color="#faedd4"/><stop id="sandS2" offset="1" stop-color="#e9d1a6"/>
+    </linearGradient>
+    <linearGradient id="deckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop id="deckS1" offset="0" stop-color="#e0ab72"/><stop id="deckS2" offset="1" stop-color="#bb7c4d"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2=".25" y2="1">
+      <stop id="bodyS1" offset="0" stop-color="#fffcf6"/><stop id="bodyS2" offset="1" stop-color="#f0e2ce"/>
+    </linearGradient>
+    <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop id="wingS1" offset="0" stop-color="#fffbf3"/><stop id="wingS2" offset="1" stop-color="#eadaC1"/>
+    </linearGradient>
+    <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6a76"/><stop offset="1" stop-color="#d61f36"/>
+    </linearGradient>
+    <linearGradient id="tyreGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d434f"/><stop offset="1" stop-color="#20242c"/>
+    </linearGradient>
+    <radialGradient id="shadowGrad">
+      <stop offset="0" stop-color="#3a2718" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#3a2718" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vigGrad" cx="50%" cy="50%" r="72%">
+      <stop offset=".52" stop-color="#0b1a33" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0b1a33" stop-opacity=".9"/>
+    </radialGradient>
+
+    <g id="cloudShape">
+      <path d="M18 46 C 2 46 0 26 16 22 C 16 6 40 -6 54 8 C 66 -6 92 -4 98 12 C 116 8 130 24 120 36 C 132 38 134 46 120 46 Z"/>
+    </g>
+    <g id="tuftShape">
+      <path d="M0 0 C 4 -20 12 -32 22 -44 C 12 -24 8 -10 6 0 Z"/>
+      <path d="M6 0 C 8 -24 18 -38 32 -50 C 21 -30 14 -12 12 0 Z"/>
+      <path d="M12 0 C 19 -17 31 -27 45 -34 C 32 -21 23 -8 19 0 Z"/>
+    </g>
+    <g id="postShape">
+      <rect x="0" y="0" width="16" height="88" rx="7"/>
+      <rect x="-5" y="-7" width="26" height="15" rx="7"/>
+    </g>
+    <clipPath id="eyeClip"><ellipse cx="866" cy="322" rx="13" ry="14"/></clipPath>
+  </defs>
+
+  <!-- ================= 天空 ================= -->
+  <rect x="-400" y="-400" width="2000" height="1300" fill="url(#skyGrad)"/>
+  <g id="stars" opacity="0"></g>
+  <g id="celestial">
+    <circle id="sunGlow" cx="1010" cy="112" r="165" fill="url(#glowGrad)"/>
+    <g id="sunRays" stroke="#ffe9a8" opacity=".85"></g>
+    <circle id="sunCore" cx="1010" cy="112" r="52" fill="#ffe27a"/>
+  </g>
+  <g id="cloudsFar" fill="#ffffff" opacity=".95"></g>
+
+  <!-- ================= 远海 ================= -->
+  <rect x="-400" y="378" width="2000" height="132" fill="url(#seaGrad)"/>
+  <g id="seaFar" fill="#ffffff" opacity=".92"></g>
+  <g id="waves" fill="none" stroke="#d6f2ff" stroke-width="4" stroke-linecap="round" opacity=".8"></g>
+
+  <!-- ================= 沙滩 ================= -->
+  <rect x="-400" y="500" width="2000" height="74" fill="url(#sandGrad)"/>
+  <g id="sandDots" fill="#d9bd91" opacity=".7"></g>
+
+  <!-- ================= 木栈道 ================= -->
+  <rect x="-400" y="566" width="2000" height="240" fill="url(#deckGrad)"/>
+  <line id="deckEdge" x1="-400" y1="572" x2="1600" y2="572" stroke="#f0c795" stroke-width="7"/>
+  <g id="planks" stroke="#a86c40" stroke-width="5" stroke-linecap="round" opacity=".55"></g>
+  <g id="stones" style="display:none"></g>
+
+  <!-- ================= 影子 ================= -->
+  <ellipse id="shadowEl" cx="545" cy="578" rx="190" ry="24" fill="url(#shadowGrad)" opacity=".45"/>
+
+  <!-- ================= 主角：鹈鹕 + 自行车 ================= -->
+  <g id="pelicanRoot">
+    <!-- 腿脚 -->
+    <g id="legs">
+      <g id="legB">
+        <path d="M500 498 C 510 522 512 544 506 560" fill="none" stroke="#e58a24" stroke-width="15" stroke-linecap="round"/>
+        <g id="footB">
+          <path d="M484 556 L 546 564 L 528 576 L 496 578 L 474 566 Z" fill="#ee9228" stroke="#d67a16" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M496 562 L 534 568 M492 570 L 524 574" fill="none" stroke="#d67a16" stroke-width="2.5"/>
+        </g>
+      </g>
+      <g id="legF">
+        <path d="M578 498 C 588 522 590 544 584 560" fill="none" stroke="#f5992e" stroke-width="16" stroke-linecap="round"/>
+        <g id="footF">
+          <path d="M562 556 L 626 564 L 608 576 L 574 578 L 552 566 Z" fill="#ffab3d" stroke="#e58a24" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M576 562 L 616 568 M572 570 L 606 574" fill="none" stroke="#e58a24" stroke-width="2.5"/>
+        </g>
+      </g>
+    </g>
+
+    <g id="bodyG">
+      <!-- 尾羽 -->
+      <g id="tail">
+        <path d="M438 424 C 386 408 344 424 316 458 C 358 470 406 466 448 452 Z" fill="#efe1cb"/>
+        <path d="M444 448 C 398 448 358 468 340 498 C 388 502 432 486 462 466 Z" fill="#e6d6bd"/>
+      </g>
+      <!-- 身体 -->
+      <ellipse cx="545" cy="450" rx="150" ry="95" fill="url(#bodyGrad)"/>
+      <ellipse cx="565" cy="494" rx="112" ry="50" fill="#f7ebda" opacity=".7"/>
+      <!-- 长颈 -->
+      <path id="neckPath" d="M648 402 C 706 398 752 380 786 352 C 804 338 820 332 838 334 L 858 388
+        C 826 390 798 406 770 434 C 736 468 692 490 646 498 Z" fill="url(#bodyGrad)"/>
+      <!-- 翅膀 -->
+      <g id="wing">
+        <path d="M578 410 C 520 392 448 412 406 464 C 428 506 486 518 542 498 C 582 484 600 448 578 410 Z"
+              fill="url(#wingGrad)" stroke="#e0cbaa" stroke-width="3.5" stroke-linejoin="round"/>
+        <path d="M470 474 C 502 452 538 442 572 440" fill="none" stroke="#e0cbaa" stroke-width="3" stroke-linecap="round"/>
+        <path d="M444 486 C 478 470 512 460 546 456" fill="none" stroke="#e0cbaa" stroke-width="3" stroke-linecap="round"/>
+      </g>
+      <!-- 头部 -->
+      <g id="headG">
+        <circle id="headC" cx="850" cy="340" r="43" fill="url(#bodyGrad)"/>
+        <path id="crest" d="M812 316 C 802 292 826 280 842 298 C 854 286 870 296 864 312 Z" fill="#f1e3cf"/>
+        <g id="beakG">
+          <g id="pouch">
+            <path d="M864 348 C 902 356 962 362 1014 356 C 1012 414 968 450 916 450 C 870 450 852 404 856 366 Z" fill="#ffbc57"/>
+            <path d="M874 402 C 912 416 964 410 1002 386" fill="none" stroke="#eb9c31" stroke-width="4" opacity=".65"/>
+            <path d="M886 366 C 930 376 976 376 1010 366" fill="none" stroke="#eb9c31" stroke-width="3.5" opacity=".55"/>
+          </g>
+          <path id="beakTop" d="M862 313 C 926 311 984 328 1018 348 C 1021 354 1016 359 1011 356
+            C 966 344 912 340 862 344 Z" fill="#f9ab2d"/>
+          <path id="beakLine" d="M868 336 C 926 336 978 344 1014 354" fill="none" stroke="#e08b12" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="888" cy="324" r="4" fill="#e08b12"/>
+        </g>
+        <ellipse id="blush" cx="836" cy="366" rx="16" ry="10" fill="#ff9d8a" opacity=".5"/>
+        <g id="eyeScale">
+          <ellipse cx="866" cy="322" rx="13" ry="14" fill="#ffffff" stroke="#2b2b33" stroke-width="2.5"/>
+          <circle id="pupil" cx="871" cy="323" r="7.5" fill="#23232b"/>
+          <circle cx="874.5" cy="318.5" r="2.8" fill="#ffffff"/>
+          <g clip-path="url(#eyeClip)"><rect id="lidRect" x="844" y="258" width="46" height="48" fill="#f7e8d5"/></g>
+        </g>
+      </g>
+    </g>
+
+    <!-- ===== 骑手：自行车 ===== -->
+    <g id="bikeG">
+      <g id="wheelRear">
+        <circle cx="430" cy="315" r="79" fill="none" stroke="url(#tyreGrad)" stroke-width="14"/>
+        <g id="spokesRear" stroke="#9aa4b2" stroke-width="3.4" stroke-linecap="round"></g>
+        <circle cx="430" cy="315" r="15" fill="none" stroke="#7d8695" stroke-width="6" stroke-dasharray="4 5"/>
+        <circle cx="430" cy="315" r="8" fill="#454b57"/>
+        <circle cx="430" cy="315" r="3" fill="#e7edf5"/>
+      </g>
+      <g id="wheelFront">
+        <circle cx="665" cy="315" r="79" fill="none" stroke="url(#tyreGrad)" stroke-width="14"/>
+        <g id="spokesFront" stroke="#9aa4b2" stroke-width="3.4" stroke-linecap="round"></g>
+        <circle cx="665" cy="315" r="8" fill="#454b57"/>
+        <circle cx="665" cy="315" r="3" fill="#e7edf5"/>
+      </g>
+
+      <g id="frameG" fill="none" stroke="url(#frameGrad)" stroke-width="12" stroke-linecap="round">
+        <path d="M492 216 L 430 315"/>
+        <path d="M555 331 L 430 315"/>
+        <path d="M555 331 L 490 208"/>
+        <path d="M555 331 L 648 224"/>
+        <path d="M492 216 L 648 224"/>
+        <path d="M648 224 L 665 315"/>
+        <path d="M648 224 L 656 198"/>
+      </g>
+
+      <path id="chainTop" d="M555 300 L 430 300" fill="none" stroke="#5f6672" stroke-width="5" stroke-dasharray="7 6"/>
+      <path id="chainBot" d="M430 330 L 555 362" fill="none" stroke="#5f6672" stroke-width="5" stroke-dasharray="7 6"/>
+
+      <g id="crankG">
+        <circle cx="555" cy="331" r="32" fill="none" stroke="#8d95a3" stroke-width="7" stroke-dasharray="5 6"/>
+        <line x1="555" y1="331" x2="555" y2="377" stroke="#31353d" stroke-width="8" stroke-linecap="round"/>
+        <line x1="555" y1="331" x2="555" y2="285" stroke="#31353d" stroke-width="8" stroke-linecap="round"/>
+        <g id="pedalA"><rect x="-15" y="-5.5" width="30" height="11" rx="4" fill="#1f232a"/></g>
+        <g id="pedalB"><rect x="-15" y="-5.5" width="30" height="11" rx="4" fill="#1f232a"/></g>
+      </g>
+
+      <rect x="478" y="200" width="13" height="18" rx="5" fill="#31353d"/>
+      <path id="saddle" d="M454 202 C 466 187 508 181 520 192 C 526 199 515 207 499 209 L 468 211
+        C 454 213 448 208 454 202 Z" fill="#3a2b28"/>
+
+      <path d="M436 258 L 478 236" fill="none" stroke="#31353d" stroke-width="7" stroke-linecap="round"/>
+      <path d="M478 236 L 478 214" fill="none" stroke="#31353d" stroke-width="7" stroke-linecap="round"/>
+      <path d="M452 226 C 438 248 448 272 470 276 C 488 278 496 258 486 240 Z" fill="#2f7d5b"/>
+      <text x="466" y="262" font-size="14" font-weight="800" fill="#eafff4" text-anchor="middle">GO!</text>
+
+      <path id="bars" d="M656 198 C 666 184 686 178 704 186 C 716 192 720 204 714 214"
+            fill="none" stroke="#31353d" stroke-width="9" stroke-linecap="round"/>
+      <rect x="700" y="204" width="26" height="14" rx="6" fill="#e63946" transform="rotate(20 713 211)"/>
+
+      <g id="bikeBell" style="cursor:pointer">
+        <circle cx="670" cy="182" r="14" fill="#ffd166" stroke="#d19a1e" stroke-width="3"/>
+        <path d="M663 183 a7 7 0 0 1 14 0 Z" fill="#fff5d6"/>
+        <circle cx="670" cy="192" r="3.6" fill="#d19a1e"/>
+      </g>
+
+      <g id="flagG">
+        <line x1="470" y1="184" x2="470" y2="126" stroke="#31353d" stroke-width="5" stroke-linecap="round"/>
+        <g id="flag">
+          <path d="M472 130 C 446 136 446 158 472 164 Z" fill="#e63946"/>
+          <text x="458" y="153" font-size="12" font-weight="800" fill="#ffffff" text-anchor="middle">骑</text>
+        </g>
+      </g>
+
+      <path d="M520 268 C 512 300 514 330 524 356" fill="none" stroke="#e63946" stroke-width="7" stroke-linecap="round" opacity=".95"/>
+      <path d="M614 262 C 624 300 626 334 620 366" fill="none" stroke="#e63946" stroke-width="7" stroke-linecap="round" opacity=".95"/>
+    </g>
+
+    <!-- 缰绳（车把 → 鹈鹕长喙） -->
+    <g id="reins">
+      <path d="M716 212 C 796 234 872 274 916 320" fill="none" stroke="#7c4a2a" stroke-width="6.5" stroke-linecap="round"/>
+      <path d="M712 222 C 790 246 864 288 910 332" fill="none" stroke="#95603a" stroke-width="5.5" stroke-linecap="round"/>
+      <path id="bridle" d="M906 314 C 898 330 898 346 906 362" fill="none" stroke="#7c4a2a" stroke-width="9" stroke-linecap="round"/>
+      <path d="M916 322 C 908 336 908 350 916 364" fill="none" stroke="#95603a" stroke-width="5" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- ================= 前景（视差） ================= -->
+  <g id="foreground" fill="#5fb877"></g>
+  <g id="fgPosts" fill="#a8724a"></g>
+
+  <!-- ================= 粒子特效 ================= -->
+  <g id="fx"></g>
+  <g id="fishLayer">
+    <g id="fishFly" opacity="0">
+      <path d="M-16 0 C -6 -12 10 -12 18 0 C 10 12 -6 12 -16 0 Z" fill="#7fd0f0"/>
+      <path d="M-16 0 L -30 -10 L -27 0 L -30 10 Z" fill="#5ab6dd"/>
+      <circle cx="8" cy="-3" r="2.6" fill="#17303f"/>
+    </g>
+    <text id="feedPop" x="950" y="330" font-size="27" font-weight="800" fill="#12b97c" opacity="0" text-anchor="middle">+30 体力</text>
+  </g>
+
+  <rect id="vignette" x="-400" y="-400" width="2000" height="1300" fill="url(#vigGrad)" opacity=".16" pointer-events="none"/>
+</svg>
+</div>
+
+<header id="title">
+  <div class="card">
+    <div class="kicker">Interactive SVG Arena</div>
+    <h1>自行车骑鹈鹕</h1>
+    <p class="sub">A Bicycle Riding a Pelican</p>
+    <div id="mood">😊 悠闲巡航</div>
+  </div>
+</header>
+
+<div id="hint">
+  <b>空格</b> 冲刺 · <b>B</b> 按铃 · <b>F</b> 投喂<br>
+  <b>R</b> 路况 · <b>T</b> 时段 · 点击车上的铃也可
+</div>
+
+<section id="panel">
+  <div class="group">
+    <span class="cap">车铃</span>
+    <div class="row"><button id="bellBtn" class="btn bell">🔔 按铃</button></div>
+  </div>
+  <div class="group">
+    <span class="cap">速度 <b id="spdVal">5</b></span>
+    <div class="row">
+      <input id="speed" class="slider" type="range" min="1" max="10" step="1" value="5" aria-label="前进速度"/>
+      <button id="sprintBtn" class="btn hot">⚡ 冲刺</button>
+    </div>
+  </div>
+  <div class="group">
+    <span class="cap">体力 <b id="staVal">100</b></span>
+    <div class="row">
+      <div class="bar"><i id="stamBar"></i></div>
+      <button id="fishBtn" class="btn">🐟 投喂</button>
+    </div>
+  </div>
+  <div class="group">
+    <span class="cap">环境</span>
+    <div class="row">
+      <button id="roadBtn" class="btn ghost">🛤 路况：平路</button>
+      <button id="timeBtn" class="btn ghost">☀️ 晴天</button>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+'use strict';
+var NS='http://www.w3.org/2000/svg';
+function $(id){return document.getElementById(id);}
+function mk(tag,attrs,parent){
+  var e=document.createElementNS(NS,tag);
+  if(attrs){for(var k in attrs){e.setAttribute(k,attrs[k]);}}
+  if(parent)parent.appendChild(e);
+  return e;
+}
+function clamp(v,a,b){return v<a?a:(v>b?b:v);}
+
+/* ============================ 音频（纯代码合成） ============================ */
+var AC=null,NB=null;
+function ac(){
+  try{
+    if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C();}
+    if(AC.state==='suspended'&&AC.resume){AC.resume();}
+    return AC;
+  }catch(e){return null;}
+}
+function noiseBuffer(){
+  var a=ac();if(!a)return null;
+  if(!NB){
+    NB=a.createBuffer(1,Math.floor(a.sampleRate*0.6),a.sampleRate);
+    var d=NB.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }
+  return NB;
+}
+function live(){return !!(AC&&AC.state==='running');}
+
+function ringBell(){
+  var a=ac();if(!a)return;var t=a.currentTime;
+  var parts=[[1660,.18,1.0],[2490,.11,.82],[3320,.07,.62],[4160,.045,.46],[5240,.03,.36]];
+  for(var i=0;i<parts.length;i++){
+    var p=parts[i];
+    var o=a.createOscillator();o.type=i<2?'sine':'triangle';o.frequency.value=p[0];
+    var g=a.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(p[1],t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.32+p[2]);
+    o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+1.7);
+  }
+  var buf=noiseBuffer();
+  if(buf){
+    var n=a.createBufferSource();n.buffer=buf;
+    var f=a.createBiquadFilter();f.type='bandpass';f.frequency.value=3400;f.Q.value=1.1;
+    var ng=a.createGain();ng.gain.setValueAtTime(.22,t);ng.gain.exponentialRampToValueAtTime(.0001,t+.07);
+    n.connect(f);f.connect(ng);ng.connect(a.destination);n.start(t);n.stop(t+.1);
+  }
+}
+function thud(vol){
+  if(!live())return;var a=AC,t=a.currentTime;
+  var o=a.createOscillator();o.type='sine';
+  o.frequency.setValueAtTime(112,t);o.frequency.exponentialRampToValueAtTime(46,t+.11);
+  var g=a.createGain();
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,t+.19);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.24);
+}
+function whoosh(){
+  if(!live())return;var a=AC,t=a.currentTime,buf=noiseBuffer();if(!buf)return;
+  var n=a.createBufferSource();n.buffer=buf;
+  var f=a.createBiquadFilter();f.type='bandpass';f.Q.value=.8;
+  f.frequency.setValueAtTime(400,t);f.frequency.exponentialRampToValueAtTime(3200,t+.32);
+  var g=a.createGain();g.gain.setValueAtTime(.0001,t);
+  g.gain.exponentialRampToValueAtTime(.22,t+.05);
+  g.gain.exponentialRampToValueAtTime(.0001,t+.42);
+  n.connect(f);f.connect(g);g.connect(a.destination);n.start(t);n.stop(t+.5);
+}
+function gulpSfx(){
+  if(!live())return;var a=AC,t=a.currentTime;
+  for(var i=0;i<2;i++){
+    var o=a.createOscillator();o.type='sine';
+    o.frequency.setValueAtTime(300-i*70,t+i*.13);
+    o.frequency.exponentialRampToValueAtTime(150-i*40,t+i*.13+.11);
+    var g=a.createGain();g.gain.setValueAtTime(.0001,t+i*.13);
+    g.gain.exponentialRampToValueAtTime(.2,t+i*.13+.015);
+    g.gain.exponentialRampToValueAtTime(.0001,t+i*.13+.14);
+    o.connect(g);g.connect(a.destination);o.start(t+i*.13);o.stop(t+i*.13+.2);
+  }
+}
+
+/* ============================ 状态 ============================ */
+var S={
+  speed:5,v:4,dist:0,phase:0,wheelA:0,crankA:0,prevSin:0,
+  stamina:100,sprintT:0,startle:0,bellT:0,gulpT:0,
+  road:'flat',timeIdx:0,blinkAge:0,blinkGap:2.4,tired:false,
+  featherT:.3,sweatT:.5,lineT:0,popT:0,
+  fishOn:false,fishP:0,fishDur:.8,fishX:0,fishY:0,fishPX:0,fishPY:0
+};
+
+/* ============================ 时段调色 ============================ */
+var TIMES=[
+{label:'☀️ 晴天',bg:'linear-gradient(#54bdf8,#e6f8ff 52%,#e9d1a6 68%,#bb7c4d 76%,#8a5330)',spec:[
+  ['skyS1','stop-color','#54bdf8'],['skyS2','stop-color','#e6f8ff'],
+  ['glowS1','stop-color','#fff8cf'],['glowS2','stop-color','#ffd15a'],
+  ['sunCore','cx','1010'],['sunCore','cy','112'],['sunCore','fill','#ffe27a'],
+  ['sunGlow','cx','1010'],['sunGlow','cy','112'],
+  ['sunRays','transform','translate(1010 112)'],['sunRays','stroke','#ffe9a8'],['sunRays','opacity','.85'],
+  ['stars','opacity','0'],
+  ['seaS1','stop-color','#2f96d6'],['seaS2','stop-color','#8adef5'],
+  ['waves','stroke','#d6f2ff'],['waves','opacity','.8'],
+  ['seaFar','fill','#ffffff'],['seaFar','opacity','.92'],
+  ['sandS1','stop-color','#faedd4'],['sandS2','stop-color','#e9d1a6'],
+  ['sandDots','fill','#d9bd91'],['sandDots','opacity','.7'],
+  ['deckS1','stop-color','#e0ab72'],['deckS2','stop-color','#bb7c4d'],
+  ['planks','stroke','#a86c40'],['planks','opacity','.55'],
+  ['deckEdge','stroke','#f0c795'],
+  ['foreground','fill','#5fb877'],['fgPosts','fill','#a8724a'],['signBoard','fill','#8a5a34'],
+  ['bodyS1','stop-color','#fffcf6'],['bodyS2','stop-color','#f0e2ce'],
+  ['wingS1','stop-color','#fffbf3'],['wingS2','stop-color','#edadc1'],
+  ['cloudsFar','fill','#ffffff'],['cloudsFar','opacity','.95'],
+  ['vignette','opacity','.16']
+]},
+{label:'🌇 黄昏',bg:'linear-gradient(#4b5bbf,#ffb98a 52%,#d9ab7c 68%,#8f5730 76%,#4a2f1c)',spec:[
+  ['skyS1','stop-color','#4b5bbf'],['skyS2','stop-color','#ffd2a1'],
+  ['glowS1','stop-color','#ffe7bd'],['glowS2','stop-color','#ff9d4d'],
+  ['sunCore','cx','950'],['sunCore','cy','250'],['sunCore','fill','#ffcf8a'],
+  ['sunGlow','cx','950'],['sunGlow','cy','250'],
+  ['sunRays','transform','translate(950 250)'],['sunRays','stroke','#ffcf8a'],['sunRays','opacity','.55'],
+  ['stars','opacity','.3'],
+  ['seaS1','stop-color','#4a5fb8'],['seaS2','stop-color','#ffb98a'],
+  ['waves','stroke','#ffd9b5'],['waves','opacity','.8'],
+  ['seaFar','fill','#ffd9b5'],['seaFar','opacity','.9'],
+  ['sandS1','stop-color','#e7c79b'],['sandS2','stop-color','#cfa074'],
+  ['sandDots','fill','#b98d63'],['sandDots','opacity','.65'],
+  ['deckS1','stop-color','#c98d5e'],['deckS2','stop-color','#8f5730'],
+  ['planks','stroke','#7d4a2a'],['planks','opacity','.5'],
+  ['deckEdge','stroke','#f3c191'],
+  ['foreground','fill','#4c8f5f'],['fgPosts','fill','#7d5236'],['signBoard','fill','#8a5a34'],
+  ['bodyS1','stop-color','#fff3e2'],['bodyS2','stop-color','#e8d5c0'],
+  ['wingS1','stop-color','#fff0dd'],['wingS2','stop-color','#e3cdb4'],
+  ['cloudsFar','fill','#ffc9a6'],['cloudsFar','opacity','.8'],
+  ['vignette','opacity','.26']
+]},
+{label:'🌙 夜晚',bg:'linear-gradient(#0d1533,#2b3d74 52%,#5b6a94 68%,#3a2e27 76%,#211a15)',spec:[
+  ['skyS1','stop-color','#0d1533'],['skyS2','stop-color','#2b3d74'],
+  ['glowS1','stop-color','#e9f1ff'],['glowS2','stop-color','#8fa8e8'],
+  ['sunCore','cx','240'],['sunCore','cy','132'],['sunCore','fill','#f5f8ff'],
+  ['sunGlow','cx','240'],['sunGlow','cy','132'],
+  ['sunRays','transform','translate(240 132)'],['sunRays','stroke','#dbe6ff'],['sunRays','opacity','0'],
+  ['stars','opacity','.95'],
+  ['seaS1','stop-color','#14224a'],['seaS2','stop-color','#2f4f86'],
+  ['waves','stroke','#9fc4ff'],['waves','opacity','.45'],
+  ['seaFar','fill','#c9d8ff'],['seaFar','opacity','.75'],
+  ['sandS1','stop-color','#7b8ab3'],['sandS2','stop-color','#5b6a94'],
+  ['sandDots','fill','#4d5b84'],['sandDots','opacity','.6'],
+  ['deckS1','stop-color','#6b5546'],['deckS2','stop-color','#3a2e27'],
+  ['planks','stroke','#2b211b'],['planks','opacity','.55'],
+  ['deckEdge','stroke','#9d866f'],
+  ['foreground','fill','#2f5f57'],['fgPosts','fill','#4a3a2e'],['signBoard','fill','#54402f'],
+  ['bodyS1','stop-color','#f4f1ea'],['bodyS2','stop-color','#cdc8bf'],
+  ['wingS1','stop-color','#f0ede5'],['wingS2','stop-color','#c9c4bb'],
+  ['cloudsFar','fill','#7f8fc9'],['cloudsFar','opacity','.45'],
+  ['vignette','opacity','.42']
+]}];
+function applyTime(){
+  var T=TIMES[S.timeIdx],i,e;
+  for(i=0;i<T.spec.length;i++){e=$(T.spec[i][0]);if(e)e.setAttribute(T.spec[i][1],T.spec[i][2]);}
+  $('stage').style.background=T.bg;
+  $('timeBtn').textContent=T.label;
+}
+
+/* ============================ 场景生成 ============================ */
+function buildScene(){
+  var i,x,y,a;
+  /* 星星 */
+  var st=$('stars');
+  for(i=0;i<80;i++){
+    mk('circle',{cx:(Math.random()*1340-70).toFixed(1),cy:(Math.random()*340+8).toFixed(1),
+      r:(Math.random()*1.7+.6).toFixed(2),fill:'#ffffff',opacity:(Math.random()*.6+.35).toFixed(2)},st);
+  }
+  /* 光芒 */
+  var rays=$('sunRays');
+  for(i=0;i<12;i++){
+    a=i*Math.PI/6;
+    mk('line',{x1:(Math.cos(a)*66).toFixed(1),y1:(Math.sin(a)*66).toFixed(1),
+      x2:(Math.cos(a)*100).toFixed(1),y2:(Math.sin(a)*100).toFixed(1),
+      'stroke-width':7,'stroke-linecap':'round'},rays);
+  }
+  /* 云（视差 0.05） */
+  var cl=$('cloudsFar');
+  for(i=0;i<11;i++){
+    x=-700+i*280+(i%2?46:0); y=38+((i*57)%130);
+    var sc=(.72+((i*31)%52)/100).toFixed(2);
+    var u=mk('use',{href:'#cloudShape'},cl);
+    u.setAttribute('transform','translate('+x+' '+y+') scale('+sc+')');
+  }
+  /* 远处船只与海鸥（视差 0.12） */
+  var sf=$('seaFar');
+  for(i=0;i<5;i++){
+    x=-900+i*700+(i%2?150:0); y=432+(i%3)*14;
+    var g=mk('g',{transform:'translate('+x+' '+y+') scale('+(.72+(i%3)*.2).toFixed(2)+')'},sf);
+    mk('path',{d:'M0 0 L 0 -50 L 36 -7 Z'},g);
+    mk('path',{d:'M0 -50 L 0 4',stroke:'#7f93a8','stroke-width':3,fill:'none'},g);
+    mk('path',{d:'M-28 0 L 50 0 L 40 13 L -19 13 Z',fill:'#3f5d7a'},g);
+  }
+  for(i=0;i<4;i++){
+    x=-300+i*430+((i*97)%180); y=300+((i*61)%70);
+    mk('path',{d:'M0 0 q 9 -8 18 0 q 9 -8 18 0',fill:'none',stroke:'#5f7288','stroke-width':3,'stroke-linecap':'round'},sf);
+    sf.lastChild.setAttribute('transform','translate('+x+' '+y+')');
+  }
+  /* 浪花（视差 0.22） */
+  var wv=$('waves');
+  for(i=0;i<13;i++){
+    x=-420+i*160; y=392+((i*17)%3)*28;
+    var gw=mk('g',{transform:'translate('+x+' '+y+')'},wv);
+    mk('path',{d:'M0 0 q 17 -9 34 0'},gw);
+    mk('path',{d:'M78 14 q 14 -8 28 0'},gw);
+  }
+  /* 沙滩颗粒（视差 0.5） */
+  var sd=$('sandDots');
+  for(i=0;i<70;i++){
+    x=-420+i*26; y=508+((i*37)%54);
+    mk('ellipse',{cx:x,cy:y,rx:3+((i*13)%4),ry:2.4},sd);
+  }
+  /* 木板（视差 1.0） */
+  var pl=$('planks');
+  for(x=-640;x<2120;x+=92){ mk('line',{x1:x,y1:580,x2:x+7,y2:790},pl); }
+  /* 石子路 */
+  var stones=$('stones');
+  for(x=-640;x<2120;x+=56){
+    y=596+(((x*7)%46)+46)%46;
+    mk('ellipse',{cx:x,cy:y,rx:8+(((x/56)|0)%3)*3,ry:6,fill:'#8f8578',opacity:'.8'},stones);
+  }
+  /* 前景（视差 1.45） */
+  var fg=$('foreground'),fp=$('fgPosts');
+  for(i=-2;i<10;i++){
+    x=i*230;
+    var t=mk('use',{href:'#tuftShape'},fg);
+    t.setAttribute('transform','translate('+(x+18)+' 706) scale('+(1+((i%3)+3)%3*.24).toFixed(2)+')');
+    var p=mk('use',{href:'#postShape'},fp);
+    p.setAttribute('transform','translate('+(x+146)+' 624)');
+    if(i%3===1){
+      var p2=mk('use',{href:'#postShape'},fp);
+      p2.setAttribute('transform','translate('+(x+40)+' 664) scale(.8)');
+    }
+  }
+  var sb=mk('rect',{id:'signBoard',x:56,y:640,width:190,height:56,rx:12,fill:'#8a5a34'},fp);
+  mk('text',{x:151,y:666,'font-size':19,'font-weight':800,fill:'#fff6e4','text-anchor':'middle'},fp);
+  fp.lastChild.textContent='海滨木栈道';
+  mk('text',{x:151,y:686,'font-size':11,'font-weight':700,fill:'#ffe6bb','text-anchor':'middle','letter-spacing':'2'},fp);
+  fp.lastChild.textContent='BOARDWALK';
+  void sb;
+  /* 辐条 */
+  buildSpokes('spokesRear',430,315);
+  buildSpokes('spokesFront',665,315);
+}
+function buildSpokes(id,cx,cy){
+  var g=$(id);
+  for(var i=0;i<14;i++){
+    mk('line',{x1:cx,y1:cy,x2:cx,y2:cy-71,transform:'rotate('+(i*(360/14))+' '+cx+' '+cy+')'},g);
+  }
+}
+
+/* ============================ 粒子 ============================ */
+var pools={feather:[],sweat:[],dust:[],line:[]};
+function makePool(name,n,tag,attrs){
+  var g=$('fx');
+  for(var i=0;i<n;i++){
+    var e=mk(tag,attrs,g);e.setAttribute('opacity','0');
+    pools[name].push({el:e,on:false,x:0,y:0,vx:0,vy:0,life:0,max:1,t:0,rot:0,vr:0,r:0,len:0,sway:0});
+  }
+}
+function take(name){
+  var p=pools[name];
+  for(var i=0;i<p.length;i++){if(!p[i].on)return p[i];}
+  return p[0];
+}
+function buildPools(){
+  makePool('feather',16,'path',{d:'M0 0 C 10 -9 23 -7 27 3 C 21 14 5 13 0 0 Z',fill:'#fffaf0',stroke:'#e7d6bb','stroke-width':1.6});
+  makePool('sweat',20,'circle',{r:5,fill:'#8fd8ff',stroke:'#4fb3e8','stroke-width':1.6});
+  makePool('dust',14,'circle',{r:6,fill:'#d3ac7d'});
+  makePool('line',12,'line',{stroke:'#ffffff','stroke-width':3,'stroke-linecap':'round'});
+}
+function spawnFeather(){
+  var o=take('feather');o.on=true;
+  o.x=430+Math.random()*230;o.y=356+Math.random()*70;
+  o.vx=-45-S.v*5-Math.random()*30;o.vy=-42-Math.random()*40;
+  o.life=o.max=2.6;o.t=0;o.rot=Math.random()*360;o.vr=(Math.random()*2-1)*95;o.sway=Math.random()*6.3;
+}
+function spawnSweat(burst){
+  var o=take('sweat');o.on=true;
+  o.x=826+Math.random()*52;o.y=296+Math.random()*46;
+  var k=burst?1.7:1;
+  o.vx=(35+Math.random()*70)*k;o.vy=(-65-Math.random()*75)*k;
+  o.life=o.max=burst?.85:1.05;o.t=0;o.r=4+Math.random()*3.4;
+  o.el.setAttribute('r',o.r.toFixed(1));
+}
+function spawnDust(x){
+  var o=take('dust');o.on=true;
+  o.x=x;o.y=574;o.vx=(Math.random()*2-1)*46-16;o.vy=-22-Math.random()*26;
+  o.life=o.max=.55;o.t=0;o.r=6+Math.random()*5;
+}
+function spawnLine(){
+  var o=take('line');o.on=true;
+  o.x=1300+Math.random()*260;o.y=170+Math.random()*400;
+  o.vx=-(430+S.v*70);o.life=o.max=.75;o.t=0;o.len=60+Math.random()*150;
+}
+function updateParticles(dt){
+  var i,o,a;
+  for(var key in pools){
+    var p=pools[key];
+    for(i=0;i<p.length;i++){
+      o=p[i];if(!o.on)continue;
+      o.t+=dt;o.life-=dt;
+      if(key==='feather'){
+        o.vy+=36*dt;o.vx*=(1-.55*dt);
+        o.x+=o.vx*dt+Math.sin(o.t*3+o.sway)*20*dt;o.y+=o.vy*dt;o.rot+=o.vr*dt;
+        a=clamp(Math.min(o.life,o.max-o.life)*2.1,0,1);
+        o.el.setAttribute('opacity',a.toFixed(2));
+        o.el.setAttribute('transform','translate('+o.x.toFixed(1)+' '+o.y.toFixed(1)+') rotate('+o.rot.toFixed(1)+') scale(.85)');
+      }else if(key==='sweat'){
+        o.vy+=300*dt;o.x+=o.vx*dt;o.y+=o.vy*dt;
+        a=clamp(Math.min(o.life,o.max-o.life)*3.4,0,1);
+        o.el.setAttribute('opacity',a.toFixed(2));
+        o.el.setAttribute('transform','translate('+o.x.toFixed(1)+' '+o.y.toFixed(1)+')');
+      }else if(key==='dust'){
+        o.vy+=70*dt;o.x+=o.vx*dt;o.y+=o.vy*dt;
+        a=clamp(o.life/o.max,0,1)*.7;
+        o.el.setAttribute('opacity',a.toFixed(2));
+        o.el.setAttribute('r',(o.r*(1+o.t*2.6)).toFixed(1));
+        o.el.setAttribute('cx',o.x.toFixed(1));o.el.setAttribute('cy',o.y.toFixed(1));
+      }else{
+        o.x+=o.vx*dt;
+        a=Math.sin(Math.PI*clamp(o.t/o.max,0,1))*.45;
+        o.el.setAttribute('opacity',a.toFixed(2));
+        o.el.setAttribute('x1',o.x.toFixed(1));o.el.setAttribute('y1',o.y.toFixed(1));
+        o.el.setAttribute('x2',(o.x+o.len).toFixed(1));o.el.setAttribute('y2',o.y.toFixed(1));
+      }
+      if(o.life<=0){o.on=false;o.el.setAttribute('opacity','0');}
+    }
+  }
+}
+
+/* ============================ 交互 ============================ */
+function doBell(){
+  ringBell();
+  S.startle=1;S.bellT=1;S.stamina=clamp(S.stamina-3,0,100);
+  for(var i=0;i<7;i++)spawnSweat(true);
+  var b=$('bellBtn');b.classList.remove('shakeIt');void b.offsetWidth;b.classList.add('shakeIt');
+}
+function doSprint(){
+  if(S.stamina<15||S.sprintT>0){
+    var bar=$('stamBar');bar.style.background='linear-gradient(90deg,#ff8b8b,#ff4d6d)';
+    setTimeout(function(){paintStam();},420);
+    return;
+  }
+  S.sprintT=1.3;S.stamina=clamp(S.stamina-12,0,100);
+  whoosh();
+  for(var i=0;i<6;i++)spawnLine();
+  var b=$('sprintBtn');b.classList.add('done');setTimeout(function(){b.classList.remove('done');},700);
+}
+function doFeed(){
+  if(S.fishOn)return;
+  S.fishOn=true;S.fishP=0;
+  S.fishX=700;S.fishY=714;S.fishPX=S.fishX;S.fishPY=S.fishY;
+  $('fishFly').setAttribute('opacity','1');
+}
+function finishFeed(){
+  S.fishOn=false;
+  $('fishFly').setAttribute('opacity','0');
+  S.gulpT=1;S.stamina=clamp(S.stamina+30,0,100);S.popT=1;
+  gulpSfx();
+}
+function toggleRoad(){
+  S.road=(S.road==='flat')?'rocks':'flat';
+  $('stones').style.display=(S.road==='rocks')?'':'none';
+  $('roadBtn').textContent=(S.road==='rocks')?'🪨 路况：石子路':'🛤 路况：平路';
+}
+function toggleTime(){S.timeIdx=(S.timeIdx+1)%TIMES.length;applyTime();}
+
+/* ============================ 渲染 ============================ */
+var el={};
+function grab(){
+  ['pelicanRoot','shadowEl','cloudsFar','seaFar','waves','sandDots','planks','stones','foreground','fgPosts',
+   'wing','pouch','eyeScale','pupil','lidRect','bikeG','wheelRear','wheelFront','crankG','pedalA','pedalB',
+   'chainTop','chainBot','flag','bikeBell','legF','legB','footF','footF','footB','fishFly','feedPop','mood',
+   'stamBar','staVal','spdVal'].forEach(function(k){el[k]=$(k);});
+}
+function paintStam(){
+  var pct=S.stamina;
+  el.stamBar.style.width=pct.toFixed(0)+'%';
+  el.stamBar.style.background=pct>60?'linear-gradient(90deg,#3ddc97,#0fbf7a)':
+    (pct>30?'linear-gradient(90deg,#ffd166,#ff9f1c)':'linear-gradient(90deg,#ff8b8b,#ff4d6d)');
+}
+function moodText(){
+  if(S.startle>.35)return '🤯 受惊狂奔！';
+  if(S.sprintT>.35)return '⚡ 冲刺中！';
+  if(S.stamina<25)return '🥵 快喘不过气了';
+  if(S.stamina<55)return '😅 有点累了';
+  if(S.road==='rocks')return '🫨 颠簸石子路';
+  if(S.speed>=9)return '🏎 全速前进';
+  return '😊 悠闲巡航';
+}
+
+function render(dt){
+  var rocks=(S.road==='rocks');
+  var bump=rocks?(Math.sin(S.dist*.45)*5+Math.sin(S.dist*1.17)*2.6):0;
+  var bob=-Math.abs(Math.sin(S.phase))*(6+S.v*.45)+bump*.7-S.startle*7;
+  var rot=Math.sin(S.phase)*(2+S.v*.18)+bump*.5;
+
+  el.pelicanRoot.setAttribute('transform','translate(0 '+bob.toFixed(2)+') rotate('+rot.toFixed(2)+' 545 566)');
+
+  var h=-bob;
+  el.shadowEl.setAttribute('rx',(190-h*3.4).toFixed(1));
+  el.shadowEl.setAttribute('ry',(24-h*.7).toFixed(1));
+  el.shadowEl.setAttribute('opacity',clamp(.46-h*.017,.13,.5).toFixed(2));
+
+  /* 视差 */
+  el.cloudsFar.setAttribute('transform','translate('+(-(S.dist*.05)%700).toFixed(1)+' 0)');
+  el.seaFar.setAttribute('transform','translate('+(-(S.dist*.12)%700).toFixed(1)+' 0)');
+  el.waves.setAttribute('transform','translate('+(-(S.dist*.22)%160).toFixed(1)+' 0)');
+  el.sandDots.setAttribute('transform','translate('+(-(S.dist*.5)%26).toFixed(1)+' 0)');
+  el.planks.setAttribute('transform','translate('+(-(S.dist)%92).toFixed(1)+' 0)');
+  el.stones.setAttribute('transform','translate('+(-(S.dist)%56).toFixed(1)+' 0)');
+  el.foreground.setAttribute('transform','translate('+(-(S.dist*1.45)%230).toFixed(1)+' 0)');
+  el.fgPosts.setAttribute('transform','translate('+(-(S.dist*1.45)%230).toFixed(1)+' 0)');
+
+  /* 腿 */
+  var amp=14+S.v*3.4;
+  var aF=amp*Math.sin(S.phase), aB=-aF;
+  el.legF.setAttribute('transform','rotate('+aF.toFixed(2)+' 578 498)');
+  el.legB.setAttribute('transform','rotate('+aB.toFixed(2)+' 500 498)');
+  el.footF.setAttribute('transform','rotate('+(-aF*.75).toFixed(2)+' 584 560)');
+  el.footB.setAttribute('transform','rotate('+(-aB*.75).toFixed(2)+' 506 560)');
+
+  /* 翅膀 */
+  var wingA=-7+24*Math.sin(S.phase*1.25+1.2)*(.62+.38*Math.min(1,S.v/8));
+  if(S.sprintT>0)wingA+=16*Math.sin(S.phase*3);
+  if(S.startle>0)wingA+=18*S.startle*Math.sin(S.phase*5);
+  el.wing.setAttribute('transform','rotate('+wingA.toFixed(2)+' 578 410)');
+
+  /* 喉囊 */
+  var wob=1+.07*Math.sin(S.phase*2+.6)+.06*Math.min(1,S.v/9)+S.gulpT*.2;
+  var open=(S.tired?1:0)*(5+7*Math.max(0,Math.sin(S.phase*1.4)));
+  el.pouch.setAttribute('transform','rotate('+open.toFixed(2)+' 866 348) translate(866 348) scale(1 '+wob.toFixed(3)+') translate(-866 -348)');
+
+  /* 眨眼 / 受惊 */
+  var k=1+S.startle*.3;
+  el.eyeScale.setAttribute('transform','translate(866 322) scale('+k.toFixed(3)+') translate(-866 -322)');
+  el.pupil.setAttribute('r',(7.5-S.startle*2.4).toFixed(2));
+  var bp=0;
+  if(S.blinkAge<.16)bp=(S.blinkAge<.07)?(S.blinkAge/.07):clamp((.16-S.blinkAge)/.09,0,1);
+  el.lidRect.setAttribute('y',(258+36*bp).toFixed(1));
+
+  /* 自行车 */
+  var bb=Math.sin(S.phase*2+.8)*3+bump*.5;
+  var br=Math.sin(S.phase*1.7+.4)*2.4+bump*.6+S.startle*4.5;
+  el.bikeG.setAttribute('transform','translate(0 '+bb.toFixed(2)+') rotate('+br.toFixed(2)+' 555 345)');
+  el.wheelRear.setAttribute('transform','rotate('+S.wheelA.toFixed(1)+' 430 315)');
+  el.wheelFront.setAttribute('transform','rotate('+(S.wheelA*.995).toFixed(1)+' 665 315)');
+  el.crankG.setAttribute('transform','rotate('+S.crankA.toFixed(1)+' 555 331)');
+  el.pedalA.setAttribute('transform','translate(555 377) rotate('+(-S.crankA).toFixed(1)+')');
+  el.pedalB.setAttribute('transform','translate(555 285) rotate('+(-S.crankA).toFixed(1)+')');
+  el.chainTop.setAttribute('stroke-dashoffset',(-S.dist*.7).toFixed(1));
+  el.chainBot.setAttribute('stroke-dashoffset',(-S.dist*.7).toFixed(1));
+  el.flag.setAttribute('transform','translate(472 130) scale('+(.86+.16*Math.abs(Math.sin(S.phase*2))).toFixed(3)+' 1) translate(-472 -130)');
+  if(S.bellT>0){
+    el.bikeBell.setAttribute('transform','rotate('+(Math.sin(S.t*46)*16*S.bellT).toFixed(2)+' 670 196)');
+  }else{
+    el.bikeBell.setAttribute('transform','rotate(0 670 196)');
+  }
+
+  /* 飞鱼 */
+  if(S.fishOn){
+    var p=clamp(S.fishP,0,1);
+    var fx=700+(958-700)*p;
+    var fy=714+(372-714)*p-Math.sin(Math.PI*p)*175;
+    var ang=Math.atan2(fy-S.fishPY,fx-S.fishPX)*180/Math.PI;
+    if(!isFinite(ang))ang=0;
+    el.fishFly.setAttribute('transform','translate('+fx.toFixed(1)+' '+fy.toFixed(1)+') rotate('+ang.toFixed(1)+')');
+    el.fishFly.setAttribute('opacity','1');
+    S.fishPX=fx;S.fishPY=fy;
+  }
+  if(S.popT>0){
+    el.feedPop.setAttribute('opacity',clamp(S.popT*1.4,0,1).toFixed(2));
+    el.feedPop.setAttribute('y',(316-(1-S.popT)*72).toFixed(1));
+  }else{
+    el.feedPop.setAttribute('opacity','0');
+  }
+
+  /* HUD */
+  paintStam();
+  el.staVal.textContent=S.stamina.toFixed(0);
+  el.mood.textContent=moodText();
+}
+
+/* ============================ 主循环 ============================ */
+var last=0;
+function update(dt){
+  S.t+=dt;
+  S.startle=Math.max(0,S.startle-dt*.75);
+  S.bellT=Math.max(0,S.bellT-dt*2.4);
+  S.gulpT=Math.max(0,S.gulpT-dt*2.4);
+  if(S.sprintT>0)S.sprintT=Math.max(0,S.sprintT-dt);
+
+  if(S.sprintT>0)S.stamina-=21*dt; else S.stamina+=6.5*dt;
+  if(S.startle>0)S.stamina-=7*dt;
+  S.stamina=clamp(S.stamina,0,100);
+  if(S.stamina<=0)S.sprintT=0;
+  S.tired=(S.stamina<45||S.sprintT>0);
+
+  var target=(1.4+S.speed*.95)*(1+S.startle*.8)+S.sprintT*9;
+  target*=(.5+.5*S.stamina/100);
+  if(S.road==='rocks')target*=.87;
+  S.v+=(target-S.v)*Math.min(1,dt*3.5);
+  if(S.v<.4)S.v=.4;
+
+  S.dist+=S.v*dt*22;
+  S.phase+=dt*(2+S.v*1.9);
+  if(S.phase>Math.PI*2)S.phase-=Math.PI*2;
+  S.wheelA=(S.wheelA+dt*S.v*78)%360;
+  S.crankA=(S.crankA+dt*S.v*44)%360;
+
+  /* 眨眼 */
+  S.blinkAge+=dt;
+  if(S.blinkAge>S.blinkGap){S.blinkAge=0;S.blinkGap=2+Math.random()*3.4;}
+
+  /* 落地扬尘 + 脚步声 */
+  var sn=Math.sin(S.phase);
+  if((S.prevSin<0)!==(sn<0)){
+    if(S.v>1.6){
+      if(sn>0){spawnDust(600);thud(Math.min(.24,.07+S.v*.018));}
+      else{spawnDust(540);thud(Math.min(.2,.06+S.v*.015));}
+    }
+  }
+  S.prevSin=sn;
+
+  /* 粒子生成 */
+  S.featherT-=dt;
+  if(S.featherT<=0){S.featherT=.4+Math.random()*.65;spawnFeather();}
+  if(S.stamina<55||S.sprintT>0||S.startle>0){
+    S.sweatT-=dt;
+    if(S.sweatT<=0){S.sweatT=(S.stamina<35?.15:.28)+Math.random()*.2;spawnSweat(false);}
+  }
+  if(S.v>7.6){
+    S.lineT-=dt;
+    if(S.lineT<=0){S.lineT=.07;spawnLine();}
+  }
+
+  /* 投喂飞行动画 */
+  if(S.fishOn){
+    S.fishP+=dt/S.fishDur;
+    if(S.fishP>=1)finishFeed();
+  }
+  if(S.popT>0)S.popT=Math.max(0,S.popT-dt*.85);
+}
+
+function frame(now){
+  if(!last)last=now;
+  var dt=Math.min(.05,(now-last)/1000);last=now;
+  update(dt);
+  render(dt);
+  updateParticles(dt);
+  requestAnimationFrame(frame);
+}
+
+/* ============================ 绑定 ============================ */
+function bind(){
+  $('bellBtn').addEventListener('click',doBell);
+  $('bikeBell').addEventListener('click',function(e){e.stopPropagation();doBell();});
+  $('sprintBtn').addEventListener('click',doSprint);
+  $('fishBtn').addEventListener('click',doFeed);
+  $('roadBtn').addEventListener('click',toggleRoad);
+  $('timeBtn').addEventListener('click',toggleTime);
+  $('speed').addEventListener('input',function(e){
+    S.speed=parseInt(e.target.value,10);el.spdVal.textContent=e.target.value;
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.repeat)return;
+    var k=e.key.toLowerCase();
+    if(k===' '||e.code==='Space'){e.preventDefault();doSprint();}
+    else if(k==='b'){doBell();}
+    else if(k==='f'){doFeed();}
+    else if(k==='r'){toggleRoad();}
+    else if(k==='t'){toggleTime();}
+  });
+  document.addEventListener('visibilitychange',function(){last=0;});
+}
+
+/* ============================ 启动 ============================ */
+buildScene();
+buildPools();
+grab();
+applyTime();
+bind();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

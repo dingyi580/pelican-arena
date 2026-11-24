@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        /* Global Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        
+        /* Canvas Styles */
+        #canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+        
+        /* Controls Styles */
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+        }
+        
+        .controls button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        
+        /* Icon Styles */
+        i {
+            font-size: 24px;
+            color: #333;
+        }
+        
+        /* Sound Styles */
+        .sound {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+        }
+        
+        .sound span {
+            font-size: 20px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="controls">
+        <button id="bell-button">按车铃</button>
+        <button id="speed-button">速度</button>
+        <button id="sprint-button">冲刺</button>
+        <button id="fish-button">投喂小鱼</button>
+    </div>
+    <div class="sound">
+        <span id="bell-span">哔哔哔!</span>
+    </div>
+    
+    <script>
+        // Global Variables
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let clock = 0;
+        let speed = 0.1;
+        let sprint = false;
+        let fishCount = 0;
+        
+        // Initialize Background
+        ctx.fillStyle = '#87CEEB'; // Sky
+        ctx.fillRect(0, 0, canvas.width, canvas.height / 3);
+        ctx.fillStyle = '#34A85A'; // Sea
+        ctx.fillRect(0, canvas.height / 3, canvas.width, canvas.height * 2 / 3);
+        
+        // Draw Pelican and Bicycle
+        function draw() {
+            ctx.fillStyle = '#6495ED'; // Sky
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 3);
+            ctx.fillStyle = '#34A85A'; // Sea
+            ctx.fillRect(0, canvas.height / 3, canvas.width, canvas.height * 2 / 3);
+            
+            // Pelican
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2,(canvas.height * 2/3), 50, 0, Math.PI * 2, false);
+            ctx.fillStyle = '#6495ED'; // Body
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 - 40, (canvas.height * 2/3), 20, 0, Math.PI * 2, false);
+            ctx.fillStyle = '#6495ED'; // Beak
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 + 40, (canvas.height * 2/3), 20, 0, Math.PI * 2, false);
+            ctx.fillStyle = '#6495ED'; // Eye
+            ctx.fill();
+            
+            // Bicycle
+            ctx.fillStyle = '#000'; // Frame
+            ctx.fillRect(canvas.width / 2 - 50, (canvas.height * 2/3) - 30, 100, 10);
+            ctx.fillRect(canvas.width / 2 - 25, (canvas.height * 2/3), 50, 10);
+            ctx.fillRect(canvas.width / 2 - 50, (canvas.height * 2/3) + 10, 100, 10);
+            ctx.fillStyle = '#000'; // Wheels
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 - 55, (canvas.height * 2/3) + 25, 10, 0, Math.PI * 2, false);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 + 55, (canvas.height * 2/3) + 25, 10, 0, Math.PI * 2, false);
+            ctx.fill();
+            ctx.fillStyle = '#000'; // Pedals
+            ctx.fillRect(canvas.width / 2 - 50, (canvas.height * 2/3) + 50, 100, 20);
+            ctx.fillRect(canvas.width / 2 - 50, (canvas.height * 2/3) + 50 + 50, 100, 20);
+            
+            // Animations
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#000'; // Trail
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, (canvas.height * 2/3), 50 + Math.sin(clock * speed) * 10, 0, Math.PI * 2, false);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            
+            requestAnimationFrame(draw);
+            clock++;
+        }
+        
+        // Draw Fish
+        function drawFish(x, y) {
+            ctx.fillStyle = '#87CEEB'; // Body
+            ctx.fillRect(x, y, 10, 10);
+            ctx.fillStyle = '#6495ED'; // Tail
+            ctx.fillRect(x, y + 5, 10, 5);
+        }
+        
+        // Main Loop
+        draw();
+        
+        // Sound
+        let bell = ctx.createSoundBuffer(new Float32Array([0.1, 0.6, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]));
+        let bellSource = ctx.createBufferSource();
+        bellSource.connect(ctx.destination);
+        bellSource.loop = true;
+        
+        // Event Listeners
+        document.getElementById('bell-button').addEventListener('click', function() {
+            bellSource.start();
+        });
+        
+        document.getElementById('speed-button').addEventListener('click', function() {
+            speed = Math.random() * 2 + 0.1;
+        });
+        
+        document.getElementById('sprint-button').addEventListener('click', function() {
+            speed = 2;
+            sprint = true;
+        });
+        
+        document.getElementById('fish-button').addEventListener('click', function() {
+            fishCount++;
+            drawFish(Math.random() * canvas.width, Math.random() * canvas.height / 3);
+        });
+        
+        // Key Listeners
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'b') {
+                bellSource.start();
+            }
+            if (event.key === 's') {
+                speed = Math.random() * 2 + 0.1;
+            }
+            if (event.key === ' ') {
+                speed = 2;
+                sprint = true;
+            }
+        });
+        
+        document.addEventListener('keyup', function(event) {
+            if (event.key === ' ') {
+                sprint = false;
+            }
+        });
+    </script>
+</body>
+</html>

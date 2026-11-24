@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>自行车骑鹈鹕</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #87CEEB, #5F9EA0);
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    canvas {
+      border: 2px solid #333;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    }
+
+    button, input[type=range] {
+      display: block;
+      margin: 8px 0;
+      width: 180px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="controls">
+  <button id="bell">🔔 按车铃</button>
+  <label for="speed">🚀 速度控制:</label>
+  <input type="range" id="speed" min="0" max="2" step="0.1" value="1">
+  <button id="feed">🐟 投喂小鱼</button>
+</div>
+
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // 场景参数
+  let cameraOffsetX = 0;
+  let speed = 1;
+
+  // 动画帧计数器
+  let frameCount = 0;
+
+  // 鹈鹕状态
+  const pelicanState = {
+    x: 400,
+    y: 300,
+    vx: 0,
+    vy: 0,
+    flapPhase: 0,
+    throatWiggle: 0,
+    stamina: 100,
+    isFed: false,
+    blinkTimer: 0,
+    blinkState: 'open'
+  };
+
+  // 自行车状态
+  const bikeState = {
+    tilt: 0,
+    bounce: 0,
+    pedalAngle: 0,
+    bellPressed: false
+  };
+
+  // 粒子系统 (羽毛 & 汗珠)
+  const particles = [];
+
+  class Particle {
+    constructor(x, y, vx, vy, life, color) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.life = life;
+      this.initialLife = life;
+      this.color = color;
+    }
+
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.1; // gravity
+      this.life--;
+    }
+
+    draw(ctx) {
+      const alpha = this.life / this.initialLife;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function createParticles(x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const vel = Math.random() * 2 + 1;
+      particles.push(new Particle(
+        x, y,
+        Math.cos(angle) * vel,
+        Math.sin(angle) * vel - 2,
+        60,
+        color
+      ));
+    }
+  }
+
+  // UI 控件事件绑定
+  document.getElementById('bell').addEventListener('click', () => {
+    bikeState.bellPressed = true;
+    playBellSound();
+    pelicanState.vx += 2;
+    createParticles(pelicanState.x, pelicanState.y - 50, 10, '#FFF');
+  });
+
+  document.getElementById('speed').addEventListener('input', (e) => {
+    speed = parseFloat(e.target.value);
+  });
+
+  document.getElementById('feed').addEventListener('click', () => {
+    pelicanState.stamina = Math.min(100, pelicanState.stamina + 30);
+    pelicanState.isFed = true;
+    setTimeout(() => { pelicanState.isFed = false; }, 2000);
+  });
+
+  // Web Audio 车铃音效
+  function playBellSound() {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    } catch (e) {
+      console.warn("Web Audio not supported or blocked by browser policy.");
+    }
+  }
+
+  // 绘制背景（视差滚动）
+  function drawBackground() {
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGradient.addColorStop(0, "#FFB6C1");
+    skyGradient.addColorStop(1, "#87CEEB");
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 海平面
+    ctx.fillStyle = "rgba(70, 130, 180, 0.4)";
+    ctx.fillRect(0, 400, canvas.width, 100);
+
+    // 远山轮廓（静态）
+    ctx.fillStyle = "rgba(100, 100, 150, 0.3)";
+    ctx.beginPath();
+    ctx.moveTo(-100, 400);
+    ctx.lineTo(200, 300);
+    ctx.lineTo(500, 350);
+    ctx.lineTo(800, 280);
+    ctx.lineTo(1100, 320);
+    ctx.lineTo(canvas.width + 100, 400);
+    ctx.closePath();
+    ctx.fill();
+
+    // 云朵（缓慢移动）
+    ctx.fillStyle = "white";
+    const cloudBaseY = 80;
+    for (let i = 0; i < 4; i++) {
+      const offset = (frameCount * 0.2 + i * 250) % (canvas.width + 400) - 200;
+      ctx.beginPath();
+      ctx.arc(offset, cloudBaseY, 30, 0, Math.PI * 2);
+      ctx.arc(offset + 25, cloudBaseY - 10, 25, 0, Math.PI * 2);
+      ctx.arc(offset + 50, cloudBaseY, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 绘制鹈鹕
+  function drawPelican() {
+    const {x, y, flapPhase, throatWiggle} = pelicanState;
+    const scale = 1.2;
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // 翅膀
+    ctx.fillStyle = "#D2B48C";
+    ctx.beginPath();
+    const wingOffset = Math.sin(flapPhase) * 10;
+    ctx.ellipse(-30, 10 + wingOffset, 40, 20, Math.PI / 4, 0, Math.PI * 2);
+    ctx.ellipse(30, 10 - wingOffset, 40, 20, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 身体
+    ctx.fillStyle = "#D2B48C";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 50, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 喉囊
+    ctx.fillStyle = pelicanState.isFed ? "#FF6347" : "#FFA07A";
+    ctx.beginPath();
+    const throatSize = 30 + Math.sin(throatWiggle) * 5;
+    ctx.ellipse(0, 30, throatSize, throatSize * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 尾羽
+    ctx.fillStyle = "#A0522D";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-20, 40);
+    ctx.lineTo(0, 30);
+    ctx.lineTo(20, 40);
+    ctx.closePath();
+    ctx.fill();
+
+    // 脚蹼
+    ctx.strokeStyle = "#A0522D";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-20, 20);
+    ctx.lineTo(-30, 35);
+    ctx.moveTo(-20, 20);
+    ctx.lineTo(-25, 35);
+    ctx.moveTo(20, 20);
+    ctx.lineTo(30, 35);
+    ctx.moveTo(20, 20);
+    ctx.lineTo(25, 35);
+    ctx.stroke();
+
+    // 眼睛和嘴
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(-15, -10, 5, 0, Math.PI * 2);
+    ctx.arc(15, -10, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "orange";
+    ctx.beginPath();
+    ctx.moveTo(-10, -5);
+    ctx.lineTo(10, -5);
+    ctx.lineTo(0, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // 绘制自行车
+  function drawBicycle() {
+    const {tilt, bounce, pedalAngle} = bikeState;
+    const pelicanY = pelicanState.y;
+    const bikeY = pelicanY - 60 + bounce;
+
+    ctx.save();
+    ctx.translate(pelicanState.x, bikeY);
+    ctx.rotate(tilt);
+
+    // 车架
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(-30, 0); // 后轮中心
+    ctx.lineTo(0, -20); // 中间交叉点
+    ctx.lineTo(30, 0);  // 前轮中心
+    ctx.lineTo(30, -30); // 车把
+    ctx.moveTo(0, -20);
+    ctx.lineTo(0, -10); // 座椅杆
+    ctx.moveTo(-10, -10);
+    ctx.lineTo(0, 0); // 脚踏连接
+    ctx.stroke();
+
+    // 轮胎和辐条
+    function drawWheel(x, y, angleOffset) {
+      ctx.beginPath();
+      ctx.arc(x, y, 15, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const angle = i * Math.PI / 4 + angleOffset;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * 15, y + Math.sin(angle) * 15);
+        ctx.stroke();
+      }
+    }
+
+    drawWheel(-30, 0, pedalAngle);
+    drawWheel(30, 0, -pedalAngle);
+
+    // 车座
+    ctx.fillStyle = "#666";
+    ctx.fillRect(-15, -15, 10, 5);
+
+    // 车把
+    ctx.beginPath();
+    ctx.moveTo(30, -30);
+    ctx.lineTo(40, -35);
+    ctx.moveTo(30, -30);
+    ctx.lineTo(40, -25);
+    ctx.stroke();
+
+    // 脚踏
+    ctx.fillStyle = "#444";
+    ctx.beginPath();
+    ctx.arc(0 + Math.cos(pedalAngle) * 10, 0 + Math.sin(pedalAngle) * 10, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 车铃（闪烁效果）
+    if (bikeState.bellPressed) {
+      ctx.fillStyle = "gold";
+      ctx.beginPath();
+      ctx.arc(35, -30, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // 更新逻辑
+  function update() {
+    frameCount++;
+
+    // 鹈鹕运动
+    pelicanState.vx *= 0.95; // 减速
+    pelicanState.x += pelicanState.vx;
+    pelicanState.y += pelicanState.vy;
+    pelicanState.flapPhase += 0.2;
+    pelicanState.throatWiggle += 0.1;
+
+    // 重力模拟
+    if (pelicanState.y < 350) {
+      pelicanState.vy += 0.2;
+    } else {
+      pelicanState.vy *= 0.8;
+      pelicanState.y = 350;
+    }
+
+    // 摩擦力
+    pelicanState.vx -= pelicanState.vx * 0.01;
+
+    // 体力下降
+    if (!pelicanState.isFed) {
+      pelicanState.stamina = Math.max(0, pelicanState.stamina - 0.05 * speed);
+    }
+
+    // 自行车动画同步
+    bikeState.tilt = pelicanState.vx * 0.02;
+    bikeState.bounce = Math.sin(frameCount * 0.3) * 2;
+    bikeState.pedalAngle += speed * 0.2;
+    if (bikeState.bellPressed) {
+      setTimeout(() => { bikeState.bellPressed = false; }, 200);
+    }
+
+    // 相机跟随
+    cameraOffsetX = pelicanState.x - canvas.width / 3;
+
+    // 粒子更新
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+  }
+
+  // 渲染循环
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(-cameraOffsetX, 0);
+
+    drawBackground();
+    drawPelican();
+    drawBicycle();
+
+    // 绘制粒子
+    particles.forEach(p => p.draw(ctx));
+
+    ctx.restore();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function gameLoop() {
+    update();
+    render();
+  }
+
+  gameLoop();
+</script>
+</body>
+</html>

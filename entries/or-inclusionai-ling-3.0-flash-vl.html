@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自行车骑鹈鹕 — 跨代模型前端擂台赛</title>
+<style>
+:root{--bg:rgba(28,28,40,.78);--border:rgba(255,255,255,.13);--text:#fff;--sub:rgba(255,255,255,.65);--accent:#FF6B35;--accent2:#FF8C5A;--green:#4ECDC4;--blue:#5BA4CF}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+#stage{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+.panel{position:fixed;z-index:10;background:var(--bg);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px 22px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.25)}
+#title-panel{top:18px;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap}
+#title-panel h1{font-size:19px;font-weight:700;letter-spacing:1.5px}
+#title-panel p{font-size:11px;color:var(--sub);margin-top:3px}
+#status-text{position:fixed;top:82px;left:50%;transform:translateX(-50%);z-index:10;font-size:14px;font-weight:600;opacity:0;transition:opacity .3s;text-shadow:0 2px 10px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+#stamina-wrap{position:fixed;right:22px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:6px}
+#stamina-bar{width:13px;height:180px;background:rgba(28,28,40,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:7px;padding:6px;display:flex;flex-direction:column-reverse;border:1px solid var(--border)}
+#stamina-fill{width:100%;border-radius:4px;background:linear-gradient(to top,#4ECDC4,#44A08D);transition:height .25s ease,background .5s ease}
+#stamina-label{writing-mode:vertical-rl;font-size:9px;letter-spacing:3px;color:var(--sub);transform:rotate(180deg);white-space:nowrap}
+#controls-panel{bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+.ctrl-btn{display:flex;flex-direction:column;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 16px;color:var(--text);cursor:pointer;transition:all .2s;min-width:70px;user-select:none;-webkit-tap-highlight-color:transparent}
+.ctrl-btn:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
+.ctrl-btn:active{transform:scale(.94)}
+.ctrl-btn .icon{font-size:24px;line-height:1}
+.ctrl-btn .label{font-size:10.5px;color:var(--sub);white-space:nowrap}
+#speed-wrap{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.07);border-radius:12px;padding:10px 18px}
+#speed-wrap label{font-size:11px;color:var(--sub);white-space:nowrap}
+#speed-slider{-webkit-appearance:none;appearance:none;width:110px;height:6px;background:rgba(255,255,255,.15);border-radius:3px;outline:none}
+#speed-slider::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#speed-slider::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#speed-val{font-size:14px;font-weight:700;min-width:30px;text-align:center}
+.weather-group{display:flex;gap:5px}
+.wbtn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:6px 12px;color:var(--sub);cursor:pointer;font-size:11.5px;transition:all .2s;user-select:none}
+.wbtn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.wbtn:hover:not(.active){background:rgba(255,255,255,.12)}
+@media(max-width:700px){#controls-panel{gap:10px;padding:10px}.ctrl-btn{min-width:54px;padding:7px 10px}#speed-slider{width:80px}#stamina-wrap{display:none}}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="title-panel" class="panel"><h1>🚲 自行车骑鹈鹕 🐦</h1><p>跨代模型前端擂台赛 · 统一考卷</p></div>
+<div id="status-text"></div>
+<div id="stamina-wrap"><div id="stamina-bar"><div id="stamina-fill" style="height:80%"></div></div><div id="stamina-label">STAMINA</div></div>
+<div id="controls-panel" class="panel">
+<button class="ctrl-btn" id="btn-bell" aria-label="按车铃"><span class="icon">🔔</span><span class="label">按车铃</span></button>
+<button class="ctrl-btn" id="btn-fish" aria-label="投喂小鱼"><span class="icon">🐟</span><span class="label">投喂小鱼</span></button>
+<button class="ctrl-btn" id="btn-sprint" aria-label="冲刺"><span class="icon">💨</span><span class="label">冲刺</span></button>
+<div id="speed-wrap"><label>速度</label><input type="range" id="speed-slider" min="0" max="3" step=".1" value="1"><span id="speed-val">1.0</span></div>
+<div class="weather-group"><button class="wbtn active" data-w="sunny">晴天</button><button class="wbtn" data-w="dusk">黄昏</button><button class="wbtn" data-w="night">夜晚</button></div>
+</div>
+<script>
+(function(){
+'use strict';
+
+/* ===== 全局 ===== */
+var canvas=document.getElementById('stage');
+var ctx=canvas.getContext('2d');
+var W,H;
+var animT=0,bgScroll=0;
+var speed=1,targetSpeed=1;
+var stamina=80;
+var mood='normal';
+var weather='sunny';
+var bellCD=0,scaredT=0,happyT=0;
+var isSprinting=false;
+var sprintBoost=0;
+var shake=0;
+var particles=[],fishFoods=[],bellFX=[],sweatDrops=[],speedLines=[],feathers=[],clouds=[];
+var duckTrail=[];
+
+/* ===== 初始化 ===== */
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight;initClouds();initStars()}
+function initClouds(){
+    clouds=[];
+    var d=[{x:.12,y:.09,s:1},{x:.42,y:.07,s:.8},{x:.72,y:.11,s:1.1},{x:.28,y:.17,s:.6},{x:.55,y:.14,s:.7},{x:.85,y:.06,s:.9}];
+    for(var i=0;i<d.length;i++)clouds.push({x:d[i].x,y:d[i].y,s:d[i].s,off:Math.random()*100});
+}
+function initStars(){
+    /* 预计算星星位置(避免每帧随机) */
+    window._stars=[];
+    for(var i=0;i<80;i++){
+        window._stars.push({sx:(i*137.5+50)%W,sy:(i*83.7+30)%(H*.48),r:1+(i%3)*.5});
+    }
+}
+addEventListener('resize',resize);
+resize();
+
+/* ===== 音频 ===== */
+var actx=null;
+function getAC(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();return actx}
+function playBell(){
+    try{
+        var ac=getAC(),t=ac.currentTime;
+        var o1=ac.createOscillator(),g1=ac.createGain();
+        o1.type='triangle';o1.frequency.setValueAtTime(1200,t);o1.frequency.exponentialRampToValueAtTime(550,t+.45);
+        g1.gain.setValueAtTime(.22,t);g1.gain.exponentialRampToValueAtTime(.001,t+.6);
+        o1.connect(g1).connect(ac.destination);o1.start(t);o1.stop(t+.6);
+        var o2=ac.createOscillator(),g2=ac.createGain();
+        o2.type='sine';o2.frequency.setValueAtTime(2400,t);o2.frequency.exponentialRampToValueAtTime(1100,t+.3);
+        g2.gain.setValueAtTime(.07,t);g2.gain.exponentialRampToValueAtTime(.001,t+.35);
+        o2.connect(g2).connect(ac.destination);o2.start(t);o2.stop(t+.35);
+        /* 额外共鸣音 */
+        var o3=ac.createOscillator(),g3=ac.createGain();
+        o3.type='sine';o3.frequency.setValueAtTime(600,t+.05);o3.frequency.exponentialRampToValueAtTime(300,t+.5);
+        g3.gain.setValueAtTime(.05,t+.05);g3.gain.exponentialRampToValueAtTime(.001,t+.55);
+        o3.connect(g3).connect(ac.destination);o3.start(t+.05);o3.stop(t+.55);
+        bellCD=1;mood='scared';scaredT=3.5;
+        if(stamina>0)stamina=Math.min(100,stamina+8);
+        showStatus('🔔 鹈鹕受惊加速冲刺！');
+        shake=8;
+    }catch(e){}
+}
+function playChime(f){
+    try{var ac=getAC(),t=ac.currentTime;var o=ac.createOscillator(),g=ac.createGain();
+    o.type='sine';o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.25);
+    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+.25)}catch(e){}
+}
+
+/* ===== 状态 ===== */
+function showStatus(txt){
+    var el=document.getElementById('status-text');el.textContent=txt;el.style.opacity='1';
+    clearTimeout(el._t);el._t=setTimeout(function(){el.style.opacity='0'},2200);
+}
+
+function update(dt){
+    var effSpeed=isSprinting&&stamina>0?Math.min(speed*1.6,3):speed;
+    animT+=dt*effSpeed;
+    bgScroll+=effSpeed*2.8*dt;
+    if(bellCD>0)bellCD-=dt;
+    if(scaredT>0)scaredT-=dt;else if(mood==='scared')mood='normal';
+    if(happyT>0)happyT-=dt;else if(mood==='happy')mood='normal';
+    if(isSprinting&&stamina>0){stamina=Math.max(0,stamina-dt*18);sprintBoost=Math.min(1,sprintBoost+dt*3);if(stamina<=0){isSprinting=false;sprintBoost=0;showStatus('😫 鹈鹕体力耗尽...')}}
+    else if(isSprinting&&stamina<=0){isSprinting=false;sprintBoost=0}
+    if(stamina>0&&!isSprinting&&mood!='scared')stamina=Math.min(100,stamina+dt*6);
+    else if(stamina>0)stamina=Math.max(0,stamina-dt*4);
+    if(stamina<=0&&!isSprinting){effSpeed=Math.max(.2,effSpeed-dt*2);if(speed>0)speed=Math.max(.3,targetSpeed-dt*.5)}
+    shake=Math.max(0,shake-dt*8);
+    updateP(dt);
+    /* UI同步 */
+    document.getElementById('stamina-fill').style.height=stamina+'%';
+    if(stamina<25)document.getElementById('stamina-fill').style.background='linear-gradient(to top,#FF6B35,#FF4444)';
+    else if(stamina<50)document.getElementById('stamina-fill').style.background='linear-gradient(to top,#FFB347,#FF8C5A)';
+    else document.getElementById('stamina-fill').style.background='linear-gradient(to top,#4ECDC4,#44A08D)';
+    document.getElementById('speed-val').textContent=effSpeed.toFixed(1);
+}
+
+function updateP(dt){
+    /* 羽毛 */
+    if(Math.random()<.015){
+        var gY=H*.78;
+        feathers.push({x:W*.3+Math.random()*W*.4,y:gY-10,vx:-.5-Math.random()*.5+Math.random()*.3,vy:-.3-Math.random()*1.2,rot:Math.random()*Math.PI*2,rs:(Math.random()-.5)*4,sz:3+Math.random()*5,a:.4+Math.random()*.3,life:3+Math.random()*3,color:['#E8E0D4','#D4CABC','#C8BCA8','#DDD'][Math.floor(Math.random()*4)]});
+    }
+    for(var i=0;i<feathers.length;i++){
+        var f=feathers[i];f.x+=f.vx*speed*.5;f.y+=f.vy;f.rot+=f.rs*dt;f.life-=dt;f.a-=.12;
+    }
+    feathers=feathers.filter(function(f){return f.life>0&&f.a>0});
+    /* 汗滴 */
+    if(speed>1.5&&Math.random()<.25*speed){
+        sweatDrops.push({x:W*.45+Math.random()*W*.15,y:H*.28-Math.random()*H*.1,vx:-1-Math.random()*1.5,vy:.3+Math.random()*1.2,life:1,sz:1.5+Math.random()*2.5});
+    }
+    for(i=0;i<sweatDrops.length;i++){var s=sweatDrops[i];s.x+=s.vx*speed*.3;s.y+=s.vy*.3;s.life-=.012}
+    sweatDrops=sweatDrops.filter(function(s){return s.life>0});
+    /* 速度线 */
+    if(speed>2&&Math.random()<.4){
+        speedLines.push({x:W+20,y:80+Math.random()*(H-160),len:40+Math.random()*70,spd:speed*3.5,a:.22});
+    }
+    for(i=0;i<speedLines.length;i++){var l=speedLines[i];l.x-=l.spd;l.a-=.008}
+    speedLines=speedLines.filter(function(l){return l.a>0&&l.x+l.len>0});
+    /* 鱼食 */
+    for(i=0;i<fishFoods.length;i++){var ff=fishFoods[i];ff.y+=ff.vy;ff.vy-=.018;ff.life-=.015;ff.a=Math.max(0,ff.life)}
+    fishFoods=fishFoods.filter(function(f){return f.life>0});
+    /* 铃铛闪光 */
+    for(i=0;i<bellFX.length;i++){var b=bellFX[i];b.x+=b.vx;b.y+=b.vy;b.vy+=.25;b.life-=.04;b.a=Math.max(0,b.life)}
+    bellFX=bellFX.filter(function(b){return b.life>0});
+    /* 鹈鹕投喂后羽毛轨迹 */
+    if(happyT>0&&Math.random()<.2){
+        duckTrail.push({x:W*.4+Math.random()*W*.2,y:H*.72,vx:-1.5-Math.random(),vy:-.5-Math.random(),life:1.5,sz:2+Math.random()*3});
+    }
+    for(i=0;i<duckTrail.length;i++){var d=duckTrail[i];d.x+=d.vx;d.y+=d.vy;d.vy+=.03;d.life-=.02}
+    duckTrail=duckTrail.filter(function(d){return d.life>0});
+}
+
+/* ===== 绘制：背景 ===== */
+function drawBG(){
+    var cs={sunny:['#4FC3F7','#81D4FA','#6EC6E8','#2E9BF5'],dusk:['#FF6B35','#FF9A5C','#4A4E69','#1E2245'],night:['#0B0C2A','#141640','#1E2050','#0D0F25']};
+    var c=cs[weather]||cs.sunny;
+    var sg=ctx.createLinearGradient(0,0,0,H*.65);
+    sg.addColorStop(0,c[0]);sg.addColorStop(.35,c[1]);sg.addColorStop(.7,c[2]);sg.addColorStop(1,c[3]);
+    ctx.fillStyle=sg;ctx.fillRect(0,0,W,H*.65);
+    var seaY=H*.52;
+    var sg2=ctx.createLinearGradient(0,seaY,0,H*.76);
+    if(weather==='night'){sg2.addColorStop(0,'#151830');sg2.addColorStop(1,'#0A0C18')}
+    else if(weather==='dusk'){sg2.addColorStop(0,'#2A3560');sg2.addColorStop(1,'#151A30')}
+    else{sg2.addColorStop(0,'#2E9BF5');sg2.addColorStop(1,'#1A78C8')}
+    ctx.fillStyle=sg2;ctx.fillRect(0,seaY,W,H*.24);
+    ctx.strokeStyle=weather==='night'?'rgba(80,100,180,.2)':'rgba(255,255,255,.22)';ctx.lineWidth=1.5;
+    for(var i=0;i<4;i++){
+        ctx.beginPath();
+        var wy=seaY+8+i*14;
+        for(var x=0;x<=W;x+=5){var y=wy+Math.sin((x+animT*35+i*2.5)*.018)*3.5;x===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}
+        ctx.stroke();
+    }
+    var gy=H*.76;
+    var gg=ctx.createLinearGradient(0,gy,0,H);
+    if(weather==='night'){gg.addColorStop(0,'#2A2A38');gg.addColorStop(1,'#181825')}
+    else if(weather==='dusk'){gg.addColorStop(0,'#8B7355');gg.addColorStop(1,'#5C4A32')}
+    else{gg.addColorStop(0,'#C4A265');gg.addColorStop(1,'#A08040')}
+    ctx.fillStyle=gg;ctx.fillRect(0,gy,W,H-gy);
+    drawWalk(gy);
+    if(weather!=='night')drawClouds();
+    if(weather==='night')drawStars();
+    /* 黄昏太阳 */
+    if(weather==='dusk'){
+        ctx.fillStyle='rgba(255,107,53,.15)';ctx.beginPath();ctx.arc(W*.75,H*.3,60,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(255,154,92,.2)';ctx.beginPath();ctx.arc(W*.75,H*.3,40,0,Math.PI*2);ctx.fill();
+    }
+}
+
+function drawWalk(gy){
+    var ph=11,offset=(bgScroll*12)%(ph*2),cnt=Math.ceil(H/ph)+2;
+    for(var i=-1;i<cnt;i++){var py=gy+i*ph*2+offset;if(py<gy||py>H)continue;
+        ctx.fillStyle=i%2===0?'#B8956A':'#A8845A';ctx.fillRect(0,py,W,ph);
+        ctx.strokeStyle='rgba(0,0,0,.06)';ctx.lineWidth=1;
+        for(var x=0;x<W;x+=35){ctx.beginPath();ctx.moveTo(x,py);ctx.lineTo(x+25,py);ctx.stroke()}}
+    /* 栈道阴影 */
+    ctx.fillStyle='rgba(0,0,0,.06)';
+    for(var x=0;x<W;x+=50){var px=x-(bgScroll*6)%50;if(px<0||px>W)continue;
+        ctx.fillRect(px,gy-2,40,4)}
+    var rY=gy-35;
+    ctx.strokeStyle=weather==='night'?'rgba(70,70,90,.25)':'rgba(139,105,20,.35)';ctx.lineWidth=2.5;
+    ctx.beginPath();
+    for(var x=0;x<W;x+=25){var rx=x-(bgScroll*5)%25;if(rx<0)continue;var ry=rY+Math.sin((x+animT*15)*.012)*2;x===0?ctx.moveTo(rx,ry):ctx.lineTo(rx,ry)}
+    ctx.stroke();
+    ctx.fillStyle=weather==='night'?'rgba(50,50,70,.3)':'rgba(107,79,18,.3)';
+    for(var x=0;x<W;x+=55){var px=x-(bgScroll*5)%55;if(px<-5||px>W+5)continue;ctx.fillRect(px-2,rY-18,4,42)}
+}
+
+function drawClouds(){
+    for(var i=0;i<clouds.length;i++){
+        var c=clouds[i];
+        var cx=((W*c.x+c.off+animT*5*c.s-bgScroll*4*c.s)%(W+300))-150;
+        var cy=H*c.y;var s=c.s*28;
+        ctx.fillStyle=weather==='dusk'?'rgba(255,180,120,.2)':'rgba(255,255,255,.45)';
+        ctx.beginPath();ctx.ellipse(cx,cy,s*1.5,s*.55,0,0,Math.PI*2);ctx.ellipse(cx-s*.7,cy+s*.08,s*.9,s*.45,0,0,Math.PI*2);ctx.ellipse(cx+s*.8,cy+s*.04,s*1,s*.5,0,0,Math.PI*2);ctx.fill();
+    }
+}
+
+function drawStars(){
+    if(!window._stars)return;
+    for(var i=0;i<window._stars.length;i++){
+        var st=window._stars[i];
+        var blink=.3+Math.sin(animT*1.5+st.sx*.1)*.3+.3;
+        ctx.fillStyle='rgba(255,255,255,'+blink.toFixed(2)+')';ctx.beginPath();ctx.arc(st.sx,st.sy,st.r,0,Math.PI*2);ctx.fill();
+    }
+}
+
+/* ===== 绘制：鹈鹕 ===== */
+function drawPelican(cx,cy){
+    var bounce=Math.sin(animT*3)*3.5*speed;
+    var legP=animT*4.5;
+    var wingP=animT*5.5;
+    var throatP=animT*2.2;
+    var sc=mood==='scared',hk=mood==='happy';
+    ctx.save();ctx.translate(cx,cy+bounce);
+    /* 身体 */
+    var bRx=65,bRy=40;
+    ctx.fillStyle='#E8E0D4';ctx.beginPath();ctx.ellipse(0,0,bRx,bRy,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#C4B8A8';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.strokeStyle='rgba(180,170,155,.25)';
+    for(var i=0;i<5;i++){ctx.beginPath();var fy=-bRy*.4+i*(bRy*.22);ctx.moveTo(-bRx*.5,fy);ctx.quadraticCurveTo(0,fy+3,bRx*.5,fy);ctx.stroke()}
+    /* 尾巴 */
+    ctx.fillStyle='#D8D0C4';ctx.beginPath();ctx.moveTo(-bRx,-3);ctx.lineTo(-bRx-30,-22+Math.sin(animT*2)*4);ctx.lineTo(-bRx-26,-8+Math.sin(animT*2+.5)*3);ctx.lineTo(-bRx-30,8+Math.sin(animT*2+1)*4);ctx.lineTo(-bRx,8);ctx.closePath();ctx.fill();ctx.strokeStyle='#C4B8A8';ctx.lineWidth=1;ctx.stroke();
+    /* 腿 */
+    for(var side=-1;side<=1;side+=2){
+        var lp=Math.sin(legP+side*Math.PI)*.6;
+        var hx=side*32,hy=bRy-5;
+        var kx=hx+side*10+lp*8,ky=hy+26;
+        var fx=hx+lp*22,fy=ky+22;
+        ctx.strokeStyle='#E8943A';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(kx,ky);ctx.lineTo(fx,fy);ctx.stroke();
+        ctx.fillStyle='#D87B20';ctx.beginPath();ctx.moveTo(fx-7,fy);ctx.lineTo(fx+9,fy);ctx.lineTo(fx+5,fy+7);ctx.lineTo(fx-9,fy+7);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#D87B20';ctx.lineWidth=1;for(var t=-1;t<=1;t++){ctx.beginPath();ctx.moveTo(fx+t*3.5,fy+2);ctx.lineTo(fx+t*4.5,fy+7);ctx.stroke()}
+    }
+    /* 翅膀 */
+    for(var side=-1;side<=1;side+=2){
+        var ws=Math.sin(wingP+((side<0)?0:Math.PI))*18;
+        var bx=side*15,by=-bRy*.25;
+        var tx=bx+side*(28+ws),ty=by-38-ws;
+        ctx.fillStyle=side<0?'#D8D0C4':'#E0D8CC';ctx.beginPath();ctx.moveTo(bx,by);ctx.quadraticCurveTo(bx+side*22,by-18,tx,ty);ctx.quadraticCurveTo(bx+side*12,by-5,bx+side*5,by+10);ctx.closePath();ctx.fill();ctx.strokeStyle='#C4B8A8';ctx.lineWidth=1;ctx.stroke();
+        if(!sc&&!hk){ctx.strokeStyle='rgba(150,140,125,.25)';for(var f=0;f<4;f++){var ft=f/4;ctx.beginPath();var fxx=bx+(tx-bx)*ft,fyy=by+(ty-by)*ft-7;ctx.moveTo(fxx,fyy);ctx.lineTo(fxx+side*7,fyy-3);ctx.stroke()}}
+    }
+    /* 颈部 */
+    ctx.strokeStyle='#E0D8CC';ctx.lineWidth=11;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bRx*.65,-bRy*.15);ctx.quadraticCurveTo(bRx*.65+18,-bRy*.15-25,70,-50);ctx.stroke();
+    /* 头 */
+    var headX=78,headY=-52;
+    ctx.fillStyle='#F0EAE0';ctx.beginPath();ctx.ellipse(headX,headY,24,20,.3,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#D4CABC';ctx.lineWidth=1;ctx.stroke();
+    /* 眼睛 */
+    var eyeX=headX+7,eyeY=headY-7;
+    var eyeH=sc?10:6;
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(eyeX,eyeY,7,eyeH,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=sc?'#FF3333':'#222';ctx.beginPath();ctx.ellipse(eyeX+(sc?2.5:1.5),eyeY,3.5,sc?5:3,0,0,Math.PI*2);ctx.fill();
+    /* 喙 */
+    ctx.fillStyle='#F0A030';ctx.beginPath();ctx.moveTo(headX+18,headY-1);ctx.lineTo(headX+60,headY+2);ctx.lineTo(headX+57,headY+7);ctx.lineTo(headX+16,headY+6);ctx.closePath();ctx.fill();ctx.strokeStyle='#D08020';ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='#E89528';ctx.beginPath();ctx.moveTo(headX+18,headY+6);ctx.lineTo(headX+57,headY+7);ctx.lineTo(headX+52,headY+12);ctx.lineTo(headX+16,headY+11);ctx.closePath();ctx.fill();ctx.stroke();
+    /* 喉囊 */
+    var ts=sc?.55:(hk?1.3:(1+Math.sin(throatP)*.15));
+    var tw=20*ts,th=26*ts;
+    ctx.fillStyle=sc?'#E8C060':hk?'#F5D080':'#F0C868';ctx.beginPath();ctx.ellipse(headX+35,headY+16,tw,th,.1,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#D0A850';ctx.lineWidth=1;ctx.stroke();
+    ctx.strokeStyle='rgba(200,160,80,.18)';for(var i=0;i<3;i++){ctx.beginPath();ctx.moveTo(headX+35-tw*.5,headY+16-th*.3+i*th*.3);ctx.quadraticCurveTo(headX+35,headY+16+i*2,headX+35+tw*.5,headY+16-th*.3+i*th*.3);ctx.stroke()}
+    ctx.fillStyle='#F0A030';ctx.beginPath();ctx.ellipse(headX+20,headY+5,5,7,0,0,Math.PI*2);ctx.fill();
+    /* 头顶羽毛 */
+    ctx.fillStyle='#E0D8CC';ctx.beginPath();ctx.moveTo(headX-5,headY-18);ctx.lineTo(headX+2,headY-28);ctx.lineTo(headX+8,headY-20);ctx.closePath();ctx.fill();
+    ctx.restore();
+}
+
+/* ===== 绘制：自行车 ===== */
+function drawWheel(wx,wy,r,rot){
+    ctx.fillStyle='#2A2A2A';ctx.beginPath();ctx.arc(wx,wy,r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#888';ctx.lineWidth=2;ctx.beginPath();ctx.arc(wx,wy,r-4,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='#AAA';ctx.lineWidth=.8;
+    for(var i=0;i<10;i++){var a=rot+i*Math.PI/5;ctx.beginPath();ctx.moveTo(wx+Math.cos(a)*(r-4),wy+Math.sin(a)*(r-4));ctx.lineTo(wx+Math.cos(a)*3,wy+Math.sin(a)*3);ctx.stroke()}
+    ctx.fillStyle='#777';ctx.beginPath();ctx.arc(wx,wy,3.5,0,Math.PI*2);ctx.fill();
+}
+
+function drawBicycle(bx,by){
+    var tilt=Math.sin(animT*2)*.03+(speed>1.5?Math.sin(animT*7)*.015:0)+shake*.008;
+    var wheelRot=animT*speed*4;
+    var pedalRot=animT*speed*5;
+    ctx.save();ctx.translate(bx,by);ctx.rotate(tilt);
+    var wr=20,rwx=-32,fwx=32,wy=6;
+    /* 阴影 */
+    ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.ellipse(0,wy+wr+5,wr+10,4,0,0,Math.PI*2);ctx.fill();
+    drawWheel(rwx,wy,wr,wheelRot);
+    drawWheel(fwx,wy,wr,wheelRot);
+    /* 车架 */
+    var stX=-18,stY=-28,htX=20,htY=-24,bbX=2,bbY=-3;
+    ctx.strokeStyle='#C62828';ctx.lineWidth=4.5;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(rwx,wy);ctx.lineTo(stX,stY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(stX,stY);ctx.lineTo(htX,htY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(stX,stY);ctx.lineTo(bbX,bbY);ctx.lineTo(fwx,wy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(htX,htY);ctx.lineTo(fwx,wy);ctx.stroke();
+    /* 链条护罩 */
+    ctx.strokeStyle='#A0A0A0';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(rwx,wy);ctx.lineTo(bbX,bbY);ctx.stroke();
+    /* 车座 */
+    ctx.fillStyle='#333';ctx.beginPath();ctx.ellipse(stX,stY-6,11,4.5,-.08,0,Math.PI*2);ctx.fill();
+    /* 车把 */
+    ctx.strokeStyle='#888';ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(htX,htY);ctx.lineTo(htX+3,htY-14);ctx.quadraticCurveTo(htX+10,htY-18,htX+16,htY-15);ctx.stroke();
+    /* 缰绳幽默连线 */
+    ctx.setLineDash([3,4]);ctx.strokeStyle='rgba(210,180,90,.35)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(htX+16,htY-15);ctx.lineTo(45,htY-45);ctx.stroke();ctx.setLineDash([]);
+    /* 中轴 */
+    ctx.fillStyle='#666';ctx.beginPath();ctx.arc(bbX,bbY,4,0,Math.PI*2);ctx.fill();
+    /* 脚踏 */
+    for(var side=-1;side<=1;side+=2){
+        var ang=pedalRot+side*Math.PI;
+        var px=bbX+Math.cos(ang)*11,py=bbY+Math.sin(ang)*11;
+        ctx.fillStyle='#444';ctx.save();ctx.translate(px,py);ctx.rotate(ang);
+        ctx.fillRect(-6,-1.8,12,3.6);ctx.strokeStyle='#666';ctx.lineWidth=.5;
+        for(var ti=-4;ti<=4;ti+=2.5){ctx.beginPath();ctx.moveTo(ti,-1.8);ctx.lineTo(ti,1.8);ctx.stroke()}
+        ctx.restore();
+    }
+    /* 铃铛 */
+    ctx.fillStyle='#C0C0C0';ctx.beginPath();ctx.arc(htX+8,htY-12,3.5,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.beginPath();ctx.arc(htX+8,htY-12,3,0,Math.PI*2);ctx.stroke();
+    /* 冲刺火焰效果 */
+    if(sprintBoost>.1){
+        var fa=Math.min(1,sprintBoost)*.6;
+        ctx.fillStyle='rgba(255,107,53,'+fa.toFixed(2)+')';
+        for(var fi=0;fi<3;fi++){
+            var fx=fwx+5, fy=wy+fi*6-6;
+            ctx.beginPath();ctx.ellipse(fx-10-fi*5,fy,8-fi*2,3-fi,0,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(255,200,50,'+(fa*.5).toFixed(2)+')';
+        }
+        ctx.fillStyle='rgba(255,107,53,'+fa.toFixed(2)+')';
+    }
+    ctx.restore();
+}
+
+/* ===== 绘制：粒子 ===== */
+function drawParticles(){
+    for(var i=0;i<feathers.length;i++){
+        var f=feathers[i];ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=Math.max(0,f.a);ctx.fillStyle=f.color;ctx.fillRect(-f.sz/2,-f.sz/4,f.sz,f.sz/2);ctx.restore();
+    }
+    for(var i=0;i<sweatDrops.length;i++){var s=sweatDrops[i];ctx.globalAlpha=Math.max(0,s.life);ctx.fillStyle='rgba(150,200,255,.7)';ctx.beginPath();ctx.ellipse(s.x,s.y,s.sz*.7,s.sz,0,0,Math.PI*2);ctx.fill()}
+    ctx.globalAlpha=1;
+    for(var i=0;i<speedLines.length;i++){var l=speedLines[i];ctx.globalAlpha=l.a;ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(l.x+l.len,l.y);ctx.stroke()}
+    ctx.globalAlpha=1;
+    for(var i=0;i<duckTrail.length;i++){var d=duckTrail[i];ctx.globalAlpha=Math.max(0,d.life*.4);ctx.fillStyle='#FF8C5A';ctx.beginPath();ctx.arc(d.x,d.y,d.sz,0,Math.PI*2);ctx.fill()}
+    ctx.globalAlpha=1;
+}
+
+function drawFishFood(){
+    var fy=H*.2,gx=W*.4+Math.sin(animT*1.5)*30;
+    ctx.save();ctx.globalAlpha=.6+Math.sin(animT*3)*.15;
+    ctx.fillStyle='#FFD700';ctx.beginPath();ctx.ellipse(gx,fy,12,5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#FFC107';ctx.beginPath();ctx.moveTo(gx+12,fy);ctx.lineTo(gx+20,fy-5);ctx.lineTo(gx+20,fy+5);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#333';ctx.beginPath();ctx.arc(gx-4,fy-1,2,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+}
+
+/* ===== 主循环 ===== */
+var lastTime=0;
+function loop(ts){
+    var dt=Math.min((ts-lastTime)/1000,.05);
+    lastTime=ts;
+    /* 平滑速度 */
+    var dispSpeed=targetSpeed;
+    var effSpeed=isSprinting&&stamina>0?Math.min(dispSpeed*1.6,3):dispSpeed;
+    if(stamina<=0&&!isSprinting)effSpeed=Math.max(.3,effSpeed-dt*.5);
+    update(dt);
+
+    /* 画布 */
+    ctx.clearRect(0,0,W,H);
+    /* 抖动偏移 */
+    ctx.save();
+    if(shake>0){ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);shake*=.92}
+
+    drawBG();
+
+    var cx=W/2,cy=H*.72-55;
+    drawPelican(cx,cy);
+    drawBicycle(cx,cy-45);
+
+    /* 鸟喙处缰绳终点绘制 */
+    ctx.save();ctx.translate(cx,cy+Math.sin(animT*3)*3.5*speed);
+    ctx.setLineDash([3,4]);ctx.strokeStyle='rgba(210,180,90,.25)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(45,-45);ctx.lineTo(78,-45);ctx.stroke();ctx.setLineDash([]);
+    ctx.restore();
+
+    drawFishFood();
+    drawParticles();
+
+    /* 铃铛闪光 */
+    if(bellCD>0){
+        ctx.globalAlpha=bellCD*.5;ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(cx-22,cy-65,15+bellCD*10,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    }
+
+    /* 雾效果（冲刺时） */
+    if(sprintBoost>.1){
+        var fogA=Math.min(.3,sprintBoost*.25);
+        var fg=ctx.createLinearGradient(W*.3,0,W*.7,0);
+        fg.addColorStop(0,'rgba(255,255,255,0)');fg.addColorStop(.5,'rgba(255,255,255,'+fogA.toFixed(3)+')');fg.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=fg;ctx.fillRect(0,0,W,H);
+    }
+
+    /* 速度模糊边缘 */
+    if(effSpeed>2){
+        var vigA=Math.min(.15,(effSpeed-2)*.1);
+        var vg=ctx.createRadialGradient(W/2,H/2,W*.2,W/2,H/2,W*.7);
+        vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,'+vigA.toFixed(3)+')');
+        ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+    }
+
+    ctx.restore();
+
+    requestAnimationFrame(loop);
+}
+
+/* ===== 事件 ===== */
+document.getElementById('btn-bell').addEventListener('click',function(){if(bellCD<=0)playBell()});
+document.getElementById('btn-fish').addEventListener('click',function(){
+    for(var i=0;i<6;i++){
+        fishFoods.push({x:W*.35+Math.random()*W*.3,y:-20-Math.random()*60,vx:0,vy:.3+Math.random()*.5,life:1.8,maxLife:1.8,a:1});
+    }
+    mood='happy';happyT=4;stamina=Math.min(100,stamina+25);
+    showStatus('🐟 鹈鹕开心享用小鱼！体力+25');
+    for(var i=0;i<8;i++){
+        bellFX.push({x:W/2+Math.random()*100-50,y:H*.68,vx:(Math.random()-.5)*3,vy:-1-Math.random()*3,life:1,a:1});
+    }
+    playChime(880);setTimeout(function(){playChime(1100)},120);
+});
+document.getElementById('btn-sprint').addEventListener('click',function(){
+    if(stamina>5){isSprinting=!isSprinting;showStatus(isSprinting?'💨 冲刺开始！':'🛑 停止冲刺');if(!isSprinting)sprintBoost=0}
+    else showStatus('😫 体力不足，无法冲刺！');
+});
+document.getElementById('speed-slider').addEventListener('input',function(){targetSpeed=parseFloat(this.value)});
+document.querySelectorAll('.wbtn').forEach(function(btn){btn.addEventListener('click',function(){
+    document.querySelectorAll('.wbtn').forEach(function(b){b.classList.remove('active')});
+    btn.classList.add('active');weather=btn.dataset.w;
+    showStatus(weather==='sunny'?'☀️ 晴天':weather==='dusk'?'🌅 黄昏':'🌙 夜晚');
+})});
+
+/* 键盘支持 */
+document.addEventListener('keydown',function(e){
+    if(e.code==='Space'){e.preventDefault();if(bellCD<=0)playBell()}
+    if(e.code==='KeyF')document.getElementById('btn-fish').click();
+    if(e.code==='KeyR')document.getElementById('btn-sprint').click();
+});
+
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

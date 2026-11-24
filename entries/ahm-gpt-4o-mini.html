@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Bicycle Riding a Pelican</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #87CEEB; /* 天空蓝背景 */
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to top, #87CEEB, #FFFFFF 40%);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #f39c12;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #e67e22;
+        }
+
+        #sb {
+            position: absolute;
+            left: 20px;
+            bottom: 100px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <button id="ringButton" class="btn">按车铃</button>
+        <button id="speedButton" class="btn">加速冲刺</button>
+        <button id="feedButton" class="btn">投喂小鱼</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let pelicanY = canvas.height / 2;
+        let pelicanX = canvas.width / 2 - 100;
+        let speed = 2;
+        let isSpeedBoost = false;
+        let isEating = false;
+
+        const pelicanImage = new Image();
+        pelicanImage.src = 'data:image/png;base64,...'; // 这里将替换为一个有效的鹈鹕SVG或图片
+        const bikeImage = new Image();
+        bikeImage.src = 'data:image/png;base64,...'; // 这里将替换为一个有效的自行车SVG或图片
+
+        function drawPelican() {
+            ctx.drawImage(pelicanImage, pelicanX, pelicanY, 200, 100);
+        }
+
+        function drawBike() {
+            ctx.save();
+            ctx.translate(0, -10 * Math.sin(Date.now() / 100));
+            ctx.drawImage(bikeImage, pelicanX + 20, pelicanY - 45, 80, 40);
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPelican();
+            drawBike();
+            pelicanY += speed + (isEating ? -0.5 : 0);
+            if (isSpeedBoost) speed += 1; // 增加速度
+            requestAnimationFrame(draw);
+        }
+
+        document.getElementById('ringButton').addEventListener('click', () => {
+            const audio = new Audio('data:audio/wav;base64,...'); // 替换为有效的车铃音效
+            audio.play();
+            speed += 2;
+            pelicanY -= 5;
+            setTimeout(() => {
+                pelicanY += 5;
+            }, 200);
+        });
+
+        document.getElementById('speedButton').addEventListener('click', () => {
+            isSpeedBoost = true;
+            setTimeout(() => {
+                isSpeedBoost = false;
+            }, 2000);
+        });
+
+        document.getElementById('feedButton').addEventListener('click', () => {
+            isEating = true;
+            setTimeout(() => {
+                isEating = false;
+            }, 1500);
+        });
+
+        pelicanImage.onload = draw;
+        bikeImage.onload = draw;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

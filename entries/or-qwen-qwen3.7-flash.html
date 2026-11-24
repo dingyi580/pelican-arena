@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨代模型前端擂台赛 · 自行车骑鹈鹕</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a1628;font-family:'Segoe UI',system-ui,sans-serif}
+#gameCanvas{display:block;width:100%;height:100%}
+#controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;z-index:10;padding:14px 24px;background:rgba(10,22,40,0.75);backdrop-filter:blur(12px);border-radius:20px;border:1px solid rgba(255,255,255,0.15);box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.ctrl-btn{padding:8px 18px;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;color:#fff}
+.ctrl-btn:hover{transform:scale(1.05);filter:brightness(1.15)}
+.ctrl-btn:active{transform:scale(0.97)}
+#bellBtn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff}
+#bellBtn.ringing{animation:ringShake .15s ease-in-out 3}
+@keyframes ringShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+#feedBtn{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+.speed-group{display:flex;flex-direction:column;align-items:center;gap:4px}
+.speed-group label{color:rgba(255,255,255,0.7);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+#speedSlider{-webkit-appearance:none;width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,0.2);outline:none;cursor:pointer}
+#speedSlider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);cursor:pointer;box-shadow:0 0 8px rgba(59,130,246,.5)}
+#staminaBar{width:100px;height:8px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden}
+#staminaFill{height:100%;width:100%;background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981);border-radius:4px;transition:width .3s}
+.info-bar{position:fixed;top:16px;left:50%;transform:translateX(-50%);display:flex;gap:20px;z-index:10;padding:10px 24px;background:rgba(10,22,40,0.65);backdrop-filter:blur(10px);border-radius:14px;border:1px solid rgba(255,255,255,0.1)}
+.info-item{color:rgba(255,255,255,0.85);font-size:13px;display:flex;align-items:center;gap:6px}
+.info-item span{color:#fbbf24;font-weight:700;font-size:15px}
+.title-overlay{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:10;color:rgba(255,255,255,0.9);font-size:20px;font-weight:800;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.6);pointer-events:none;letter-spacing:2px}
+.title-overlay em{font-style:normal;color:#fbbf24}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div class="title-overlay"><em>🚲</em> 一辆自行车正在骑着鹈鹕 <em>🐦</em></div>
+<div class="info-bar">
+  <div class="info-item">⚡ 速度: <span id="speedVal">中速</span></div>
+  <div class="info-item">💧 体力: <div id="staminaBar"><div id="staminaFill"></div></div></div>
+  <div class="info-item">🌤 天气: <span id="weatherLabel">晴天</span></div>
+</div>
+<div id="controls">
+  <button class="ctrl-btn" id="bellBtn" title="按车铃！">🔔 车铃</button>
+  <div class="speed-group">
+    <label>车速控制</label>
+    <input type="range" id="speedSlider" min="0.1" max="3" step="0.05" value="1">
+  </div>
+  <button class="ctrl-btn" id="feedBtn" title="投喂小鱼，恢复体力！">🐟 投喂</button>
+  <button class="ctrl-btn" id="weatherBtn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)" title="切换天气">☁️ 天气</button>
+  <button class="ctrl-btn" id="terrainBtn" style="background:linear-gradient(135deg,#ec4899,#be185d)" title="切换路面">🛣 路况</button>
+</div>
+
+<script>
+// ============ SETUP ============
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============ AUDIO ============
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playBell() {
+  initAudio();
+  const o1 = audioCtx.createOscillator();
+  const o2 = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o1.type = 'sine'; o1.frequency.setValueAtTime(1800, audioCtx.currentTime);
+  o2.type = 'triangle'; o2.frequency.setValueAtTime(2400, audioCtx.currentTime);
+  g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+  o1.connect(g); o2.connect(g); g.connect(audioCtx.destination);
+  o1.start(); o2.start();
+  o1.stop(audioCtx.currentTime + 0.6);
+  o2.stop(audioCtx.currentTime + 0.6);
+}
+function playFishSplash() {
+  initAudio();
+  const bufLen = audioCtx.sampleRate * 0.4;
+  const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 2);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const f = audioCtx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 2;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  src.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  src.start();
+}
+function playWhoosh(speed) {
+  initAudio();
+  const freq = 200 + speed * 400;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + 0.3);
+}
+
+// ============ STATE ============
+let speedMultiplier = 1;
+let baseSpeed = 3;
+let scrollOffset = 0;
+let bikeAngle = 0;
+let pelicanRunPhase = 0;
+let stamina = 100;
+let weatherState = 0; // 0=sunny, 1=sunset, 2=night
+const weathers = ['晴天', '黄昏', '夜晚'];
+let terrainType = 0; // 0=smooth boardwalk, 1=bumpy rocks
+let bellCooldown = 0;
+let feedCooldown = 0;
+let pelicanExhaustion = 0;
+let particles = [];
+let dustParticles = [];
+let featherParticles = [];
+let sweatDrops = [];
+let splashEffects = [];
+let time = 0;
+let lastBellEffect = 0;
+let accelBoost = 0;
+
+// ============ COLORS per weather ============
+function getColors() {
+  const s = weatherState;
+  if (s === 0) return { sky1: '#1e90ff', sky2: '#87ceeb', ground1: '#c2a06e', ground2: '#8b7355', sea: '#4682b4', cloud: '#ffffff', sun: '#ffd700' };
+  if (s === 1) return { sky1: '#ff7e47', sky2: '#ffb347', ground1: '#b5651d', ground2: '#704214', sea: '#cd6838', cloud: '#ffa07a', sun: '#ff6347' };
+  return { sky1: '#0c1445', sky2: '#1a1a4e', ground1: '#2c2c44', ground2: '#1a1a2e', sea: '#191970', cloud: '#4a4a6e', sun: '#ffe4b5' };
+}
+
+// ============ DRAWING FUNCTIONS ============
+function drawSky(c) {
+  const colors = getColors();
+  const grad = c.createLinearGradient(0, 0, 0, H * 0.6);
+  grad.addColorStop(0, colors.sky1);
+  grad.addColorStop(1, colors.sky2);
+  c.fillStyle = grad;
+  c.fillRect(0, 0, W, H * 0.65);
+
+  // Stars for night
+  if (weatherState === 2) {
+    c.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let i = 0; i < 50; i++) {
+      const sx = (i * 137.5 + scrollOffset * 0.02) % W;
+      const sy = (i * 97.3) % (H * 0.5);
+      c.beginPath(); c.arc(sx, sy, 1 + (i % 3) * 0.3, 0, Math.PI * 2); c.fill();
+    }
+    // Moon
+    c.fillStyle = '#ffe4b5';
+    c.beginPath(); c.arc(W * 0.8, H * 0.1, 30, 0, Math.PI * 2); c.fill();
+    c.fillStyle = colors.sky1;
+    c.beginPath(); c.arc(W * 0.8 + 10, H * 0.1 - 5, 26, 0, Math.PI * 2); c.fill();
+  } else if (weatherState === 1) {
+    // Sun near horizon
+    const grd = c.createRadialGradient(W * 0.15, H * 0.35, 10, W * 0.15, H * 0.35, 80);
+    grd.addColorStop(0, 'rgba(255,200,50,0.8)');
+    grd.addColorStop(0.5, 'rgba(255,140,50,0.3)');
+    grd.addColorStop(1, 'rgba(255,100,50,0)');
+    c.fillStyle = grd;
+    c.fillRect(0, 0, W, H * 0.5);
+    c.fillStyle = '#ffc832';
+    c.beginPath(); c.arc(W * 0.15, H * 0.35, 25, 0, Math.PI * 2); c.fill();
+  }
+}
+
+// Sea and distant land
+function drawBackground(c) {
+  const colors = getColors();
+  // Ocean
+  c.fillStyle = colors.sea;
+  const seaY = H * 0.42;
+  c.fillRect(0, seaY, W, H * 0.15);
+  // Waves
+  c.strokeStyle = 'rgba(255,255,255,0.15)';
+  c.lineWidth = 1;
+  for (let row = 0; row < 4; row++) {
+    c.beginPath();
+    for (let x = 0; x <= W; x += 20) {
+      const y = seaY + row * 20 + Math.sin((x + scrollOffset * (0.5 + row * 0.1)) * 0.02) * 4;
+      x === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
+    }
+    c.stroke();
+  }
+  // Beach
+  c.fillStyle = '#e8d5a3';
+  const beachTop = seaY + H * 0.15;
+  c.fillRect(0, beachTop, W, H * 0.12);
+  // Shoreline wave detail
+  c.fillStyle = 'rgba(255,255,255,0.2)';
+  for (let i = 0; i < 20; i++) {
+    const bx = (i * 83 + scrollOffset * 0.8) % W;
+    c.beginPath();
+    c.ellipse(bx, beachTop + 5, 15 + Math.sin(time * 2 + i) * 5, 3, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  // Palm tree silhouettes
+  drawPalmTree(c, W * 0.1, beachTop - 30, 50, true);
+  drawPalmTree(c, W * 0.9, beachTop - 20, 40, true);
+}
+
+function drawPalmTree(c, x, y, size, dark) {
+  c.save();
+  c.strokeStyle = dark ? '#3a2f1f' : '#5a3e28';
+  c.lineWidth = size * 0.06;
+  // Trunk
+  c.beginPath();
+  c.moveTo(x, y + size);
+  c.quadraticCurveTo(x + size * 0.1, y + size * 0.4, x + size * 0.05, y);
+  c.stroke();
+  // Leaves
+  c.fillStyle = dark ? '#2d4a1f' : '#3a6b28';
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + Math.sin(time + i) * 0.1;
+    c.beginPath();
+    c.moveTo(x + size * 0.05, y);
+    c.quadraticCurveTo(
+      x + Math.cos(angle) * size * 0.4,
+      y + Math.sin(angle) * size * 0.2 - size * 0.1,
+      x + Math.cos(angle) * size * 0.6,
+      y + Math.sin(angle) * size * 0.35
+    );
+    c.quadraticCurveTo(
+      x + Math.cos(angle) * size * 0.4,
+      y + Math.sin(angle) * size * 0.2 - size * 0.1,
+      x + size * 0.05, y
+    );
+    c.fill();
+  }
+  c.restore();
+}
+
+// Clouds
+function drawClouds(c) {
+  const colors = getColors();
+  c.fillStyle = colors.cloud;
+  c.globalAlpha = 0.6;
+  for (let i = 0; i < 8; i++) {
+    const cx = ((i * 220 + scrollOffset * 0.15 + i * 50) % (W + 300)) - 150;
+    const cy = 40 + i * 25 + Math.sin(i * 3.7) * 30;
+    const sz = 40 + i * 10;
+    c.beginPath();
+    c.arc(cx, cy, sz, 0, Math.PI * 2);
+    c.arc(cx + sz * 0.7, cy - sz * 0.2, sz * 0.8, 0, Math.PI * 2);
+    c.arc(cx + sz * 1.3, cy, sz * 0.6, 0, Math.PI * 2);
+    c.arc(cx - sz * 0.5, cy + sz * 0.1, sz * 0.5, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
+// Boardwalk / ground
+function drawGround(c) {
+  const colors = getColors();
+  let gy = H * 0.72;
+
+  if (terrainType === 0) {
+    // Smooth wooden boardwalk
+    c.fillStyle = colors.ground1;
+    c.fillRect(0, gy, W, H - gy);
+    // Planks
+    c.strokeStyle = colors.gound2 || '#6b5b3e';
+    c.lineWidth = 1.5;
+    for (let i = 0; i < 30; i++) {
+      const px = ((i * 70 - scrollOffset) % (W + 140)) - 70;
+      c.fillStyle = `rgba(${terrainType === 0 ? '180,150,100' : '120,100,70'},0.3)`;
+      c.fillRect(px, gy, 65, H - gy);
+      c.strokeStyle = 'rgba(0,0,0,0.1)';
+      c.strokeRect(px, gy, 65, H - gy);
+    }
+    // Railing posts
+    c.fillStyle = '#8b6f47';
+    for (let i = 0; i < 10; i++) {
+      const rx = ((i * 200 - scrollOffset * 0.5) % (W + 200)) - 100;
+      c.fillRect(rx, gy - 25, 6, 40);
+    }
+    // Rail bar
+    c.strokeStyle = '#8b6f47';
+    c.lineWidth = 3;
+    c.beginPath(); c.moveTo(0, gy - 20); c.lineTo(W, gy - 20); c.stroke();
+  } else {
+    // Rocky bumpy path
+    c.fillStyle = '#7a6e5f';
+    c.fillRect(0, gy, W, H - gy);
+    // Rocks
+    c.fillStyle = '#6e6358';
+    for (let i = 0; i < 40; i++) {
+      const rx = ((i * 53 + 17 - scrollOffset) % (W + 60)) - 30;
+      const ry = gy + 5 + (i % 5) * 15;
+      c.beginPath();
+      c.ellipse(rx, ry, 8 + (i % 7) * 3, 5 + (i % 3) * 2, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    // Path edges
+    c.strokeStyle = '#555';
+    c.lineWidth = 2;
+    c.beginPath(); c.moveTo(0, gy); c.lineTo(W, gy); c.stroke();
+  }
+}
+
+// Particles system
+function spawnParticle(type, x, y, vx, vy, life, color) {
+  particles.push({ type, x, y, vx: vx || (Math.random() - 0.5) * 2, vy: vy || -Math.random() * 2, life, maxLife: life, color, size: 2 + Math.random() * 3 });
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt * 60;
+    p.y += p.vy * dt * 60;
+    if (p.type === 'sweat') p.vy += 0.05;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles(c) {
+  for (const p of particles) {
+    const alpha = Math.min(p.life / p.maxLife, 1) * 0.8;
+    if (p.type === 'feather') {
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate(p.vx * 0.3);
+      c.fillStyle = p.color || 'rgba(255,255,255,' + alpha + ')';
+      c.globalAlpha = alpha;
+      c.beginPath();
+      c.ellipse(0, 0, p.size * 1.5, p.size * 0.4, 0, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    } else if (p.type === 'sweat') {
+      c.globalAlpha = alpha;
+      c.fillStyle = '#87ceeb';
+      c.beginPath();
+      c.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
+      c.fill();
+    } else if (p.type === 'dust') {
+      c.globalAlpha = alpha * 0.4;
+      c.fillStyle = '#c2a06e';
+      c.beginPath();
+      c.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+      c.fill();
+    } else if (p.type === 'splash') {
+      c.globalAlpha = alpha * 0.6;
+      c.fillStyle = p.color || '#4682b4';
+      c.beginPath();
+      c.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+}
+
+// ===== PELICAN =====
+function drawPelican(c, bx, by, phase) {
+  const scale = Math.min(W, H) / 600;
+  c.save();
+  c.translate(bx, by);
+  c.scale(scale, scale);
+
+  const runBob = Math.sin(phase * 3) * 8;
+  const runTilt = Math.sin(phase * 3 + 0.5) * 3;
+
+  // Left foot (behind body)
+  const lFootPhase = Math.sin(phase * 3) * 20;
+  c.save();
+  c.translate(-20, 95 + runBob);
+  c.rotate(lFootPhase * Math.PI / 180 * 0.3);
+  drawFoot(c, '#d4a056');
+  c.restore();
+
+  // Right foot (in front)
+  const rFootPhase = Math.sin(phase * 3 + Math.PI) * 20;
+  c.save();
+  c.translate(20, 95 + runBob);
+  c.rotate(rFootPhase * Math.PI / 180 * 0.3);
+  drawFoot(c, '#d4a056');
+  c.restore();
+
+  // Tail feathers
+  c.save();
+  c.translate(-70, -10 + runBob);
+  c.fillStyle = '#4a4a4a';
+  for (let i = 0; i < 4; i++) {
+    c.save();
+    c.rotate(-0.3 - i * 0.15 + Math.sin(phase * 2 + i) * 0.05);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.quadraticCurveTo(-25, -15 + i * 8, -35, -5 + i * 10);
+    c.quadraticCurveTo(-20, 0, 0, 5);
+    c.fillStyle = i % 2 === 0 ? '#3a3a3a' : '#4d4d4d';
+    c.fill();
+    c.restore();
+  }
+  c.restore();
+
+  // Body
+  c.save();
+  c.rotate(runTilt * Math.PI / 180);
+  c.translate(0, runBob);
+
+  // Main body ellipse
+  const bodyGrad = c.createRadialGradient(0, -20, 10, 0, 0, 80);
+  bodyGrad.addColorStop(0, '#ffffff');
+  bodyGrad.addColorStop(0.7, '#f0ece4');
+  bodyGrad.addColorStop(1, '#ddd8cc');
+  c.fillStyle = bodyGrad;
+  c.beginPath();
+  c.ellipse(0, 0, 75, 55, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = 'rgba(0,0,0,0.1)';
+  c.lineWidth = 1;
+  c.stroke();
+
+  // Wing left (behind)
+  drawWing(c, -30, -30, phase, 0.7);
+
+  // Neck
+  const neckSway = Math.sin(phase * 1.5) * 5;
+  c.save();
+  c.translate(55, -35);
+  c.rotate(neckSway * Math.PI / 180);
+  c.fillStyle = '#f5f1ea';
+  c.beginPath();
+  c.moveTo(0, -10);
+  c.quadraticCurveTo(20, -60, 15, -100);
+  c.quadraticCurveTo(10, -60, 15, 10);
+  c.fill();
+
+  // Head
+  c.fillStyle = '#f0ece4';
+  c.beginPath();
+  c.ellipse(18, -100, 22, 20, 0.1, 0, Math.PI * 2);
+  c.fill();
+
+  // Eye
+  c.fillStyle = '#111';
+  c.beginPath();
+  c.arc(28, -105, 4, 0, Math.PI * 2);
+  c.fill();
+  // Eye highlight
+  c.fillStyle = '#fff';
+  c.beginPath();
+  c.arc(29, -106, 1.5, 0, Math.PI * 2);
+  c.fill();
+  // Angry/exhausted eyebrow
+  c.strokeStyle = '#333';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(23, -112);
+  c.lineTo(32, -110);
+  c.stroke();
+
+  // Beak
+  drawBeak(c, 18, -100, phase);
+
+  // Throat pouch
+  drawPouch(c, 15, -90, phase);
+
+  c.restore(); // neck
+
+  // Wing right (front)
+  drawWing(c, 25, -25, phase, 1);
+
+  // Feather details on body
+  c.fillStyle = 'rgba(200,190,170,0.3)';
+  for (let i = 0; i < 8; i++) {
+    const fx = -40 + i * 10;
+    const fy = -15 + Math.sin(i * 0.8) * 10;
+    c.beginPath();
+    c.moveTo(fx, fy);
+    c.quadraticCurveTo(fx + 8, fy - 8, fx + 5, fy - 3);
+    c.quadraticCurveTo(fx + 3, fy, fx, fy);
+    c.fill();
+  }
+
+  c.restore(); // rotate bob
+  c.restore(); // translate
+}
+
+function drawFoot(c, color) {
+  c.fillStyle = color;
+  // Webbed foot
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.lineTo(-8, 18);
+  c.lineTo(-5, 22);
+  c.lineTo(0, 16);
+  c.lineTo(5, 22);
+  c.lineTo(8, 18);
+  c.lineTo(0, 0);
+  c.fill();
+  // Toes
+  c.strokeStyle = color;
+  c.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    c.beginPath();
+    c.moveTo(-5 + i * 5, 22);
+    c.lineTo(-8 + i * 5, 28);
+    c.stroke();
+  }
+}
+
+function drawWing(c, ox, oy, phase, alpha) {
+  c.save();
+  c.translate(ox, oy);
+  c.globalAlpha = alpha;
+  const flapAngle = Math.sin(phase * 4) * 25 * Math.PI / 180;
+  c.rotate(flapAngle);
+
+  // Wing shape
+  const wingGrad = c.createLinearGradient(0, 0, 40, -30);
+  wingGrad.addColorStop(0, '#e8e4dc');
+  wingGrad.addColorStop(0.5, '#d0ccc4');
+  wingGrad.addColorStop(1, '#bfb8aa');
+  c.fillStyle = wingGrad;
+  c.beginPath();
+  c.moveTo(0, 10);
+  c.quadraticCurveTo(30, -30, 60, -40);
+  c.quadraticCurveTo(70, -35, 65, -20);
+  c.quadraticCurveTo(50, -10, 20, 5);
+  c.closePath();
+  c.fill();
+
+  // Feathers lines
+  c.strokeStyle = 'rgba(0,0,0,0.15)';
+  c.lineWidth = 0.8;
+  for (let i = 0; i < 4; i++) {
+    c.beginPath();
+    c.moveTo(5 + i * 12, 5 + i * -5);
+    c.lineTo(30 + i * 8, -20 + i * 5);
+    c.stroke();
+  }
+  c.globalAlpha = 1;
+  c.restore();
+}
+
+function drawBeak(c, hx, hy, phase) {
+  // Upper beak
+  c.fillStyle = '#d4a030';
+  c.beginPath();
+  c.moveTo(hx, hy - 5);
+  c.quadraticCurveTo(hx + 40, hy - 3, hx + 65, hy + 3);
+  c.lineTo(hx + 5, hy + 3);
+  c.closePath();
+  c.fill();
+  // Beak tip hook
+  c.fillStyle = '#8b7340';
+  c.beginPath();
+  c.moveTo(hx + 60, hy);
+  c.quadraticCurveTo(hx + 70, hy + 5, hx + 62, hy + 8);
+  c.lineTo(hx + 55, hy + 3);
+  c.closePath();
+  c.fill();
+  // Line separation
+  c.strokeStyle = '#7a6330';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(hx, hy - 2);
+  c.lineTo(hx + 55, hy + 2);
+  c.stroke();
+}
+
+function drawPouch(c, hx, hy, phase) {
+  const inflateAmount = Math.sin(phase * 2.5) * 3 + 5;
+  const exhaustAmount = pelicanExhaustion > 50 ? Math.sin(phase * 5) * 4 : 0;
+  const pw = 35 + inflateAmount;
+  const ph = 30 + exhaustAmount;
+
+  // Pouch sac
+  const pouchGrad = c.createRadialGradient(hx + 10, hy + 15, 2, hx + 15, hy + 20, pw);
+  pouchGrad.addColorStop(0, '#e88030');
+  pouchGrad.addColorStop(0.6, '#d06820');
+  pouchGrad.addColorStop(1, '#b85515');
+  c.fillStyle = pouchGrad;
+  c.beginPath();
+  c.moveTo(hx - 5, hy);
+  c.quadraticCurveTo(hx + 5, hy + 15, hx - 5 + pw * 0.5, hy + ph);
+  c.quadraticCurveTo(hx + pw * 0.5, hy + ph * 0.3, hx + pw, hy + 5);
+  c.quadraticCurveTo(hx + pw * 0.8, hy - 5, hx - 5, hy);
+  c.fill();
+
+  // Pouch texture lines
+  c.strokeStyle = 'rgba(0,0,0,0.15)';
+  c.lineWidth = 0.5;
+  for (let i = 0; i < 5; i++) {
+    c.beginPath();
+    c.moveTo(hx + 5 + i * 6, hy + 5);
+    c.quadraticCurveTo(hx + 10 + i * 5, hy + 15 + (i % 2) * 8, hx + 5 + i * 4, hy + ph * 0.8);
+    c.stroke();
+  }
+}
+
+// ===== BICYCLE =====
+function drawBicycle(c, bx, by, phase, bounce) {
+  const scale = Math.min(W, H) / 600;
+  c.save();
+  c.translate(bx, by + bounce);
+  c.scale(scale, scale);
+
+  const wheelAngle = phase * 2;
+  const pedalAngle = phase * 2;
+  const slightTilt = Math.sin(time * 1.5) * 1;
+
+  c.rotate(slightTilt * Math.PI / 180);
+
+  // Shadow on pelican body
+  c.fillStyle = 'rgba(0,0,0,0.12)';
+  c.beginPath();
+  c.ellipse(0, 25, 50, 8, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // --- Rear Wheel ---
+  c.save();
+  c.translate(-40, 15);
+  drawWheel(c, wheelAngle, false);
+  c.restore();
+
+  // --- Front Wheel ---
+  c.save();
+  c.translate(45, 15);
+  drawWheel(c, wheelAngle, false);
+  c.restore();
+
+  // --- Frame ---
+  // Seat tube
+  c.strokeStyle = '#c0392b';
+  c.lineWidth = 4;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(-40, 15); // rear hub
+  c.lineTo(-12, -30); // seat post bottom
+  c.stroke();
+
+  // Top tube
+  c.strokeStyle = '#e74c3c';
+  c.lineWidth = 3.5;
+  c.beginPath();
+  c.moveTo(-12, -30);
+  c.lineTo(25, -28);
+  c.stroke();
+
+  // Down tube
+  c.strokeStyle = '#c0392b';
+  c.lineWidth = 3.5;
+  c.beginPath();
+  c.moveTo(-12, -30);
+  c.lineTo(45, 15); // front hub
+  c.stroke();
+
+  // Chain stays
+  c.strokeStyle = '#999';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(-12, -5); // bottom bracket
+  c.lineTo(-40, 15);
+  c.stroke();
+
+  // Seat stays
+  c.strokeStyle = '#aaa';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(-12, -30);
+  c.lineTo(-40, 15);
+  c.stroke();
+
+  // Fork
+  c.strokeStyle = '#888';
+  c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(25, -28);
+  c.lineTo(45, 15);
+  c.stroke();
+
+  // Head tube area
+  c.strokeStyle = '#c0392b';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.moveTo(23, -32);
+  c.lineTo(27, -26);
+  c.stroke();
+
+  // --- Handlebars ---
+  c.strokeStyle = '#333';
+  c.lineWidth = 4;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(30, -32);
+  c.quadraticCurveTo(35, -45, 25, -48);
+  c.stroke();
+  c.beginPath();
+  c.moveTo(30, -32);
+  c.quadraticCurveTo(35, -45, 42, -48);
+  c.stroke();
+  // Grips
+  c.strokeStyle = '#222';
+  c.lineWidth = 5;
+  c.lineCap = 'round';
+  c.beginPath(); c.moveTo(20, -48); c.lineTo(28, -49); c.stroke();
+  c.beginPath(); c.moveTo(37, -49); c.lineTo(45, -48); c.stroke();
+
+  // Brake lever (simple)
+  c.strokeStyle = '#555';
+  c.lineWidth = 2;
+  c.beginPath(); c.moveTo(22, -47); c.lineTo(26, -42); c.stroke();
+  c.beginPath(); c.moveTo(43, -47); c.lineTo(39, -42); c.stroke();
+
+  // --- Seat & Post ---
+  // Seat post
+  c.strokeStyle = '#666';
+  c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(-12, -30);
+  c.lineTo(-14, -45);
+  c.stroke();
+  // Seat
+  c.fillStyle = '#2c2c2c';
+  c.beginPath();
+  c.ellipse(-14, -48, 16, 5, -0.1, 0, Math.PI * 2);
+  c.fill();
+  // Seat stripe
+  c.strokeStyle = '#555';
+  c.lineWidth = 0.5;
+  c.beginPath(); c.moveTo(-22, -48); c.lineTo(-6, -48); c.stroke();
+
+  // --- Bottom Bracket area ---
+  c.fillStyle = '#555';
+  c.beginPath();
+  c.arc(-12, -5, 6, 0, Math.PI * 2);
+  c.fill();
+
+  // --- Cranks & Pedals ---
+  c.save();
+  c.translate(-12, -5);
+  // Crank arms
+  c.strokeStyle = '#666';
+  c.lineWidth = 3;
+  c.lineCap = 'round';
+  // Up crank
+  const ux = Math.cos(pedalAngle) * 12;
+  const uy = Math.sin(pedalAngle) * 12;
+  c.beginPath(); c.moveTo(0, 0); c.lineTo(ux, uy); c.stroke();
+  // Down crank
+  const dx = Math.cos(pedalAngle + Math.PI) * 12;
+  const dy = Math.sin(pedalAngle + Math.PI) * 12;
+  c.beginPath(); c.moveTo(0, 0); c.lineTo(dx, dy); c.stroke();
+  // Pedal platform up
+  drawPedal(c, ux, uy);
+  // Pedal platform down
+  drawPedal(c, dx, dy);
+  // Chainring
+  c.strokeStyle = '#777';
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.arc(0, 0, 8, 0, Math.PI * 2);
+  c.stroke();
+  c.restore();
+
+  // --- Chain ---
+  c.strokeStyle = '#888';
+  c.lineWidth = 1.5;
+  c.setLineDash([2, 2]);
+  c.beginPath();
+  // Simplified chain route
+  c.moveTo(-12, -5 + 8); // from crank
+  c.lineTo(-12, 15 - 8); // to rear hub
+  c.moveTo(-12, -5 - 8);
+  c.lineTo(-12, 15 + 8);
+  c.stroke();
+  c.setLineDash([]);
+
+  // --- Saddlebag / cargo hint ---
+  c.fillStyle = '#8B7355';
+  c.fillRect(-28, -44, 20, 14);
+  c.strokeStyle = '#6b5b3e';
+  c.lineWidth = 1;
+  c.strokeRect(-28, -44, 20, 14);
+  // Strap
+  c.strokeStyle = '#a0522d';
+  c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-10, -44); c.lineTo(-10, -38); c.stroke();
+
+  // --- Basket on handlebar (holding fish for feeding!) ---
+  c.strokeStyle = '#8B7355';
+  c.lineWidth = 1.5;
+  // Basket wires
+  c.beginPath(); c.moveTo(22, -44); c.lineTo(18, -30); c.lineTo(32, -30); c.lineTo(36, -44); c.stroke();
+  c.beginPath(); c.moveTo(20, -38); c.lineTo(34, -38); c.stroke();
+  c.beginPath(); c.moveTo(21, -35); c.lineTo(33, -35); c.stroke();
+
+  // Bell on handlebar
+  c.fillStyle = '#daa520';
+  c.beginPath();
+  c.arc(28, -50, 4, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#b8860b';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.arc(28, -50, 4, Math.PI, 0);
+  c.stroke();
+  // Bell striker line
+  c.strokeStyle = '#b8860b';
+  c.lineWidth = 1;
+  c.beginPath(); c.moveTo(28, -46); c.lineTo(28, -50); c.stroke();
+
+  c.restore();
+}
+
+function drawWheel(c, angle, flip) {
+  // Tire
+  c.strokeStyle = '#222';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.arc(0, 0, 18, 0, Math.PI * 2);
+  c.stroke();
+
+  // Rim
+  c.strokeStyle = '#aaa';
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.arc(0, 0, 16, 0, Math.PI * 2);
+  c.stroke();
+
+  // Spokes
+  c.strokeStyle = '#bbb';
+  c.lineWidth = 0.7;
+  for (let i = 0; i < 16; i++) {
+    const a = angle + (i / 16) * Math.PI * 2;
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(Math.cos(a) * 16, Math.sin(a) * 16);
+    c.stroke();
+  }
+
+  // Hub
+  c.fillStyle = '#888';
+  c.beginPath();
+  c.arc(0, 0, 3, 0, Math.PI * 2);
+  c.fill();
+
+  // Brake pads (simplified)
+  c.fillStyle = '#444';
+  c.fillRect(-4, -20, 2, 5);
+  c.fillRect(2, -20, 2, 5);
+}
+
+function drawPedal(c, px, py) {
+  c.fillStyle = '#444';
+  c.fillRect(px - 4, py - 2, 8, 4);
+  // Pedal pegs
+  c.fillStyle = '#555';
+  for (let i = -1; i <= 1; i++) {
+    c.fillRect(px - 1, py - 2 + i * 2.5, 2, 1.5);
+  }
+}
+
+// ===== FEED FISH ANIMATION =====
+let feedAnimActive = false;
+let feedAnimTimer = 0;
+let feedFishList = [];
+
+function startFeedAnimation() {
+  feedAnimActive = true;
+  feedAnimTimer = 0;
+  feedFishList = [];
+  // Spawn several fish going from basket to pelican's beak
+  for (let i = 0; i < 3; i++) {
+    feedFishList.push({ t: i * 0.15 });
+  }
+}
+
+function drawFeedAnimation(c, pelicanX, pelicanY, bikeX, bikeY) {
+  if (!feedAnimActive) return;
+  feedAnimTimer += 0.016;
+
+  for (const fish of feedFishList) {
+    const ft = (feedAnimTimer - fish.t);
+    if (ft < 0 || ft > 0.5) continue;
+
+    const progress = ft / 0.5;
+    // Arc from bike basket (handlebar) toward pelican beak
+    const startX = bikeX + 25 * Math.min(W,H)/600;
+    const startY = bikeY - 45 * Math.min(W,H)/600;
+    const endX = pelicanX + 18 * Math.min(W,H)/600;
+    const endY = pelicanY - 100 * Math.min(W,H)/600;
+
+    const cx = (1-progress) * (1-progress) * startX + 2 * (1-progress) * progress * W * 0.5 + progress * progress * endX;
+    const cy = (1-progress) * (1-progress) * startY - 80 * Math.sin(progress * Math.PI) + 2 * (1-progress) * progress * (startY + endY) * 0.5 + progress * progress * endY;
+
+    // Actually simpler arc
+    const ax = startX + (endX - startX) * progress;
+    const ay = startY - 60 * Math.sin(progress * Math.PI) + (endY - startY) * progress;
+
+    drawSmallFish(c, ax, ay, progress * 0.5);
+
+    if (progress > 0.9 && !fish.caught) {
+      fish.caught = true;
+      // Create catch particle burst
+      for (let j = 0; j < 8; j++) {
+        spawnParticle('splash', endX + (Math.random()-0.5)*20, endY + 30, (Math.random()-0.5)*4, Math.random()*2-1, 1.5, 'rgba(100,180,255,0.6)');
+      }
+    }
+  }
+
+  if (feedAnimTimer > 1.0) {
+    feedAnimActive = false;
+    feedFishList = [];
+  }
+}
+
+function drawSmallFish(c, x, y, rot) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(rot);
+  // Fish body
+  c.fillStyle = '#5dade2';
+  c.beginPath();
+  c.ellipse(0, 0, 8, 3.5, 0, 0, Math.PI * 2);
+  c.fill();
+  // Tail
+  c.fillStyle = '#3498db';
+  c.beginPath();
+  c.moveTo(-7, 0);
+  c.lineTo(-12, -5);
+  c.lineTo(-12, 5);
+  c.closePath();
+  c.fill();
+  // Eye
+  c.fillStyle = '#fff';
+  c.beginPath(); c.arc(4, -1, 1.5, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#111';
+  c.beginPath(); c.arc(4.5, -1, 0.8, 0, Math.PI*2); c.fill();
+  c.restore();
+}
+
+// ===== BELLED EFFECT =====
+let bellFlashTimer = 0;
+let bellShockRings = [];
+
+function drawBellEffects(c, cx, cy) {
+  if (bellFlashTimer > 0) {
+    c.globalAlpha = bellFlashTimer * 2;
+    c.fillStyle = '#ffff00';
+    c.beginPath();
+    c.arc(cx, cy - 60 * Math.min(W,H)/600, 20 + (1-bellFlashTimer)*20, 0, Math.PI*2);
+    c.fill();
+    c.globalAlpha = 1;
+    // Sound waves
+    c.strokeStyle = 'rgba(255,255,0,0.5)';
+    c.lineWidth = 2;
+    for (const ring of bellShockRings) {
+      c.globalAlpha = ring.life;
+      c.beginPath();
+      c.arc(cx, cy - 60 * Math.min(W,H)/600, ring.radius, 0, Math.PI*2);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+}
+
+// ===== MAIN GAME LOOP =====
+let lastTime = 0;
+let totalDistance = 0;
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+  time += dt;
+
+  // Update state
+  const effectiveSpeed = baseSpeed * speedMultiplier + accelBoost;
+  scrollOffset += effectiveSpeed * dt * 60;
+  totalDistance += effectiveSpeed * dt;
+
+  if (bellCooldown > 0) bellCooldown -= dt;
+  if (feedCooldown > 0) feedCooldown -= dt;
+  if (accelBoost > 0) {
+    accelBoost = Math.max(0, accelBoost - dt * 3);
+  }
+  if (bellFlashTimer > 0) {
+    bellFlashTimer = Math.max(0, bellFlashTimer - dt * 3);
+    // Update shock rings
+    for (let i = bellShockRings.length - 1; i >= 0; i--) {
+      const r = bellShockRings[i];
+      r.radius += dt * 80;
+      r.life -= dt * 1.5;
+      if (r.life <= 0) bellShockRings.splice(i, 1);
+    }
+  }
+
+  // Stamina depletion
+  if (effectiveSpeed > 1) {
+    pelicanExhaustion = Math.min(100, pelicanExhaustion + dt * (3 + speedMultiplier * 2));
+    stamina = Math.max(0, 100 - pelicanExhaustion);
+    document.getElementById('staminaFill').style.width = stamina + '%';
+  }
+
+  pelicanRunPhase += effectiveSpeed * dt * 2;
+  bikeAngle += effectiveSpeed * dt * 2;
+
+  // Terrain bump
+  const terrainBounce = terrainType === 1 ? Math.sin(scrollOffset * 0.05) * 4 * Math.sin(scrollOffset * 0.08) + Math.sin(scrollOffset * 0.13) * 2 : 0;
+
+  // Spawn particles
+  if (effectiveSpeed > 0.3) {
+    if (Math.random() < 0.02 * effectiveSpeed) {
+      const groundY = H * 0.72;
+      spawnParticle('dust', W * 0.3 + Math.random() * W * 0.4, groundY - 5, -effectiveSpeed * Math.random() * 2 - 1, -Math.random(), 1.5, 'rgba(194,160,110,0.5)');
+    }
+    if (pelicanExhaustion > 30 && Math.random() < 0.01 * pelicanExhaustion / 10) {
+      const pelX = W * 0.4;
+      const pelY = H * 0.48;
+      spawnParticle('sweat', pelX + (Math.random()-0.5)*40, pelY + 20, (Math.random()-0.5)*3, -Math.random() * 3 - 1, 2, '');
+    }
+    if (Math.random() < 0.008) {
+      spawnParticle('feather', W * 0.35 + Math.random() * W * 0.3, H * 0.35 + Math.random() * 60, -effectiveSpeed - Math.random() * 2, Math.random() * 1 - 0.5, 3, `rgba(255,255,255,${0.5 + Math.random()*0.3})`);
+    }
+  }
+  updateParticles(dt);
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw scene layers
+  drawSky(ctx);
+  drawClouds(ctx);
+  drawBackground(ctx);
+  drawGround(ctx);
+  drawParticles(ctx);
+
+  // Positions
+  const mainScale = Math.min(W, H) / 600;
+  const pelicanBaseX = W * 0.45;
+  const pelicanBaseY = H * 0.46;
+  const bikeBaseX = pelicanBaseX;
+  const bikeBaseY = pelicanBaseY - 55 * mainScale;
+  const bikeBounce = terrainBounce + Math.sin(time * 3) * 2 + Math.sin(time * 4.7) * 1;
+
+  // Feed fish animation
+  drawFeedAnimation(ctx, pelicanBaseX, pelicanBaseY, bikeBaseX, bikeBaseY);
+
+  // Draw pelican
+  drawPelican(ctx, pelicanBaseX, pelicanBaseY, pelicanRunPhase);
+
+  // Draw bicycle
+  drawBicycle(ctx, bikeBaseX, bikeBaseY, bikeAngle, bikeBounce);
+
+  // Bell effects
+  drawBellEffects(ctx, bikeBaseX, bikeBaseY);
+
+  // Exhaustion face change (drawn inside drawPelican already via throat pouch inflation)
+
+  // Stamina low warning
+  if (stamina < 20 && Math.sin(time * 6) > 0.5) {
+    ctx.fillStyle = 'rgba(255,0,0,0.05)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Vignette
+  const vigGrad = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.min(W,H)*0.75);
+  vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  vigGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
+  ctx.fillStyle = vigGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Title distance marker
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = `${12}px sans-serif`;
+  ctx.fillText(`里程 ${totalDistance.toFixed(0)}m`, 12, 22);
+
+  // Speed indicator visual
+  const meterY = H - 70;
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(W * 0.5 - 50, meterY, 100, 6);
+  const speedFrac = Math.min(1, (effectiveSpeed - 0.1) / 2.9);
+  const speedColor = effectiveSpeed > 2.5 ? '#ef4444' : effectiveSpeed > 1.5 ? '#f59e0b' : '#10b981';
+  ctx.fillStyle = speedColor;
+  ctx.fillRect(W * 0.5 - 50, meterY, 100 * speedFrac, 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${(effectiveSpeed * 15).toFixed(0)} km/h`, W * 0.5, meterY - 4);
+  ctx.textAlign = 'left';
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============ CONTROLS ============
+document.getElementById('bellBtn').addEventListener('click', () => {
+  if (bellCooldown > 0) return;
+  playBell();
+  bellCooldown = 0.5;
+  bellFlashTimer = 1;
+  bellShockRings = [{ radius: 5, life: 1 }, { radius: 3, life: 0.8 }];
+
+  // Accelerate!
+  accelBoost = Math.min(accelBoost + 0.5, 2);
+
+  // Pelican startles - scatter feathers
+  const pelX = W * 0.45;
+  const pelY = H * 0.46;
+  for (let i = 0; i < 6; i++) {
+    spawnParticle('feather', pelX + (Math.random()-0.5)*60, pelY - 20 + Math.random()*40, (Math.random()-0.5)*6, Math.random()*3+1, 2.5, 'rgba(255,250,240,0.8)');
+  }
+  // Sweat explosion
+  for (let i = 0; i < 8; i++) {
+    spawnParticle('sweat', pelX + (Math.random()-0.5)*30, pelY + 10, (Math.random()-0.5)*4, -Math.random()*4-1, 1.5, '');
+  }
+
+  const btn = document.getElementById('bellBtn');
+  btn.classList.add('ringing');
+  setTimeout(() => btn.classList.remove('ringing'), 500);
+});
+
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+  speedMultiplier = parseFloat(e.target.value);
+  const v = speedMultiplier;
+  let label = '慢速';
+  if (v < 0.8) label = '慢速';
+  else if (v < 1.5) label = '中速';
+  else if (v < 2.2) label = '快速';
+  else label = '冲刺';
+  document.getElementById('speedVal').textContent = label;
+  if (v > 2) playWhoosh(v);
+});
+
+document.getElementById('feedBtn').addEventListener('click', () => {
+  if (feedCooldown > 0) return;
+  playFishSplash();
+  feedCooldown = 2;
+  stamina = Math.min(100, stamina + 20);
+  pelicanExhaustion = Math.max(0, pelicanExhaustion - 20);
+  document.getElementById('staminaFill').style.width = stamina + '%';
+  startFeedAnimation();
+
+  // Happy particles
+  const pelX = W * 0.45;
+  const pelY = H * 0.46;
+  for (let i = 0; i < 5; i++) {
+    spawnParticle('splash', pelX + (Math.random()-0.5)*50, pelY + 20 + Math.random()*30, (Math.random()-0.5)*3, -Math.random()*2, 2, `rgba(${100+Math.random()*100},${180+Math.random()*75},255,0.5)`);
+  }
+
+  const btn = document.getElementById('feedBtn');
+  btn.textContent = '🐟 已投喂 ✓';
+  setTimeout(() => { btn.textContent = '🐟 投喂'; }, 1500);
+});
+
+const weatherOrder = ['晴天', '黄昏', '夜晚'];
+document.getElementById('weatherBtn').addEventListener('click', () => {
+  weatherState = (weatherState + 1) % 3;
+  document.getElementById('weatherLabel').textContent = weatherOrder[weatherState];
+});
+
+document.getElementById('terrainBtn').addEventListener('click', () => {
+  terrainType = terrainType === 0 ? 1 : 0;
+  const btn = document.getElementById('terrainBtn');
+  btn.textContent = terrainType === 0 ? '🛣 路况' : '🪨 路况';
+  // Dust when changing
+  for (let i = 0; i < 10; i++) {
+    spawnParticle('dust', W*0.3+Math.random()*W*0.4, H*0.72, (Math.random()-0.5)*3, -Math.random()*2, 1.5, 'rgba(194,160,110,0.5)');
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('bellBtn').click(); }
+  if (e.code === 'ArrowUp') { speedMultiplier = Math.min(3, speedMultiplier + 0.2); document.getElementById('speedSlider').value = speedMultiplier; speedMultiplier = parseFloat(document.getElementById('speedSlider').value); document.getElementById('speedVal').textContent = '加速'; }
+  if (e.code === 'ArrowDown') { speedMultiplier = Math.max(0.1, speedMultiplier - 0.2); document.getElementById('speedSlider').value = speedMultiplier; speedMultiplier = parseFloat(document.getElementById('speedSlider').value); document.getElementById('speedVal').textContent = '减速'; }
+  if (e.code === 'KeyF') { document.getElementById('feedBtn').click(); }
+  if (e.code === 'KeyW') { document.getElementById('weatherBtn').click(); }
+  if (e.code === 'KeyT') { document.getElementById('terrainBtn').click(); }
+});
+
+// Start
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

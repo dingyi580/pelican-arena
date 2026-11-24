@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一辆自行车正在骑着一只鹈鹕</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, #87CEEB, #6495ED);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        .control-button {
+            padding: 10px 20px;
+            border: none;
+            background: #FFD700;
+            color: #000;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .control-button:hover {
+            background: #FFA500;
+        }
+        #scene {
+            position: relative;
+            width: 80%;
+            height: 80%;
+        }
+        .background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MDAlIiBoZWlnaHQ9IjUwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGNvbG9yPSIjNTM3RUZCIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iNyIgZmlsbD0ib3JhbGxiYWIiLz48L3N2Zz4=') repeat;
+        }
+        .pelican {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 150px;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAlIiBoZWlnaHQ9IjE1MCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMwM0RCQiIvPjxwYXRoIGQ9Ik0xNTAsNjBoLTI2MEwzMCw5MGwyMCwxMGg1MEwzMCw5MHptNTAsNjBsLTIwLDEwSDI2MEwxNTAsMTUweiIgZmlsbD0iI0ZGRiIvPjwvc3ZnPg==') no-repeat center;
+        }
+        .bike {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%) rotate(-10deg);
+            width: 100px;
+            height: 50px;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iNTAiPjxwYXRoIGQ9Ik01LDBNMTUsMiBMNSwxMCBMNSwyOSBMMTUsNTAgTDI1LDI4IEwyNSwzIEw1LDEgeiIgZmlsbD0iI0ZGRiIvPjxwYXRoIGQ9Ik0yNSwyOCBMNDEsMjggTDQxLDI4IEw0MSwxMCBMMjUsMTAgTDI1LDI4eiIgZmlsbD0iI0ZGRiIvPjxwYXRoIGQ9Ik00MSw2IEw2MSw2IEw2MSw0MSBMNDEsNDEgeiIgZmlsbD0iI0ZGRiIvPjxwYXRoIGQ9Ik02MSwyOSBMNzAsMjkgTDcwLDYgTDYxLDYgeiIgZmlsbD0iI0ZGRiIvPjxwYXRoIGQ9Ik02MSw0MSBMNzAsNDEgTDcwLDI4IEw2MSwyOCB6IiBmaWxsPSIjRkZGIi8+PC9zdmc+');
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="scene">
+            <div class="background"></div>
+            <div class="pelican" id="pelican"></div>
+            <div class="bike" id="bike"></div>
+        </div>
+        <div id="controls">
+            <button class="control-button" id="bell">按车铃</button>
+            <button class="control-button" id="sprint">冲刺</button>
+            <button class="control-button" id="fish">投喂小鱼</button>
+        </div>
+    </div>
+
+    <script>
+        const pelican = document.getElementById('pelican');
+        const bike = document.getElementById('bike');
+        const bellButton = document.getElementById('bell');
+        const sprintButton = document.getElementById('sprint');
+        const fishButton = document.getElementById('fish');
+
+        let speed = 1;
+        let sprinting = false;
+        let feeding = false;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (sprinting) {
+                pelican.style.transform = `translateX(-50%) translateX(${speed * 5}px)`;
+                bike.style.transform = `translateX(-50%) translateX(${speed * 5}px) rotate(-15deg)`;
+            } else {
+                pelican.style.transform = `translateX(-50%) translateX(${speed}px)`;
+                bike.style.transform = `translateX(-50%) translateX(${speed}px) rotate(-10deg)`;
+            }
+
+            if (feeding) {
+                pelican.style.transform += ` translateX(-50px)`;
+                bike.style.transform += ` translateX(-50px)`;
+                setTimeout(() => {
+                    feeding = false;
+                    pelican.style.transform = `translateX(-50%) translateX(${speed}px)`;
+                    bike.style.transform = `translateX(-50%) translateX(${speed}px) rotate(-10deg)`;
+                }, 1000);
+            }
+        }
+
+        bellButton.addEventListener('click', () => {
+            const oscillator = new OscillatorNode(context);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, context.currentTime);
+            oscillator.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.1);
+            pelican.style.transform += ` translateY(-10px)`;
+            bike.style.transform += ` translateY(-10px)`;
+            setTimeout(() => {
+                pelican.style.transform = `translateX(-50%) translateX(${speed}px)`;
+                bike.style.transform = `translateX(-50%) translateX(${speed}px) rotate(-10deg)`;
+            }, 200);
+        });
+
+        sprintButton.addEventListener('click', () => {
+            sprinting = !sprinting;
+            if (sprinting) {
+                speed += 5;
+            } else {
+                speed = 1;
+            }
+        });
+
+        fishButton.addEventListener('click', () => {
+            feeding = true;
+        });
+
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        animate();
+    </script>
+</body>
+</html>

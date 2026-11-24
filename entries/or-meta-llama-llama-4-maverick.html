@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        #canvas {
+            width: 100%;
+            height: 100vh;
+            display: block;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .controls button, .controls input[type="range"] {
+            width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <button id="bell-btn">按车铃</button>
+        <input type="range" id="speed-slider" min="0.5" max="2" step="0.1" value="1">
+        <label for="speed-slider">速度</label>
+        <button id="sprint-btn">冲刺</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let bicycle = {
+            x: canvas.width / 2,
+            y: canvas.height / 2 - 100,
+            width: 150,
+            height: 100,
+            wheelRadius: 20,
+            pedalAngle: 0,
+            bellAngle: 0,
+            isBellRinging: false
+        };
+
+        let pelican = {
+            x: canvas.width / 2,
+            y: canvas.height / 2 + 50,
+            width: 150,
+            height: 100,
+            wingAngle: 0,
+            throatAngle: 0,
+            speed: 1,
+            isSprinting: false
+        };
+
+        let background = {
+            cloudX: 0,
+            featherX: 0
+        };
+
+        document.getElementById('bell-btn').addEventListener('click', () => {
+            bicycle.isBellRinging = true;
+            pelican.speed += 0.5;
+            setTimeout(() => {
+                bicycle.isBellRinging = false;
+                pelican.speed -= 0.5;
+            }, 1000);
+            ringBell();
+        });
+
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            pelican.speed = parseFloat(e.target.value);
+        });
+
+        document.getElementById('sprint-btn').addEventListener('click', () => {
+            pelican.isSprinting = true;
+            pelican.speed *= 1.5;
+            setTimeout(() => {
+                pelican.isSprinting = false;
+                pelican.speed /= 1.5;
+            }, 3000);
+        });
+
+        function ringBell() {
+            const audioContext = new AudioContext();
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 800;
+            oscillator.connect(audioContext.destination);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        function drawBicycle() {
+            ctx.save();
+            ctx.translate(bicycle.x, bicycle.y);
+            ctx.rotate(Math.sin(Date.now() * 0.01) * 0.1);
+
+            // 车架
+            ctx.fillStyle = '#666';
+            ctx.fillRect(-bicycle.width / 2, -bicycle.height / 2, bicycle.width, bicycle.height);
+
+            // 前后轮
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(-bicycle.width / 2 + bicycle.wheelRadius, bicycle.height / 2 - bicycle.wheelRadius, bicycle.wheelRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(bicycle.width / 2 - bicycle.wheelRadius, bicycle.height / 2 - bicycle.wheelRadius, bicycle.wheelRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 车把
+            ctx.fillStyle = '#666';
+            ctx.fillRect(-20, -bicycle.height / 2 - 20, 40, 20);
+
+            // 车座
+            ctx.fillRect(-10, -bicycle.height / 2, 20, 10);
+
+            // 脚踏
+            ctx.fillStyle = '#333';
+            ctx.save();
+            ctx.rotate(bicycle.pedalAngle);
+            ctx.fillRect(-bicycle.width / 2 + 30, bicycle.height / 2 + 10, 20, 5);
+            ctx.restore();
+
+            // 车铃
+            ctx.fillStyle = '#f00';
+            ctx.save();
+            ctx.translate(-bicycle.width / 2 + 40, -bicycle.height / 2);
+            ctx.rotate(bicycle.bellAngle);
+            ctx.fillRect(-5, -5, 10, 10);
+            ctx.restore();
+
+            ctx.restore();
+
+            bicycle.pedalAngle += 0.1;
+            if (bicycle.isBellRinging) {
+                bicycle.bellAngle += 0.5;
+            }
+        }
+
+        function drawPelican() {
+            ctx.save();
+            ctx.translate(pelican.x, pelican.y);
+
+            // 身体
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-pelican.width / 2, -pelican.height / 2, pelican.width, pelican.height);
+
+            // 翅膀
+            ctx.save();
+            ctx.rotate(pelican.wingAngle);
+            ctx.fillStyle = '#ddd';
+            ctx.fillRect(-pelican.width / 2 - 20, -pelican.height / 4, 40, 20);
+            ctx.restore();
+
+            // 喉囊
+            ctx.fillStyle = '#ff0';
+            ctx.save();
+            ctx.rotate(pelican.throatAngle);
+            ctx.beginPath();
+            ctx.arc(0, pelican.height / 2, 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.restore();
+
+            pelican.wingAngle = Math.sin(Date.now() * 0.01 * pelican.speed) * 0.5;
+            pelican.throatAngle = Math.sin(Date.now() * 0.01 * pelican.speed) * 0.2;
+            pelican.x += pelican.speed;
+            if (pelican.x > canvas.width || pelican.x < 0) {
+                pelican.speed = -pelican.speed;
+            }
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 云朵
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(background.cloudX, 100, 50, 0, Math.PI * 2);
+            ctx.fill();
+            background.cloudX += 0.1 * pelican.speed;
+            if (background.cloudX > canvas.width) {
+                background.cloudX = -50;
+            }
+
+            // 羽毛
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(background.featherX, 200, 10, 0, Math.PI * 2);
+            ctx.fill();
+            background.featherX += 0.5 * pelican.speed;
+            if (background.featherX > canvas.width) {
+                background.featherX = -10;
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawPelican();
+            drawBicycle();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

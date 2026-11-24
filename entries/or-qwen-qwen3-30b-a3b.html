@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            background: #87CEEB;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+            background: #87CEEB;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+        .control-btn, .slider {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .slider {
+            width: 120px;
+            height: 8px;
+            background: #fff;
+            border-radius: 4px;
+            appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #FFD700;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 1px 1px 2px #000;
+        }
+    </style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<div class="controls">
+    <button class="control-btn" id="bellBtn">按车铃</button>
+    <input type="range" class="slider" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
+    <button class="control-btn" id="feedBtn">投喂小鱼</button>
+</div>
+<div class="info" id="info">速度: 1.0x | 体力: 100%</div>
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    });
+
+    // 鹈鹕参数
+    let pelican = {
+        x: width/2,
+        y: height - 150,
+        speed: 1,
+        stamina: 100,
+        wingAngle: 0,
+        throatScale: 1,
+        isAccelerating: false
+    };
+
+    // 自行车参数
+    let bike = {
+        x: width/2 - 30,
+        y: height - 200,
+        wheelAngle: 0,
+        pedalAngle: 0,
+        frameTilt: 0,
+        wheelSpeed: 0.05
+    };
+
+    // 背景层
+    const backgroundLayers = [
+        { speed: 0.1, elements: [] },
+        { speed: 0.3, elements: [] },
+        { speed: 0.5, elements: [] }
+    ];
+
+    // 初始化背景
+    for (let i = 0; i < 20; i++) {
+        backgroundLayers[0].elements.push({ x: Math.random()*width, y: Math.random()*height });
+        backgroundLayers[1].elements.push({ x: Math.random()*width, y: Math.random()*height });
+        backgroundLayers[2].elements.push({ x: Math.random()*width, y: Math.random()*height });
+    }
+
+    // 鹈鹕绘制
+    function drawPelican() {
+        // 身体
+        ctx.save();
+        ctx.translate(pelican.x, pelican.y);
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(30, -50, 70, -30, 100, 0);
+        ctx.bezierCurveTo(80, 30, 60, 50, 0, 50);
+        ctx.closePath();
+        ctx.fill();
+
+        // 羽毛
+        ctx.fillStyle = '#A0522D';
+        ctx.beginPath();
+        ctx.moveTo(0, 50);
+        ctx.lineTo(-20, 70);
+        ctx.lineTo(-10, 90);
+        ctx.lineTo(10, 90);
+        ctx.lineTo(20, 70);
+        ctx.closePath();
+        ctx.fill();
+
+        // 喉囊
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(10, -20, 30, -10, 40, 0);
+        ctx.bezierCurveTo(30, 20, 10, 30, 0, 20);
+        ctx.bezierCurveTo(-10, 30, -30, 20, -40, 0);
+        ctx.bezierCurveTo(-30, -10, -10, -20, 0, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 眼睛
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(15, -10, 3, 0, Math.PI*2);
+        ctx.arc(-15, -10, 3, 0, Math.PI*2);
+        ctx.fill();
+
+        // 喙
+        ctx.fillStyle = '#FFA500';
+        ctx.beginPath();
+        ctx.moveTo(40, 0);
+        ctx.lineTo(60, 10);
+        ctx.lineTo(60, -10);
+        ctx.closePath();
+        ctx.fill();
+
+        // 翅膀
+        ctx.save();
+        ctx.translate(60, 0);
+        ctx.rotate(pelican.wingAngle);
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(20, -30);
+        ctx.lineTo(40, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(-60, 0);
+        ctx.rotate(-pelican.wingAngle);
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-20, -30);
+        ctx.lineTo(-40, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // 脚蹼
+        ctx.fillStyle = '#A0522D';
+        ctx.beginPath();
+        ctx.moveTo(0, 50);
+        ctx.lineTo(10, 70);
+        ctx.lineTo(0, 80);
+        ctx.lineTo(-10, 70);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 自行车绘制
+    function drawBike() {
+        ctx.save();
+        ctx.translate(bike.x, bike.y);
+        ctx.fillStyle = '#000';
+
+        // 车架
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -60);
+        ctx.lineTo(30, -80);
+        ctx.lineTo(60, -60);
+        ctx.lineTo(60, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 车把
+        ctx.beginPath();
+        ctx.moveTo(-30, -60);
+        ctx.lineTo(90, -60);
+        ctx.stroke();
+
+        // 前轮
+        ctx.save();
+        ctx.translate(30, 0);
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI*2);
+        ctx.fillStyle = '#000';
+        ctx.fill();
+        ctx.strokeStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        // 后轮
+        ctx.save();
+        ctx.translate(60, 0);
+        ctx.rotate(bike.wheelAngle);
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI*2);
+        ctx.fillStyle = '#000';
+        ctx.fill();
+        ctx.strokeStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        // 脚踏
+        ctx.save();
+        ctx.translate(60, 0);
+        ctx.rotate(bike.pedalAngle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(10, 10);
+        ctx.lineTo(10, -10);
+        ctx.closePath();
+        ctx.fillStyle = '#000';
+        ctx.fill();
+        ctx.restore();
+
+        // 车座
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(30, -80);
+        ctx.lineTo(40, -85);
+        ctx.lineTo(50, -80);
+        ctx.closePath();
+        ctx.fill();
+
+        // 链条
+        ctx.strokeStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(30, 0);
+        ctx.lineTo(60, 0);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    // 背景绘制
+    function drawBackground() {
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, width, height);
+
+        // 云朵
+        ctx.fillStyle = '#FFF';
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath();
+            ctx.arc(100 + i*80, 100, 20, 0, Math.PI*2);
+            ctx.arc(120 + i*80, 90, 15, 0, Math.PI*2);
+            ctx.arc(140 + i*80, 100, 20, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 海浪
+        ctx.fillStyle = '#4682B4';
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        ctx.bezierCurveTo(width/2, height-50, width, height, width, height);
+        ctx.lineTo(0, height);
+        ctx.fill();
+    }
+
+    // 动画循环
+    function animate() {
+        ctx.clearRect(0, 0, width, height);
+        drawBackground();
+
+        // 更新鹈鹕
+        pelican.x += pelican.speed * pelican.speed * 0.5;
+        if (pelican.x > width) pelican.x = -100;
+        pelican.wingAngle += 0.1;
+        pelican.throatScale = 1 + Math.sin(Date.now() * 0.005) * 0.1;
+
+        // 更新自行车
+        bike.wheelAngle += bike.wheelSpeed;
+        bike.pedalAngle += 0.1;
+        bike.frameTilt = Math.sin(Date.now() * 0.01) * 0.1;
+
+        // 绘制元素
+        drawPelican();
+        drawBike();
+
+        // 绘制背景层
+        backgroundLayers.forEach(layer => {
+            ctx.fillStyle = '#000';
+            layer.elements.forEach(el => {
+                el.x += layer.speed;
+                if (el.x > width) el.x = -10;
+                ctx.fillRect(el.x, el.y, 2, 2);
+            });
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    // 车铃音效
+    function playBellSound() {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(2000, audioCtx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+        oscillator.stop(audioCtx.currentTime + 0.1);
+    }
+
+    // 交互事件
+    document.getElementById('bellBtn').addEventListener('click', () => {
+        playBellSound();
+        pelican.isAccelerating = true;
+        setTimeout(() => pelican.isAccelerating = false, 500);
+    });
+
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+        pelican.speed = parseFloat(e.target.value);
+        document.getElementById('info').textContent = `速度: ${e.target.value}x | 体力: ${pelican.stamina}%`;
+    });
+
+    document.getElementById('feedBtn').addEventListener('click', () => {
+        if (pelican.stamina < 100) {
+            pelican.stamina = Math.min(100, pelican.stamina + 20);
+            document.getElementById('info').textContent = `速度: ${pelican.speed}x | 体力: ${pelican.stamina}%`;
+        }
+    });
+
+    animate();
+</script>
+</body>
+</html>

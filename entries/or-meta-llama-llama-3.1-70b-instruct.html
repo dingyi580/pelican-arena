@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        /* CSS */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        #canvas {
+            width: 100%;
+            height: 100vh;
+            border: none;
+        }
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+        <button id="ring-bell">按车铃</button>
+        <button id="speed-up">加速</button>
+        <button id="slow-down">减速</button>
+        <button id="feed-fish">投喂小鱼</button>
+    </div>
+    <script>
+        // JavaScript
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const controls = document.getElementById('controls');
+        const ringBellBtn = document.getElementById('ring-bell');
+        const speedUpBtn = document.getElementById('speed-up');
+        const slowDownBtn = document.getElementById('slow-down');
+        const feedFishBtn = document.getElementById('feed-fish');
+        let bikeX = 100;
+        let bikeY = 100;
+        let pelicanX = 200;
+        let pelicanY = 300;
+        let speed = 2;
+        let bellRinging = false;
+        let fishFed = false;
+        let background = {
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 600,
+            image: null
+        };
+        let bike = {
+            x: bikeX,
+            y: bikeY,
+            width: 100,
+            height: 50,
+            image: null
+        };
+        let pelican = {
+            x: pelicanX,
+            y: pelicanY,
+            width: 150,
+            height: 100,
+            image: null
+        };
+        let bell = {
+            x: bikeX + 50,
+            y: bikeY + 25,
+            width: 20,
+            height: 20,
+            image: null
+        };
+        let fish = {
+            x: pelicanX + 75,
+            y: pelicanY + 50,
+            width: 20,
+            height: 20,
+            image: null
+        };
+        // 加载背景图
+        background.image = new Image();
+        background.image.src = 'background.png';
+        background.image.onload = function() {
+            drawBackground();
+        };
+        // 加载自行车图
+        bike.image = new Image();
+        bike.image.src = 'bike.png';
+        bike.image.onload = function() {
+            drawBike();
+        };
+        // 加载鹈鹕图
+        pelican.image = new Image();
+        pelican.image.src = 'pelican.png';
+        pelican.image.onload = function() {
+            drawPelican();
+        };
+        // 加载铃铛图
+        bell.image = new Image();
+        bell.image.src = 'bell.png';
+        bell.image.onload = function() {
+            drawBell();
+        };
+        // 加载小鱼图
+        fish.image = new Image();
+        fish.image.src = 'fish.png';
+        fish.image.onload = function() {
+            drawFish();
+        };
+        // 绘制背景
+        function drawBackground() {
+            ctx.drawImage(background.image, background.x, background.y, background.width, background.height);
+        }
+        // 绘制自行车
+        function drawBike() {
+            ctx.drawImage(bike.image, bike.x, bike.y, bike.width, bike.height);
+        }
+        // 绘制鹈鹕
+        function drawPelican() {
+            ctx.drawImage(pelican.image, pelican.x, pelican.y, pelican.width, pelican.height);
+        }
+        // 绘制铃铛
+        function drawBell() {
+            ctx.drawImage(bell.image, bell.x, bell.y, bell.width, bell.height);
+        }
+        // 绘制小鱼
+        function drawFish() {
+            ctx.drawImage(fish.image, fish.x, fish.y, fish.width, fish.height);
+        }
+        // 动画循环
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawBike();
+            drawPelican();
+            if (bellRinging) {
+                drawBell();
+            }
+            if (fishFed) {
+                drawFish();
+            }
+            bike.x += speed;
+            pelican.x += speed;
+            bell.x = bike.x + 50;
+            fish.x = pelican.x + 75;
+            if (bike.x > canvas.width) {
+                bike.x = -bike.width;
+                pelican.x = -pelican.width;
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+        // 按车铃事件
+        ringBellBtn.addEventListener('click', function() {
+            bellRinging = true;
+            setTimeout(function() {
+                bellRinging = false;
+            }, 2000);
+        });
+        // 加速事件
+        speedUpBtn.addEventListener('click', function() {
+            speed += 1;
+        });
+        // 减速事件
+        slowDownBtn.addEventListener('click', function() {
+            speed -= 1;
+            if (speed < 1) {
+                speed = 1;
+            }
+        });
+        // 投喂小鱼事件
+        feedFishBtn.addEventListener('click', function() {
+            fishFed = true;
+            setTimeout(function() {
+                fishFed = false;
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

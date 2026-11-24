@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自行车骑鹈鹕 · Bicycle Riding a Pelican</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; }
+#scene { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+canvas#bgCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+canvas#particleCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+#mainStage { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+#controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); border-radius: 20px; padding: 12px 20px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+.ctrl-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; user-select: none; }
+.ctrl-btn:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.ctrl-btn:active { transform: translateY(0); }
+.ctrl-btn.active { background: rgba(255,200,50,0.3); border-color: rgba(255,200,50,0.6); }
+#speedSlider { -webkit-appearance: none; appearance: none; width: 100px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.2); outline: none; }
+#speedSlider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #ffd700; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.speed-label { color: rgba(255,255,255,0.8); font-size: 12px; white-space: nowrap; }
+#staminaBar { position: fixed; top: 20px; right: 20px; z-index: 10; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); border-radius: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.1); }
+#staminaBar .label { color: rgba(255,255,255,0.7); font-size: 11px; margin-bottom: 4px; }
+#staminaBar .bar { width: 120px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+#staminaBar .fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #ffd700, #51cf66); border-radius: 4px; transition: width 0.3s; }
+#timeDisplay { position: fixed; top: 20px; left: 20px; z-index: 10; color: rgba(255,255,255,0.6); font-size: 12px; background: rgba(0,0,0,0.3); backdrop-filter: blur(8px); border-radius: 8px; padding: 6px 12px; }
+#bellEffect { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; font-size: 48px; opacity: 0; transition: opacity 0.1s; }
+.tooltip { position: relative; }
+.tooltip::after { content: attr(data-tip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.tooltip:hover::after { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="scene">
+  <canvas id="bgCanvas"></canvas>
+  <svg id="mainStage" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet"></svg>
+  <canvas id="particleCanvas"></canvas>
+</div>
+
+<div id="timeDisplay">🌅 清晨模式</div>
+
+<div id="staminaBar">
+  <div class="label">🐦 鹈鹕体力</div>
+  <div class="bar"><div class="fill" id="staminaFill" style="width:100%"></div></div>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn tooltip" id="bellBtn" data-tip="按铃！叮铃铃~">🔔 按车铃</button>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+    <span class="speed-label">速度</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="4">
+  </div>
+  <button class="ctrl-btn tooltip" id="sprintBtn" data-tip="全力冲刺！">🚀 冲刺</button>
+  <button class="ctrl-btn tooltip" id="feedBtn" data-tip="投喂小鱼恢复体力">🐟 投喂</button>
+  <button class="ctrl-btn tooltip" id="timeBtn" data-tip="切换天气时间">🌤 天气</button>
+  <button class="ctrl-btn tooltip" id="roadBtn" data-tip="切换路况">🛤 路况</button>
+</div>
+
+<div id="bellEffect">🔔</div>
+
+<script>
+// ============ STATE ============
+const state = {
+  speed: 4,
+  stamina: 100,
+  timeOfDay: 0, // 0=morning, 1=dusk, 2=night
+  roadType: 0, // 0=smooth, 1=bumpy
+  sprinting: false,
+  bellRinging: false,
+  bellTimer: 0,
+  pelicanX: 600,
+  pelicanY: 420,
+  bouncePhase: 0,
+  wingPhase: 0,
+  pedalPhase: 0,
+  wheelRotation: 0,
+  legPhase: 0,
+  pouchWobble: 0,
+  scrollX: 0,
+  particles: [],
+  feathers: [],
+  sweatDrops: [],
+  fish: [],
+  startled: 0,
+  breathPhase: 0,
+  eyeBlink: 0,
+  blinkTimer: 0
+};
+
+const timeModes = [
+  { name: '🌅 清晨模式', sky: ['#87CEEB', '#E0F7FA'], sea: '#4FC3F7', boardwalk: '#8D6E63', cloud: 'rgba(255,255,255,0.8)' },
+  { name: '🌇 黄昏模式', sky: ['#FF6B35', '#FFD700'], sea: '#E65100', boardwalk: '#5D4037', cloud: 'rgba(255,200,150,0.7)' },
+  { name: '🌙 夜晚模式', sky: ['#0D1B2A', '#1B2838'], sea: '#0A1628', boardwalk: '#3E2723', cloud: 'rgba(100,100,150,0.4)' }
+];
+
+// ============ CANVAS SETUP ============
+const bgCanvas = document.getElementById('bgCanvas');
+const bgCtx = bgCanvas.getContext('2d');
+const ptCanvas = document.getElementById('particleCanvas');
+const ptCtx = ptCanvas.getContext('2d');
+
+function resizeCanvases() {
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+  ptCanvas.width = window.innerWidth;
+  ptCanvas.height = window.innerHeight;
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// ============ AUDIO ============
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playBellSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  // Bell sound synthesis
+  [800, 1200, 1600, 2400].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.8, now + 0.5);
+    gain.gain.setValueAtTime(0.15 / (i + 1), now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.8);
+  });
+  // Second ring
+  setTimeout(() => {
+    const now2 = audioCtx.currentTime;
+    [900, 1350, 1800].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now2);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.7, now2 + 0.6);
+      gain.gain.setValueAtTime(0.12 / (i + 1), now2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now2 + 0.6);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now2);
+      osc.stop(now2 + 0.6);
+    });
+  }, 150);
+}
+
+function playFeedSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.linearRampToValueAtTime(800, now + 0.15);
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
+// ============ BACKGROUND RENDERING ============
+function drawBackground(t) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  const mode = timeModes[state.timeOfDay];
+  
+  // Sky gradient
+  const skyGrad = bgCtx.createLinearGradient(0, 0, 0, h * 0.6);
+  skyGrad.addColorStop(0, mode.sky[0]);
+  skyGrad.addColorStop(1, mode.sky[1]);
+  bgCtx.fillStyle = skyGrad;
+  bgCtx.fillRect(0, 0, w, h);
+  
+  // Sun/Moon
+  if (state.timeOfDay === 2) {
+    // Moon
+    bgCtx.beginPath();
+    bgCtx.arc(w * 0.8, h * 0.15, 40, 0, Math.PI * 2);
+    bgCtx.fillStyle = '#F5F5DC';
+    bgCtx.fill();
+    // Stars
+    for (let i = 0; i < 50; i++) {
+      const sx = (i * 137.5 + state.scrollX * 0.02) % w;
+      const sy = (i * 73.3) % (h * 0.4);
+      const brightness = 0.3 + 0.7 * Math.sin(t * 0.001 + i);
+      bgCtx.beginPath();
+      bgCtx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      bgCtx.fillStyle = `rgba(255,255,255,${brightness})`;
+      bgCtx.fill();
+    }
+  } else {
+    // Sun
+    const sunY = state.timeOfDay === 0 ? h * 0.18 : h * 0.35;
+    const sunX = (w * 0.75 - state.scrollX * 0.01) % w;
+    bgCtx.beginPath();
+    bgCtx.arc(sunX, sunY, 50, 0, Math.PI * 2);
+    const sunGrad = bgCtx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
+    sunGrad.addColorStop(0, state.timeOfDay === 0 ? '#FFF176' : '#FF6F00');
+    sunGrad.addColorStop(0.6, state.timeOfDay === 0 ? '#FFEE58' : '#FF3D00');
+    sunGrad.addColorStop(1, 'transparent');
+    bgCtx.fillStyle = sunGrad;
+    bgCtx.fill();
+  }
+  
+  // Clouds (parallax layer 1 - far)
+  for (let i = 0; i < 5; i++) {
+    const cx = ((i * 300 + 100 - state.scrollX * 0.1) % (w + 200)) - 100;
+    const cy = 60 + i * 35;
+    drawCloud(cx, cy, 1 + i * 0.2, mode.cloud);
+  }
+  
+  // Distant mountains/hills (parallax layer 2)
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, h * 0.55);
+  for (let x = 0; x <= w; x += 20) {
+    const y = h * 0.55 + Math.sin((x + state.scrollX * 0.15) * 0.005) * 30 + Math.sin((x + state.scrollX * 0.15) * 0.012) * 15;
+    bgCtx.lineTo(x, y);
+  }
+  bgCtx.lineTo(w, h);
+  bgCtx.lineTo(0, h);
+  bgCtx.fillStyle = state.timeOfDay === 2 ? '#1a2332' : (state.timeOfDay === 1 ? '#4A2C2A' : '#66BB6A');
+  bgCtx.globalAlpha = 0.5;
+  bgCtx.fill();
+  bgCtx.globalAlpha = 1;
+  
+  // Sea (parallax layer 3)
+  const seaY = h * 0.6;
+  const seaGrad = bgCtx.createLinearGradient(0, seaY, 0, h * 0.75);
+  seaGrad.addColorStop(0, mode.sea);
+  seaGrad.addColorStop(1, state.timeOfDay === 2 ? '#0A1628' : '#0277BD');
+  bgCtx.fillStyle = seaGrad;
+  bgCtx.fillRect(0, seaY, w, h * 0.15);
+  
+  // Waves
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, seaY);
+  for (let x = 0; x <= w; x += 5) {
+    const waveY = seaY + Math.sin((x + state.scrollX * 0.5 + t * 0.002) * 0.03) * 4 + Math.sin((x + t * 0.003) * 0.05) * 2;
+    bgCtx.lineTo(x, waveY);
+  }
+  bgCtx.lineTo(w, seaY + 20);
+  bgCtx.lineTo(0, seaY + 20);
+  bgCtx.fillStyle = 'rgba(255,255,255,0.1)';
+  bgCtx.fill();
+  
+  // Boardwalk (parallax layer 4 - near)
+  const boardY = h * 0.75;
+  bgCtx.fillStyle = mode.boardwalk;
+  bgCtx.fillRect(0, boardY, w, h - boardY);
+  
+  // Boardwalk planks
+  const plankWidth = 60;
+  for (let x = -state.scrollX % plankWidth - plankWidth; x < w + plankWidth; x += plankWidth) {
+    bgCtx.strokeStyle = 'rgba(0,0,0,0.2)';
+    bgCtx.lineWidth = 1;
+    bgCtx.beginPath();
+    bgCtx.moveTo(x, boardY);
+    bgCtx.lineTo(x, h);
+    bgCtx.stroke();
+  }
+  
+  // Boardwalk railing
+  bgCtx.strokeStyle = 'rgba(100,70,50,0.8)';
+  bgCtx.lineWidth = 3;
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, boardY - 5);
+  bgCtx.lineTo(w, boardY - 5);
+  bgCtx.stroke();
+  
+  // Railing posts
+  for (let x = -state.scrollX * 0.8 % 80 - 80; x < w + 80; x += 80) {
+    bgCtx.fillStyle = 'rgba(100,70,50,0.7)';
+    bgCtx.fillRect(x, boardY - 40, 4, 40);
+  }
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, boardY - 38);
+  bgCtx.lineTo(w, boardY - 38);
+  bgCtx.strokeStyle = 'rgba(100,70,50,0.6)';
+  bgCtx.lineWidth = 2;
+  bgCtx.stroke();
+  
+  // Road texture for bumpy road
+  if (state.roadType === 1) {
+    for (let i = 0; i < 30; i++) {
+      const rx = ((i * 97 - state.scrollX * 2) % w + w) % w;
+      const ry = boardY + 10 + (i * 37) % 40;
+      bgCtx.beginPath();
+      bgCtx.arc(rx, ry, 3 + (i % 3), 0, Math.PI * 2);
+      bgCtx.fillStyle = 'rgba(80,60,40,0.4)';
+      bgCtx.fill();
+    }
+  }
+}
+
+function drawCloud(x, y, scale, color) {
+  bgCtx.save();
+  bgCtx.translate(x, y);
+  bgCtx.scale(scale, scale);
+  bgCtx.fillStyle = color;
+  bgCtx.beginPath();
+  bgCtx.arc(0, 0, 25, 0, Math.PI * 2);
+  bgCtx.arc(25, -5, 20, 0, Math.PI * 2);
+  bgCtx.arc(-20, 2, 18, 0, Math.PI * 2);
+  bgCtx.arc(10, 5, 22, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.restore();
+}
+
+// ============ SVG SCENE ============
+const svg = document.getElementById('mainStage');
+const svgNS = 'http://www.w3.org/2000/svg';
+
+function createSVGElement(tag, attrs) {
+  const el = document.createElementNS(svgNS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    el.setAttribute(k, v);
+  }
+  return el;
+}
+
+// Build the scene SVG
+function buildScene() {
+  svg.innerHTML = '';
+  
+  // Main group that will be animated
+  const mainGroup = createSVGElement('g', { id: 'mainGroup' });
+  
+  // ---- PELICAN ----
+  const pelican = createSVGElement('g', { id: 'pelican' });
+  
+  // Body
+  pelican.appendChild(createSVGElement('ellipse', {
+    cx: '0', cy: '0', rx: '80', ry: '50',
+    fill: '#F5F5F0', stroke: '#BDB76B', 'stroke-width': '2', id: 'pBody'
+  }));
+  
+  // Wing (back)
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M-20,-30 Q-60,-80 -30,-100 Q10,-90 30,-50 Q10,-30 -20,-30Z',
+    fill: '#E8E4D4', stroke: '#BDB76B', 'stroke-width': '1.5', id: 'wingBack'
+  }));
+  
+  // Tail feathers
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M60,-10 Q90,-30 100,-20 Q95,-5 80,5 Q70,0 60,-10Z',
+    fill: '#DDD8C4', stroke: '#BDB76B', 'stroke-width': '1', id: 'tail'
+  }));
+  
+  // Neck
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M-55,-20 Q-80,-50 -90,-80 Q-85,-90 -75,-85 Q-65,-60 -45,-30',
+    fill: '#F5F5F0', stroke: '#BDB76B', 'stroke-width': '2', id: 'neck'
+  }));
+  
+  // Head
+  pelican.appendChild(createSVGElement('circle', {
+    cx: '-88', cy: '-88', r: '18',
+    fill: '#F5F5F0', stroke: '#BDB76B', 'stroke-width': '1.5', id: 'head'
+  }));
+  
+  // Eye
+  pelican.appendChild(createSVGElement('circle', {
+    cx: '-95', cy: '-92', r: '5', fill: '#fff', stroke: '#333', 'stroke-width': '1', id: 'eyeWhite'
+  }));
+  pelican.appendChild(createSVGElement('circle', {
+    cx: '-96', cy: '-92', r: '3', fill: '#222', id: 'eyePupil'
+  }));
+  pelican.appendChild(createSVGElement('circle', {
+    cx: '-97', cy: '-94', r: '1.2', fill: '#fff', id: 'eyeHighlight'
+  }));
+  
+  // Eyelid for blinking
+  pelican.appendChild(createSVGElement('ellipse', {
+    cx: '-95', cy: '-92', rx: '6', ry: '0', fill: '#F5F5F0', id: 'eyelid'
+  }));
+  
+  // Beak (upper)
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M-105,-88 L-145,-85 L-140,-82 L-105,-83Z',
+    fill: '#F4A460', stroke: '#CD853F', 'stroke-width': '1', id: 'beakUpper'
+  }));
+  
+  // Beak (lower) with pouch
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M-105,-83 L-140,-80 Q-130,-65 -110,-70 Q-100,-75 -105,-83Z',
+    fill: '#FFB74D', stroke: '#E65100', 'stroke-width': '1', opacity: '0.9', id: 'pouch'
+  }));
+  
+  // Wing (front)
+  pelican.appendChild(createSVGElement('path', {
+    d: 'M-10,-25 Q-40,-70 -15,-90 Q15,-80 35,-45 Q15,-25 -10,-25Z',
+    fill: '#EDE8D0', stroke: '#BDB76B', 'stroke-width': '1.5', id: 'wingFront'
+  }));
+  
+  // Legs
+  pelican.appendChild(createSVGElement('g', { id: 'legs' }, ));
+  const legsGroup = pelican.querySelector('#legs');
+  // Left leg
+  legsGroup.appendChild(createSVGElement('line', {
+    x1: '-20', y1: '45', x2: '-30', y2: '80',
+    stroke: '#F4A460', 'stroke-width': '4', 'stroke-linecap': 'round', id: 'legL'
+  }));
+  // Left foot
+  legsGroup.appendChild(createSVGElement('path', {
+    d: 'M-35,78 L-45,85 L-30,83 L-25,88 L-20,82 L-15,86 L-18,78Z',
+    fill: '#F4A460', stroke: '#CD853F', 'stroke-width': '1', id: 'footL'
+  }));
+  // Right leg
+  legsGroup.appendChild(createSVGElement('line', {
+    x1: '20', y1: '45', x2: '30', y2: '80',
+    stroke: '#F4A460', 'stroke-width': '4', 'stroke-linecap': 'round', id: 'legR'
+  }));
+  // Right foot
+  legsGroup.appendChild(createSVGElement('path', {
+    d: 'M25,78 L15,85 L30,83 L35,88 L40,82 L45,86 L42,78Z',
+    fill: '#F4A460', stroke: '#CD853F', 'stroke-width': '1', id: 'footR'
+  }));
+  
+  // Sweat drops group
+  pelican.appendChild(createSVGElement('g', { id: 'sweatGroup' }));
+  
+  // ---- BICYCLE ----
+  const bicycle = createSVGElement('g', { id: 'bicycle' });
+  
+  // Frame
+  const frame = createSVGElement('g', { id: 'bikeFrame' });
+  
+  // Main triangle frame
+  frame.appendChild(createSVGElement('line', { x1: '0', y1: '0', x2: '-35', y2: '40', stroke: '#E53935', 'stroke-width': '4', 'stroke-linecap': 'round' })); // seat tube
+  frame.appendChild(createSVGElement('line', { x1: '0', y1: '0', x2: '40', y2: '35', stroke: '#E53935', 'stroke-width': '4', 'stroke-linecap': 'round' })); // top tube to head
+  frame.appendChild(createSVGElement('line', { x1: '-35', y1: '40', x2: '40', y2: '35', stroke: '#E53935', 'stroke-width': '3.5', 'stroke-linecap': 'round' })); // down tube
+  
+  // Chain stays
+  frame.appendChild(createSVGElement('line', { x1: '-35', y1: '40', x2: '-55', y2: '55', stroke: '#E53935', 'stroke-width': '3', 'stroke-linecap': 'round' }));
+  // Seat stays
+  frame.appendChild(createSVGElement('line', { x1: '0', y1: '0', x2: '-55', y2: '55', stroke: '#E53935', 'stroke-width': '2.5', 'stroke-linecap': 'round' }));
+  
+  // Fork
+  frame.appendChild(createSVGElement('line', { x1: '40', y1: '35', x2: '50', y2: '55', stroke: '#E53935', 'stroke-width': '3', 'stroke-linecap': 'round' }));
+  
+  bicycle.appendChild(frame);
+  
+  // Seat
+  bicycle.appendChild(createSVGElement('ellipse', {
+    cx: '-2', cy: '-8', rx: '12', ry: '5',
+    fill: '#3E2723', stroke: '#1B0000', 'stroke-width': '1', id: 'seat'
+  }));
+  // Seat post
+  bicycle.appendChild(createSVGElement('line', { x1: '0', y1: '-3', x2: '0', y2: '5', stroke: '#666', 'stroke-width': '3' }));
+  
+  // Handlebars
+  const handlebar = createSVGElement('g', { id: 'handlebar' });
+  handlebar.appendChild(createSVGElement('line', { x1: '38', y1: '25', x2: '42', y2: '18', stroke: '#333', 'stroke-width': '3', 'stroke-linecap': 'round' }));
+  handlebar.appendChild(createSVGElement('line', { x1: '35', y1: '18', x2: '50', y2: '18', stroke: '#333', 'stroke-width': '3', 'stroke-linecap': 'round' }));
+  // Grips
+  handlebar.appendChild(createSVGElement('circle', { cx: '35', cy: '18', r: '3', fill: '#222' }));
+  handlebar.appendChild(createSVGElement('circle', { cx: '50', cy: '18', r: '3', fill: '#222' }));
+  bicycle.appendChild(handlebar);
+  
+  // Bell on handlebar
+  bicycle.appendChild(createSVGElement('circle', {
+    cx: '52', cy: '15', r: '5', fill: '#FFD700', stroke: '#B8860B', 'stroke-width': '1', id: 'bikeBell'
+  }));
+  
+  // Front wheel
+  const frontWheel = createSVGElement('g', { id: 'frontWheel', transform: 'translate(50,55)' });
+  frontWheel.appendChild(createSVGElement('circle', { cx: '0', cy: '0', r: '22', fill: 'none', stroke: '#333', 'stroke-width': '4' }));
+  frontWheel.appendChild(createSVGElement('circle', { cx: '0', cy: '0', r: '4', fill: '#666', stroke: '#333', 'stroke-width': '1' }));
+  // Spokes
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    frontWheel.appendChild(createSVGElement('line', {
+      x1: '0', y1: '0', x2: Math.cos(angle) * 19, y2: Math.sin(angle) * 19,
+      stroke: '#999', 'stroke-width': '0.8', class: 'spoke'
+    }));
+  }
+  bicycle.appendChild(frontWheel);
+  
+  // Rear wheel
+  const rearWheel = createSVGElement('g', { id: 'rearWheel', transform: 'translate(-55,55)' });
+  rearWheel.appendChild(createSVGElement('circle', { cx: '0', cy: '0', r: '22', fill: 'none', stroke: '#333', 'stroke-width': '4' }));
+  rearWheel.appendChild(createSVGElement('circle', { cx: '0', cy: '0', r: '4', fill: '#666', stroke: '#333', 'stroke-width': '1' }));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    rearWheel.appendChild(createSVGElement('line', {
+      x1: '0', y1: '0', x2: Math.cos(angle) * 19, y2: Math.sin(angle) * 19,
+      stroke: '#999', 'stroke-width': '0.8', class: 'spoke'
+    }));
+  }
+  bicycle.appendChild(rearWheel);
+  
+  // Pedals and crank
+  const crankGroup = createSVGElement('g', { id: 'crankGroup' });
+  crankGroup.appendChild(createSVGElement('circle', { cx: '-35', cy: '40', r: '3', fill: '#444' })); // crank center
+  crankGroup.appendChild(createSVGElement('line', {
+    x1: '-35', y1: '40', x2: '-25', y2: '40', stroke: '#555', 'stroke-width': '3', 'stroke-linecap': 'round', id: 'crankArm1'
+  }));
+  crankGroup.appendChild(createSVGElement('rect', {
+    x: '-27', y: '37', width: '8', height: '4', rx: '1', fill: '#333', id: 'pedal1'
+  }));
+  crankGroup.appendChild(createSVGElement('line', {
+    x1: '-35', y1: '40', x2: '-45', y2: '40', stroke: '#555', 'stroke-width': '3', 'stroke-linecap': 'round', id: 'crankArm2'
+  }));
+  crankGroup.appendChild(createSVGElement('rect', {
+    x: '-49', y: '37', width: '8', height: '4', rx: '1', fill: '#333', id: 'pedal2'
+  }));
+  // Chain ring
+  crankGroup.appendChild(createSVGElement('circle', { cx: '-35', cy: '40', r: '10', fill: 'none', stroke: '#666', 'stroke-width': '1.5' }));
+  bicycle.appendChild(crankGroup);
+  
+  // Chain (simplified)
+  bicycle.appendChild(createSVGElement('path', {
+    d: 'M-25,40 Q-40,58 -55,55 Q-45,52 -35,50 Q-25,48 -25,40',
+    fill: 'none', stroke: '#444', 'stroke-width': '1.5', 'stroke-dasharray': '3,2', id: 'chain'
+  }));
+  
+  // Reins (connecting handlebar to pelican - creative touch!)
+  const reins = createSVGElement('g', { id: 'reins' });
+  reins.appendChild(createSVGElement('path', {
+    d: 'M35,18 Q20,30 -20,20 Q-50,10 -70,-20',
+    fill: 'none', stroke: '#8B4513', 'stroke-width': '2.5', 'stroke-dasharray': 'none', id: 'reinL'
+  }));
+  reins.appendChild(createSVGElement('path', {
+    d: 'M50,18 Q35,35 -10,25 Q-40,15 -60,-15',
+    fill: 'none', stroke: '#8B4513', 'stroke-width': '2.5', id: 'reinR'
+  }));
+  bicycle.appendChild(reins);
+  
+  // Assemble
+  mainGroup.appendChild(pelican);
+  mainGroup.appendChild(bicycle);
+  svg.appendChild(mainGroup);
+  
+  // Position: bicycle sits on top of pelican
+  // Pelican at center, bicycle above on its back
+  pelican.setAttribute('transform', 'translate(600, 420)');
+  bicycle.setAttribute('transform', 'translate(595, 355)');
+}
+
+buildScene();
+
+// ============ ANIMATION ============
+let lastTime = 0;
+let frameCount = 0;
+
+function animate(timestamp) {
+  const dt = Math.min(timestamp - lastTime, 50);
+  lastTime = timestamp;
+  frameCount++;
+  
+  const effectiveSpeed = state.sprinting ? state.speed * 2.2 : state.speed;
+  
+  // Update scroll
+  state.scrollX += effectiveSpeed * dt * 0.05;
+  
+  // Update phases
+  state.bouncePhase += dt * 0.005 * effectiveSpeed;
+  state.wingPhase += dt * 0.004 * (effectiveSpeed * 0.5 + 1);
+  state.pedalPhase += dt * 0.006 * effectiveSpeed;
+  state.wheelRotation += dt * 0.01 * effectiveSpeed;
+  state.legPhase += dt * 0.008 * effectiveSpeed;
+  state.pouchWobble += dt * 0.003 * effectiveSpeed;
+  state.breathPhase += dt * 0.002;
+  
+  // Blink timer
+  state.blinkTimer += dt;
+  if (state.blinkTimer > 3000 + Math.random() * 2000) {
+    state.eyeBlink = 1;
+    state.blinkTimer = 0;
+  }
+  if (state.eyeBlink > 0) {
+    state.eyeBlink -= dt * 0.01;
+    if (state.eyeBlink < 0) state.eyeBlink = 0;
+  }
+  
+  // Startled decay
+  if (state.startled > 0) {
+    state.startled -= dt * 0.003;
+    if (state.startled < 0) state.startled = 0;
+  }
+  
+  // Bell ring decay
+  if (state.bellTimer > 0) {
+    state.bellTimer -= dt * 0.005;
+    if (state.bellTimer < 0) state.bellTimer = 0;
+  }
+  
+  // Stamina management
+  if (state.sprinting) {
+    state.stamina -= dt * 0.015;
+    if (state.stamina <= 0) {
+      state.stamina = 0;
+      state.sprinting = false;
+      document.getElementById('sprintBtn').classList.remove('active');
+    }
+  } else if (state.speed > 6) {
+    state.stamina -= dt * 0.003;
+  } else {
+    state.stamina = Math.min(100, state.stamina + dt * 0.005);
+  }
+  state.stamina = Math.max(0, Math.min(100, state.stamina));
+  document.getElementById('staminaFill').style.width = state.stamina + '%';
+  
+  // Bumpy road effect
+  const bumpOffset = state.roadType === 1 ? Math.sin(state.scrollX * 0.1) * 5 + Math.sin(state.scrollX * 0.23) * 3 : 0;
+  
+  // Calculate positions
+  const pelicanBaseY = 420;
+  const bounceY = Math.sin(state.bouncePhase) * (3 + effectiveSpeed * 0.5) + bumpOffset;
+  const tiltAngle = Math.sin(state.bouncePhase * 0.7) * (1 + effectiveSpeed * 0.3) + state.startled * 5;
+  
+  // Leg animation
+  const legAngle1 = Math.sin(state.legPhase) * 25;
+  const legAngle2 = Math.sin(state.legPhase + Math.PI) * 25;
+  
+  // Wing flap
+  const wingAngle = Math.sin(state.wingPhase) * (15 + effectiveSpeed * 2);
+  
+  // Pouch wobble
+  const pouchScale = 1 + Math.sin(state.pouchWobble) * 0.1;
+  
+  // Update SVG transforms
+  const pelicanEl = document.getElementById('pelican');
+  const bicycleEl = document.getElementById('bicycle');
+  
+  if (pelicanEl) {
+    pelicanEl.setAttribute('transform', 
+      `translate(600, ${pelicanBaseY + bounceY}) rotate(${tiltAngle * 0.3})`);
+  }
+  
+  if (bicycleEl) {
+    const bikeBounceY = bounceY * 0.7 + Math.sin(state.bouncePhase * 1.3) * 2;
+    const bikeTilt = tiltAngle * 0.5 + Math.sin(state.bouncePhase * 0.9) * 1.5;
+    bicycleEl.setAttribute('transform', 
+      `translate(595, ${355 + bikeBounceY}) rotate(${bikeTilt})`);
+  }
+  
+  // Animate legs
+  const legL = document.getElementById('legL');
+  const legR = document.getElementById('legR');
+  const footL = document.getElementById('footL');
+  const footR = document.getElementById('footR');
+  
+  if (legL && legR) {
+    const footOffsetX1 = Math.sin(state.legPhase) * 15;
+    const footOffsetY1 = Math.abs(Math.cos(state.legPhase)) * 10;
+    const footOffsetX2 = Math.sin(state.legPhase + Math.PI) * 15;
+    const footOffsetY2 = Math.abs(Math.cos(state.legPhase + Math.PI)) * 10;
+    
+    legL.setAttribute('x2', (-30 + footOffsetX1).toString());
+    legL.setAttribute('y2', (80 - footOffsetY1).toString());
+    legR.setAttribute('x2', (30 + footOffsetX2).toString());
+    legR.setAttribute('y2', (80 - footOffsetY2).toString());
+    
+    footL.setAttribute('transform', `translate(${footOffsetX1}, ${-footOffsetY1})`);
+    footR.setAttribute('transform', `translate(${footOffsetX2}, ${-footOffsetY2})`);
+  }
+  
+  // Animate wings
+  const wingFront = document.getElementById('wingFront');
+  const wingBack = document.getElementById('wingBack');
+  if (wingFront) {
+    const wingFlapY = Math.sin(state.wingPhase) * 20;
+    wingFront.setAttribute('d', 
+      `M-10,${-25 + wingFlapY * 0.3} Q-40,${-70 - wingFlapY} -15,${-90 - wingFlapY * 0.5} Q15,${-80 - wingFlapY * 0.3} 35,${-45 + wingFlapY * 0.2} Q15,-25 -10,${-25 + wingFlapY * 0.3}Z`);
+  }
+  if (wingBack) {
+    const wingFlapY2 = Math.sin(state.wingPhase + 0.3) * 18;
+    wingBack.setAttribute('d',
+      `M-20,${-30 + wingFlapY2 * 0.3} Q-60,${-80 - wingFlapY2} -30,${-100 - wingFlapY2 * 0.5} Q10,${-90 - wingFlapY2 * 0.3} 30,${-50 + wingFlapY2 * 0.2} Q10,-30 -20,${-30 + wingFlapY2 * 0.3}Z`);
+  }
+  
+  // Animate pouch (breathing + wobble)
+  const pouch = document.getElementById('pouch');
+  if (pouch) {
+    const breathScale = 1 + Math.sin(state.breathPhase) * 0.08 + (state.stamina < 30 ? Math.sin(state.breathPhase * 3) * 0.12 : 0);
+    const wobble = Math.sin(state.pouchWobble * 2) * 3;
+    pouch.setAttribute('d',
+      `M-105,-83 L-140,${-80 + wobble} Q${-130 - wobble},${-65 * breathScale} -110,${-70 * breathScale} Q-100,-75 -105,-83Z`);
+  }
+  
+  // Animate eye blink
+  const eyelid = document.getElementById('eyelid');
+  if (eyelid) {
+    eyelid.setAttribute('ry', (state.eyeBlink * 6).toString());
+  }
+  
+  // Animate wheels rotation
+  const frontWheel = document.getElementById('frontWheel');
+  const rearWheel = document.getElementById('rearWheel');
+  if (frontWheel) {
+    const spokes = frontWheel.querySelectorAll('.spoke');
+    spokes.forEach((spoke, i) => {
+      const angle = (i / 8) * Math.PI * 2 + state.wheelRotation;
+      spoke.setAttribute('x2', (Math.cos(angle) * 19).toString());
+      spoke.setAttribute('y2', (Math.sin(angle) * 19).toString());
+    });
+  }
+  if (rearWheel) {
+    const spokes = rearWheel.querySelectorAll('.spoke');
+    spokes.forEach((spoke, i) => {
+      const angle = (i / 8) * Math.PI * 2 + state.wheelRotation;
+      spoke.setAttribute('x2', (Math.cos(angle) * 19).toString());
+      spoke.setAttribute('y2', (Math.sin(angle) * 19).toString());
+    });
+  }
+  
+  // Animate pedals/crank
+  const crankArm1 = document.getElementById('crankArm1');
+  const crankArm2 = document.getElementById('crankArm2');
+  const pedal1 = document.getElementById('pedal1');
+  const pedal2 = document.getElementById('pedal2');
+  if (crankArm1 && crankArm2) {
+    const cAngle1 = state.pedalPhase;
+    const cAngle2 = state.pedalPhase + Math.PI;
+    const crankLen = 12;
+    const cx = -35, cy = 40;
+    const ex1 = cx + Math.cos(cAngle1) * crankLen;
+    const ey1 = cy + Math.sin(cAngle1) * crankLen;
+    const ex2 = cx + Math.cos(cAngle2) * crankLen;
+    const ey2 = cy + Math.sin(cAngle2) * crankLen;
+    
+    crankArm1.setAttribute('x2', ex1.toString());
+    crankArm1.setAttribute('y2', ey1.toString());
+    crankArm2.setAttribute('x2', ex2.toString());
+    crankArm2.setAttribute('y2', ey2.toString());
+    
+    if (pedal1) {
+      pedal1.setAttribute('x', (ex1 - 4).toString());
+      pedal1.setAttribute('y', (ey1 - 2).toString());
+    }
+    if (pedal2) {
+      pedal2.setAttribute('x', (ex2 - 4).toString());
+      pedal2.setAttribute('y', (ey2 - 2).toString());
+    }
+  }
+  
+  // Bell shake
+  const bikeBell = document.getElementById('bikeBell');
+  if (bikeBell && state.bellTimer > 0) {
+    const shake = Math.sin(state.bellTimer * 30) * 2 * state.bellTimer;
+    bikeBell.setAttribute('cx', (52 + shake).toString());
+    bikeBell.setAttribute('r', (5 + state.bellTimer * 2).toString());
+  }
+  
+  // Reins animation (connecting bike to pelican)
+  const reinL = document.getElementById('reinL');
+  const reinR = document.getElementById('reinR');
+  if (reinL && reinR) {
+    const reinWobble = Math.sin(state.bouncePhase * 0.8) * 5;
+    reinL.setAttribute('d', `M35,18 Q20,${30 + reinWobble} -20,${20 + reinWobble} Q-50,${10 + reinWobble * 0.5} -70,-20`);
+    reinR.setAttribute('d', `M50,18 Q35,${35 + reinWobble} -10,${25 + reinWobble} Q-40,${15 + reinWobble * 0.5} -60,-15`);
+  }
+  
+  // Draw background
+  drawBackground(timestamp);
+  
+  // Draw particles
+  drawParticles(timestamp, dt);
+  
+  // Generate sweat when stamina low or sprinting
+  if ((state.stamina < 50 || state.sprinting) && frameCount % 10 === 0) {
+    state.sweatDrops.push({
+      x: 600 + Math.random() * 40 - 20,
+      y: 380 + Math.random() * 30,
+      vx: -1 - Math.random() * 2,
+      vy: -2 - Math.random() * 2,
+      life: 1,
+      size: 2 + Math.random() * 2
+    });
+  }
+  
+  // Generate feathers occasionally
+  if (frameCount % 30 === 0 && effectiveSpeed > 3) {
+    state.feathers.push({
+      x: 600 + 60 + Math.random() * 20,
+      y: 400 + Math.random() * 30,
+      vx: 1 + Math.random() * 2,
+      vy: -1 + Math.random() * 2,
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 5,
+      life: 1,
+      size: 5 + Math.random() * 5
+    });
+  }
+  
+  requestAnimationFrame(animate);
+}
+
+// ============ PARTICLES ============
+function drawParticles(t, dt) {
+  ptCtx.clearRect(0, 0, ptCanvas.width, ptCanvas.height);
+  
+  const scaleX = ptCanvas.width / 1200;
+  const scaleY = ptCanvas.height / 700;
+  
+  // Sweat drops
+  for (let i = state.sweatDrops.length - 1; i >= 0; i--) {
+    const drop = state.sweatDrops[i];
+    drop.x += drop.vx;
+    drop.y += drop.vy;
+    drop.vy += 0.15;
+    drop.life -= 0.02;
+    
+    if (drop.life <= 0) {
+      state.sweatDrops.splice(i, 1);
+      continue;
+    }
+    
+    ptCtx.save();
+    ptCtx.globalAlpha = drop.life;
+    ptCtx.fillStyle = '#87CEEB';
+    ptCtx.beginPath();
+    const px = drop.x * scaleX;
+    const py = drop.y * scaleY;
+    // Teardrop shape
+    ptCtx.moveTo(px, py - drop.size * scaleY);
+    ptCtx.quadraticCurveTo(px + drop.size * scaleX, py, px, py + drop.size * scaleY * 0.5);
+    ptCtx.quadraticCurveTo(px - drop.size * scaleX, py, px, py - drop.size * scaleY);
+    ptCtx.fill();
+    ptCtx.restore();
+  }
+  
+  // Feathers
+  for (let i = state.feathers.length - 1; i >= 0; i--) {
+    const f = state.feathers[i];
+    f.x += f.vx;
+    f.y += f.vy;
+    f.vy += 0.02;
+    f.vx *= 0.99;
+    f.rotation += f.rotSpeed;
+    f.life -= 0.008;
+    
+    if (f.life <= 0) {
+      state.feathers.splice(i, 1);
+      continue;
+    }
+    
+    ptCtx.save();
+    const px = f.x * scaleX;
+    const py = f.y * scaleY;
+    ptCtx.translate(px, py);
+    ptCtx.rotate(f.rotation * Math.PI / 180);
+    ptCtx.globalAlpha = f.life;
+    ptCtx.fillStyle = '#F5F5DC';
+    ptCtx.beginPath();
+    ptCtx.ellipse(0, 0, f.size * scaleX * 0.3, f.size * scaleY, 0, 0, Math.PI * 2);
+    ptCtx.fill();
+    ptCtx.strokeStyle = '#BDB76B';
+    ptCtx.lineWidth = 0.5;
+    ptCtx.beginPath();
+    ptCtx.moveTo(0, -f.size * scaleY);
+    ptCtx.lineTo(0, f.size * scaleY);
+    ptCtx.stroke();
+    ptCtx.restore();
+  }
+  
+  // Fish particles (when feeding)
+  for (let i = state.fish.length - 1; i >= 0; i--) {
+    const fish = state.fish[i];
+    fish.x += fish.vx;
+    fish.y += fish.vy;
+    fish.vy += 0.1;
+    fish.life -= 0.015;
+    fish.rotation += fish.rotSpeed;
+    
+    if (fish.life <= 0) {
+      state.fish.splice(i, 1);
+      continue;
+    }
+    
+    ptCtx.save();
+    const px = fish.x * scaleX;
+    const py = fish.y * scaleY;
+    ptCtx.translate(px, py);
+    ptCtx.rotate(fish.rotation);
+    ptCtx.globalAlpha = fish.life;
+    ptCtx.fillStyle = '#90CAF9';
+    ptCtx.beginPath();
+    ptCtx.ellipse(0, 0, 8 * scaleX, 4 * scaleY, 0, 0, Math.PI * 2);
+    ptCtx.fill();
+    // Tail
+    ptCtx.beginPath();
+    ptCtx.moveTo(8 * scaleX, 0);
+    ptCtx.lineTo(14 * scaleX, -4 * scaleY);
+    ptCtx.lineTo(14 * scaleX, 4 * scaleY);
+    ptCtx.closePath();
+    ptCtx.fill();
+    // Eye
+    ptCtx.fillStyle = '#333';
+    ptCtx.beginPath();
+    ptCtx.arc(-3 * scaleX, -1 * scaleY, 1.5 * scaleX, 0, Math.PI * 2);
+    ptCtx.fill();
+    ptCtx.restore();
+  }
+  
+  // Dust from road when bumpy
+  if (state.roadType === 1 && frameCount % 5 === 0) {
+    const effectiveSpeed = state.sprinting ? state.speed * 2.2 : state.speed;
+    state.particles.push({
+      x: 600 - 50 + Math.random() * 20,
+      y: 500 + Math.random() * 10,
+      vx: -effectiveSpeed * 0.3 + (Math.random() - 0.5) * 2,
+      vy: -Math.random() * 1.5,
+      life: 1,
+      size: 3 + Math.random() * 4
+    });
+  }
+  
+  // Road dust particles
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.025;
+    p.size *= 1.01;
+    
+    if (p.life <= 0) {
+      state.particles.splice(i, 1);
+      continue;
+    }
+    
+    ptCtx.save();
+    ptCtx.globalAlpha = p.life * 0.5;
+    ptCtx.fillStyle = state.roadType === 1 ? '#8D6E63' : '#A1887F';
+    ptCtx.beginPath();
+    ptCtx.arc(p.x * scaleX, p.y * scaleY, p.size * scaleX, 0, Math.PI * 2);
+    ptCtx.fill();
+    ptCtx.restore();
+  }
+}
+
+// ============ CONTROLS ============
+document.getElementById('bellBtn').addEventListener('click', () => {
+  playBellSound();
+  state.bellTimer = 1;
+  state.startled = 1;
+  
+  // Visual feedback
+  const bellEffect = document.getElementById('bellEffect');
+  bellEffect.style.opacity = '1';
+  bellEffect.textContent = '🔔 叮铃铃~';
+  setTimeout(() => { bellEffect.style.opacity = '0'; }, 800);
+  
+  // Speed boost from startled
+  state.speed = Math.min(10, state.speed + 1);
+  setTimeout(() => { state.speed = Math.max(1, state.speed - 1); }, 2000);
+});
+
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+  state.speed = parseInt(e.target.value);
+});
+
+document.getElementById('sprintBtn').addEventListener('click', () => {
+  if (state.stamina > 5) {
+    state.sprinting = !state.sprinting;
+    document.getElementById('sprintBtn').classList.toggle('active', state.sprinting);
+    if (state.sprinting) {
+      // Burst of feathers
+      for (let i = 0; i < 5; i++) {
+        state.feathers.push({
+          x: 600 + Math.random() * 40,
+          y: 400 + Math.random() * 20,
+          vx: 2 + Math.random() * 3,
+          vy: -2 - Math.random() * 3,
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 8,
+          life: 1,
+          size: 6 + Math.random() * 6
+        });
+      }
+    }
+  }
+});
+
+document.getElementById('feedBtn').addEventListener('click', () => {
+  playFeedSound();
+  state.stamina = Math.min(100, state.stamina + 25);
+  
+  // Throw fish animation
+  for (let i = 0; i < 3; i++) {
+    state.fish.push({
+      x: 500 + Math.random() * 30,
+      y: 350,
+      vx: (Math.random() - 0.3) * 3,
+      vy: -4 - Math.random() * 3,
+      rotation: 0,
+      rotSpeed: (Math.random() - 0.5) * 0.2,
+      life: 1
+    });
+  }
+  
+  // Happy reaction
+  state.startled = 0.3;
+  
+  // Visual feedback
+  const btn = document.getElementById('feedBtn');
+  btn.textContent = '🐟 好吃！';
+  setTimeout(() => { btn.textContent = '🐟 投喂'; }, 1000);
+});
+
+document.getElementById('timeBtn').addEventListener('click', () => {
+  state.timeOfDay = (state.timeOfDay + 1) % 3;
+  document.getElementById('timeDisplay').textContent = timeModes[state.timeOfDay].name;
+  
+  // Update body background
+  const colors = ['#87CEEB', '#FF6B35', '#0D1B2A'];
+  document.body.style.background = colors[state.timeOfDay];
+});
+
+document.getElementById('roadBtn').addEventListener('click', () => {
+  state.roadType = (state.roadType + 1) % 2;
+  const btn = document.getElementById('roadBtn');
+  btn.textContent = state.roadType === 0 ? '🛤 平路' : '🪨 石子路';
+  
+  // Bumpy road creates more particles
+  if (state.roadType === 1) {
+    for (let i = 0; i < 10; i++) {
+      state.particles.push({
+        x: 600 + Math.random() * 60 - 30,
+        y: 500 + Math.random() * 10,
+        vx: (Math.random() - 0.5) * 4,
+        vy: -Math.random() * 3,
+        life: 1,
+        size: 2 + Math.random() * 4
+      });
+    }
+  }
+});
+
+// ============ START ============
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

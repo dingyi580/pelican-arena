@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bicycle Riding a Pelican</title>
+    <style>
+        body, html {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEFA;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        button, input {
+            margin: 5px;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+        <button onclick="ringBell()">按车铃</button>
+        <label>速度:
+            <input type="range" min="1" max="10" value="5" id="speedControl" oninput="adjustSpeed(this.value)">
+        </label>
+        <button onclick="feedPelican()">投喂小鱼</button>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        let bicycle = { x: 100, y: height / 2 };
+        let pelican = { x: 100, y: height / 2 + 50, speed: 2 };
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Background
+            ctx.fillStyle = '#E0FFFF';
+            ctx.fillRect(0, height - 100, width, 100);
+
+            // Bicycle
+            ctx.fillStyle = 'black';
+            ctx.fillRect(bicycle.x, bicycle.y, 60, 20);
+            ctx.fillRect(bicycle.x + 10, bicycle.y - 10, 40, 20);
+            ctx.beginPath();
+            ctx.arc(bicycle.x + 15, bicycle.y + 20, 10, 0, Math.PI * 2);
+            ctx.arc(bicycle.x + 45, bicycle.y + 20, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pelican
+            ctx.fillStyle = 'white';
+            ctx.fillRect(pelican.x, pelican.y, 80, 40);
+            ctx.beginPath();
+            ctx.arc(pelican.x + 60, pelican.y + 20, 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.arc(pelican.x + 80, pelican.y + 30, 10, 0, Math.PI, true);
+            ctx.fill();
+
+            bicycle.x += pelican.speed;
+
+            if (bicycle.x > width) {
+                bicycle.x = -60;
+            }
+            requestAnimationFrame(draw);
+        }
+
+        function ringBell() {
+            pelican.speed += 1;
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, context.currentTime);
+            oscillator.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.1);
+        }
+
+        function adjustSpeed(value) {
+            pelican.speed = parseInt(value);
+        }
+
+        function feedPelican() {
+            pelican.speed = 1;
+            alert('Pelican is tired and needs a rest!');
+        }
+
+        draw();
+    </script>
+</body>
+</html>

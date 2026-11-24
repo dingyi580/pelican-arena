@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>自行车骑鹈鹕 - 跨代模型前端擂台赛</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
+        #canvas { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; }
+        #ui { position: absolute; bottom: 30px; display: flex; gap: 20px; background: rgba(255,255,255,0.8); padding: 15px; border-radius: 50px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); z-index: 10; }
+        button { padding: 10px 20px; border: none; border-radius: 25px; cursor: pointer; background: #FF6B6B; color: white; font-weight: bold; transition: transform 0.2s; }
+        button:hover { transform: scale(1.1); }
+        .stats { position: absolute; top: 20px; left: 20px; font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+        
+        /* 动画逻辑 */
+        .bike-rider { transform-origin: center; animation: bounce 0.6s infinite ease-in-out; }
+        .pelican-legs { animation: run 0.3s infinite linear; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes run { 0% { transform: rotate(20deg); } 50% { transform: rotate(-20deg); } 100% { transform: rotate(20deg); } }
+    </style>
+</head>
+<body>
+
+<div id="canvas">
+    <div class="stats" id="status">鹈鹕体力: 100%</div>
+    
+    <!-- SVG 角色 -->
+    <svg width="600" height="400" viewBox="0 0 600 400">
+        <!-- 鹈鹕 -->
+        <g id="pelican">
+            <path d="M100 200 Q 250 150 400 200 L 380 300 Q 250 320 120 280 Z" fill="#E0E0E0" />
+            <path id="beak" d="M380 210 L 550 250 L 380 280 Z" fill="#FFD700" />
+            <ellipse cx="400" cy="220" rx="40" ry="60" fill="#FFA500" /> <!-- 喉囊 -->
+            <g class="pelican-legs"><line x1="250" y1="300" x2="250" y2="380" stroke="#FFD700" stroke-width="10" /></g>
+        </g>
+        
+        <!-- 自行车 -->
+        <g class="bike-rider" transform="translate(180, 80)">
+            <circle cx="50" cy="150" r="40" fill="none" stroke="#333" stroke-width="8" />
+            <circle cx="200" cy="150" r="40" fill="none" stroke="#333" stroke-width="8" />
+            <path d="M50 150 L 125 70 L 200 150 L 125 150 Z" stroke="#333" stroke-width="6" fill="none" />
+            <path d="M125 70 L 150 40 M 125 70 L 100 40" stroke="#333" stroke-width="6" />
+            <!-- 车把缰绳 -->
+            <path d="M100 40 L 350 210" stroke="#8B4513" stroke-width="2" />
+        </g>
+    </svg>
+
+    <div id="ui">
+        <button onclick="ringBell()">🔔 按车铃</button>
+        <button onclick="sprint()">⚡ 冲刺！</button>
+        <button onclick="feed()">🐟 投喂</button>
+    </div>
+</div>
+
+<script>
+    let energy = 100;
+    const statusEl = document.getElementById('status');
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function ringBell() {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 2000;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+        
+        // 鹈鹕受惊反应
+        document.getElementById('pelican').style.transform = 'scale(1.1)';
+        setTimeout(() => document.getElementById('pelican').style.transform = 'scale(1)', 200);
+    }
+
+    function sprint() {
+        if (energy > 10) {
+            energy -= 10;
+            document.querySelector('.pelican-legs').style.animationDuration = '0.1s';
+            setTimeout(() => {
+                document.querySelector('.pelican-legs').style.animationDuration = '0.3s';
+            }, 1000);
+            updateStatus();
+        }
+    }
+
+    function feed() {
+        energy = Math.min(100, energy + 20);
+        updateStatus();
+    }
+
+    function updateStatus() {
+        statusEl.innerText = `鹈鹕体力: ${energy}%`;
+        if (energy < 20) statusEl.style.color = 'red';
+        else statusEl.style.color = 'white';
+    }
+
+    // 自动体力消耗
+    setInterval(() => {
+        if (energy > 0) energy -= 0.5;
+        updateStatus();
+    }, 1000);
+</script>
+
+</body>
+</html>

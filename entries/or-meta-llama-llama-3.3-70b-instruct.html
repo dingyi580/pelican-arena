@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        #canvas {
+            border: 1px solid #ccc;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .controls button {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="controls">
+        <button id="bell-btn">按车铃</button>
+        <button id="speed-btn">加速</button>
+        <button id="feed-btn">投喂小鱼</button>
+        <input id="speed-input" type="range" min="0" max="10" value="5">
+        <label for="speed-input">速度：5</label>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const bellBtn = document.getElementById('bell-btn');
+        const speedBtn = document.getElementById('speed-btn');
+        const feedBtn = document.getElementById('feed-btn');
+        const speedInput = document.getElementById('speed-input');
+
+        let bikeX = 100;
+        let bikeY = 100;
+        let pelicanX = 100;
+        let pelicanY = 200;
+        let speed = 5;
+        let isRinging = false;
+        let isAccelerating = false;
+        let isFeeding = false;
+
+        function drawBike(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(50, 0);
+            ctx.lineTo(50, 20);
+            ctx.lineTo(0, 20);
+            ctx.closePath();
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPelican(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(50, 0);
+            ctx.lineTo(50, 50);
+            ctx.lineTo(0, 50);
+            ctx.closePath();
+            ctx.fillStyle = 'brown';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = 'skyblue';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawBike(bikeX, bikeY);
+            drawPelican(pelicanX, pelicanY);
+            if (isRinging) {
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(bikeX + 20, bikeY + 20, 10, 10);
+            }
+            if (isAccelerating) {
+                pelicanX += speed;
+            } else {
+                pelicanX += speed / 2;
+            }
+            if (isFeeding) {
+                ctx.fillStyle = 'green';
+                ctx.fillRect(pelicanX + 20, pelicanY + 20, 10, 10);
+            }
+            if (pelicanX > canvas.width) {
+                pelicanX = 0;
+            }
+            requestAnimationFrame(update);
+        }
+
+        bellBtn.addEventListener('click', () => {
+            isRinging = true;
+            setTimeout(() => {
+                isRinging = false;
+            }, 1000);
+        });
+
+        speedBtn.addEventListener('click', () => {
+            isAccelerating = true;
+            setTimeout(() => {
+                isAccelerating = false;
+            }, 1000);
+        });
+
+        feedBtn.addEventListener('click', () => {
+            isFeeding = true;
+            setTimeout(() => {
+                isFeeding = false;
+            }, 1000);
+        });
+
+        speedInput.addEventListener('input', (e) => {
+            speed = parseInt(e.target.value);
+        });
+
+        update();
+    </script>
+</body>
+</html>

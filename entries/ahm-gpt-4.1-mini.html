@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>「自行车骑鹈鹕」Interactive Animation</title>
+<style>
+  /* Reset & base */
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin:0; padding:0; height:100%;
+    background: linear-gradient(#a0d8f7, #f0f9ff);
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    user-select:none;
+  }
+
+  #app {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(to top, #66b3ff, #cdf0ff 60%, #f0f9ff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  canvas#stage {
+    background: transparent;
+    display: block;
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  /* UI container bottom right */
+  #ui {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    background: rgba(255 255 255 / 0.9);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    width: 320px;
+    box-shadow: 0 0 12px rgb(0 0 0 / 0.12);
+    user-select:none;
+  }
+
+  #ui > * {
+    flex: 1 1 100%;
+    min-width: 130px;
+  }
+
+  button, input[type=range], select {
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1.5px solid #9cc9ff;
+    background: #eaf4ff;
+    padding: 8px 12px;
+    width: 100%;
+    outline-offset: 2px;
+    cursor: pointer;
+    transition:
+      background 0.25s ease,
+      border-color 0.25s ease;
+  }
+  button:hover, select:hover, input[type=range]:hover {
+    background: #d8ecff;
+    border-color: #6fa6ff;
+  }
+  button:active {
+    background: #b4d1ff;
+  }
+  label {
+    font-weight: 600;
+    color: #134a84;
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    height: 8px;
+    background: #aacfff;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #3a7be0;
+    cursor: pointer;
+    border: 2.5px solid #3465cf;
+    margin-top: -7px;
+    transition: background 0.3s;
+  }
+  input[type=range]:active::-webkit-slider-thumb {
+    background: #1350c9;
+  }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="stage" width="960" height="540" aria-label="A Bicycle Riding a Pelican animation"></canvas>
+</div>
+<div id="ui" role="region" aria-label="Controls">
+  <div>
+    <label for="btn-ringer">🔔 按车铃 (Ring Bell)</label>
+    <button id="btn-ringer" aria-describedby="bell-desc">🚲 Ding Ding!</button>
+    <div id="bell-desc" style="font-size:0.75rem; color:#4a7297; margin-top:2px;">
+      触发车铃声，鹈鹕受惊加速
+    </div>
+  </div>
+  <div>
+    <label for="speed-range">🏃‍♂️ 速度控制 (Speed)</label>
+    <input type="range" id="speed-range" min="0" max="3" step="0.01" value="1" aria-valuemin="0" aria-valuemax="3" aria-valuenow="1" aria-label="Set pelican running speed">
+  </div>
+  <div>
+    <label for="interaction-select">🎨 环境切换 (Environment)</label>
+    <select id="interaction-select" aria-label="Change environment">
+      <option value="day">晴天 Daytime</option>
+      <option value="dusk">黄昏 Dusk</option>
+      <option value="night">夜晚 Night</option>
+      <option value="bumpy">颠簸石子路 Bumpy Road</option>
+    </select>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+
+  // Dimensions and scaling
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Constants for ground and horizons
+  const GROUND_Y = H * 0.75;
+  const AIR_Y = GROUND_Y * 0.55;
+  // Pelican dimensions and states
+  const pelicanBase = {
+    x: W / 2,
+    y: GROUND_Y,
+    baseSize: 140,
+  };
+
+  // Bicycle parameters
+  const bikeBase = {
+    wheelRadius: 35,
+    frameHeight: 70,
+    frameLength: 90,
+    xOffset: 0, // horizontal offset from pelican center
+    yOffset: 0,
+  };
+
+  // State
+  let speed = 1; // ~0 to 3, controls pelican speed
+  let bellRingingId = null; // timer for bell vibration effect
+  let bellRingTime = 0; // time since bell last rang
+  let lastTime = 0;
+  let particles = [];
+  let runTime = 0;
+  let sceneMode = 'day'; // 'day', 'dusk', 'night', 'bumpy'
+  let pelicanState = { // track pelican physiological state
+    stamina: 1, // from 0 (exhausted) to 1 (full)
+    isSurprised: false,
+    surpriseTimer: 0,
+    wingFlapPhase: 0,
+    breathingPhase: 0,
+  };
+
+  // Background layers for parallax
+  // Layers: far sea, mid horizon, near pier floor planks, clouds, flying feathers/sweat drops
+  const bgLayers = {
+    clouds: [],
+    sea: [],
+    pierPlanks: [],
+    feathers: [],
+    sweatDrops: [],
+  };
+
+  // Sound context & bell synth
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Utilities
+  function lerp(a,b,t){return a+(b - a)*t;}
+  function inverseLerp(a,b,v){return (v - a) / (b - a);}
+  function clamp(v,min,max){return Math.min(max, Math.max(min, v));}
+  function randomRange(min, max) {return Math.random()*(max-min)+min;}
+  function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2,3)/2;}
+  function easeOutQuad(t){ return t * (2 - t); }
+
+  // === PARTICLES ===
+  class Particle {
+    constructor(x,y,vx,vy,size,color,life, type='feather'){
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.size = size;
+      this.color = color;
+      this.life = life;
+      this.maxLife = life;
+      this.type = type; // 'feather' or 'sweat'
+      this.angle = randomRange(0, Math.PI*2);
+      this.angularVel = randomRange(-0.1, 0.1);
+      this.opacity = 1;
+    }
+    update(dt){
+      this.life -= dt;
+      if(this.life<0) this.life=0;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.vy += (this.type==='sweat'? 500 : 0) * dt; // gravity on sweat drops
+      this.angle += this.angularVel;
+      this.opacity = this.life / this.maxLife;
+    }
+    draw(ctx){
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      ctx.globalAlpha = this.opacity;
+      if(this.type==='feather'){
+        // Draw a stylized small feather as a curved shape
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.quadraticCurveTo(this.size*0.8, -this.size*0.3, this.size, 0);
+        ctx.quadraticCurveTo(this.size*0.8, this.size*0.3, 0, 0);
+        ctx.fill();
+        // quill line
+        ctx.strokeStyle = 'rgba(40,40,80,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.size * 0.5, 0);
+        ctx.lineTo(this.size * 0.5, this.size*0.3);
+        ctx.stroke();
+      } else if(this.type==='sweat'){
+        // drop shape
+        const r = this.size*0.6;
+        let grad = ctx.createRadialGradient(0,0,r*0.3,0,0,r);
+        grad.addColorStop(0,'rgba(180,230,255,0.9)');
+        grad.addColorStop(1,'rgba(180,230,255,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(0,0,r, r*1.5, Math.PI/4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(150,200,255,0.6)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0,0,r,r*1.5, Math.PI/4, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
+  // === BACKGROUND ===
+
+  // Initialize background elements
+  function initBackground(){
+    bgLayers.clouds.length = 0;
+    bgLayers.sea.length = 0;
+    bgLayers.pierPlanks.length = 0;
+    bgLayers.feathers.length = 0;
+    bgLayers.sweatDrops.length = 0;
+
+    // Clouds: layered with speed factor, random shapes
+    const cloudCount = 15;
+    for(let i=0; i<cloudCount; i++){
+      bgLayers.clouds.push({
+        x: Math.random()*W,
+        y: randomRange(30, H*0.35),
+        size: randomRange(50,110),
+        speedFactor: 0.04 + Math.random()*0.04,
+        phase: Math.random()*Math.PI*2,
+      });
+    }
+    // Sea waves (far background)
+    const waveCount = Math.floor(W / 100) + 2;
+    for(let i=0; i<waveCount; i++){
+      bgLayers.sea.push({
+        x: i*100,
+        baseY: GROUND_Y + 40,
+        waveHeight: 12+Math.random()*6,
+        wavePhase: Math.random()*Math.PI*2,
+        waveLength: 100 + Math.random()*40,
+      });
+    }
+    // Pier planks on ground, close view with parallax horizontal scroll
+    const plankCount = Math.ceil(W / 40) + 20;
+    for(let i= -10; i< plankCount; i++){
+      bgLayers.pierPlanks.push({
+        xBase: i*40,
+        width: 38,
+        height: 16,
+        patternPhase: Math.random()*Math.PI*2,
+      });
+    }
+  }
+
+  // Draw background layers with parallax
+  // offsetX controls horizontal scroll, speed is pelican running speed
+  function drawBackground(offsetX, dt){
+    // SKY gradient: different per sceneMode
+    if(sceneMode === 'day'){
+      const skyTop = '#a0d8f7';
+      const skyBottom = '#f0f9ff';
+      let grad = ctx.createLinearGradient(0, 0, 0, AIR_Y);
+      grad.addColorStop(0, skyTop);
+      grad.addColorStop(1, skyBottom);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, AIR_Y);
+    }else if(sceneMode === 'dusk'){
+      let grad = ctx.createLinearGradient(0, 0, 0, AIR_Y);
+      grad.addColorStop(0, '#ffad54');
+      grad.addColorStop(1, '#2d3a70');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, AIR_Y);
+    }else if(sceneMode === 'night'){
+      ctx.fillStyle = '#001024';
+      ctx.fillRect(0, 0, W, AIR_Y);
+      // draw some stars
+      for(let i=0; i<80; i++){
+        const sx = (i*47 + offsetX*3) % W;
+        const sy = (i*37 + offsetX*2) % AIR_Y*0.7 + 10;
+        ctx.fillStyle = `rgba(255,255,255,${Math.abs(Math.sin(runTime*3 + i)) * 0.8 + 0.2})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 1.25, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }else if(sceneMode === 'bumpy'){
+      // bumpy day with bright sky but hazy ground layers
+      const skyTop = '#a8c6ff';
+      const skyBottom = '#dbe9f7';
+      let grad = ctx.createLinearGradient(0, 0, 0, AIR_Y);
+      grad.addColorStop(0, skyTop);
+      grad.addColorStop(1, skyBottom);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, AIR_Y);
+    }
+
+    // Clouds (slow horizontal slide)
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    bgLayers.clouds.forEach(c => {
+      c.x -= c.speedFactor * speed * 20;
+      if(c.x < -c.size*1.5) c.x = W + c.size*1.5;
+      let p = 4;
+      ctx.beginPath();
+      // cluster of 3 circles as cloud
+      ctx.ellipse(c.x, c.y, c.size*0.4, c.size*0.35, 0, 0, Math.PI*2);
+      ctx.ellipse(c.x + c.size*0.35, c.y - c.size*0.16, c.size*0.36, c.size*0.3, 0, 0, Math.PI*2);
+      ctx.ellipse(c.x + c.size*0.7, c.y, c.size*0.38, c.size*0.3, 0, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // Sea waves (horizon line)
+    if(sceneMode !== 'night'){
+      const seaY = GROUND_Y + 40;
+      const seaHeight = H - seaY;
+      // large shimmer gradient
+      let grad = ctx.createLinearGradient(0, seaY, 0, seaY + seaHeight);
+      grad.addColorStop(0, sceneMode==='dusk'? '#30587b' : '#5390d9');
+      grad.addColorStop(1, sceneMode==='dusk'? '#18324e' : '#2e6da4');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, seaY, W, seaHeight);
+
+      // waves overlay
+      ctx.strokeStyle = sceneMode==='dusk'? '#587194' : '#8eb9ff';
+      ctx.lineWidth = 1.5;
+      bgLayers.sea.forEach(w => {
+        w.wavePhase += 0.04 * speed * dt;
+        let waveY = w.baseY + Math.sin(w.wavePhase)*w.waveHeight;
+        ctx.beginPath();
+        ctx.moveTo(w.x - offsetX * 0.1, waveY);
+        ctx.lineTo(w.x + w.waveLength - offsetX * 0.1, waveY);
+        ctx.stroke();
+      });
+    }
+
+    // Pier planks (near foreground)
+    {
+      const baseY = GROUND_Y + 8;
+      bgLayers.pierPlanks.forEach(p => {
+        let x = p.xBase - offsetX * 1.2;
+        if(x < -p.width) x += (Math.ceil(W / 40) + 20)*40;
+        if(x > W+p.width) x -= (Math.ceil(W / 40) + 20)*40;
+        // Wood plank base
+        let color = '#bc946d';
+        if(sceneMode === 'dusk') color = '#7f6241';
+        else if(sceneMode === 'night') color = '#4a3a25';
+        else if(sceneMode === 'bumpy') color = '#9a7c53';
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#6b532c';
+        // vertical wood grain lines
+        ctx.lineWidth = 0.8;
+
+        // draw plank rectangle with subtle noise pattern
+        ctx.beginPath();
+        ctx.roundRect(x, baseY, p.width, p.height, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // wood grain lines, slightly curved vertical
+        let linesNum = 3;
+        for(let i=1; i<=linesNum; i++){
+          let lx = x + (p.width / (linesNum+1)) * i;
+          ctx.beginPath();
+          ctx.moveTo(lx, baseY + 1);
+          ctx.quadraticCurveTo(
+            lx + Math.sin(runTime*2 + lx*0.07)*1.8,
+            baseY + p.height/2,
+            lx,
+            baseY + p.height - 2
+          );
+          ctx.stroke();
+        }
+      });
+    }
+  }
+
+  // === PELICAN ===
+  // Draw pelican at pelicanBase.x, pelicanBase.y with state
+  // Pelican running animation cycles wings flapping and legs moving,
+  // throat pouch pulsing, also body bobs a bit.
+  // The bike rides on back.
+
+  // Pelican body parts colors
+  const pelicanColors = {
+    body: '#fbf3de',
+    wing: '#f9eec6',
+    wingAccent: '#ded3a1',
+    throat: '#ffec9a',
+    beak: '#f1b24a',
+    beakTip: '#db7f24',
+    eyeWhite: '#f0f4fb',
+    pupil: '#2f2f2f',
+    legs: '#f6b953',
+    feet: '#b46014',
+    shadow: 'rgba(0,0,0,0.1)',
+  };
+
+  // Draw a single pelican - simplified stylized - facing right
+  // Used for main pelican body with running/bob/flap animation
+  function drawPelican(ctx, x, y, size, s){
+    // s: state object holding animation phases & parameters
+    // size base size for scaling
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Body bounce: simulates run step bob
+    let bobAmplitude = 6 + 10*(1-s.stamina);
+    let bob = Math.sin(s.runPhase)*bobAmplitude;
+    ctx.translate(0, bob);
+
+    // Body shadow ellipse under foot contact
+    ctx.fillStyle = 'rgba(0,0,0,0.11)';
+    ctx.beginPath();
+    ctx.ellipse(0, size*0.28 + 8, size*0.55, 20, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Body ellipse
+    ctx.fillStyle = pelicanColors.body;
+    ctx.beginPath();
+    ctx.ellipse(0, size*0.20, size*0.8, size*0.6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(0, size*0.20, size*0.8, size*0.6, 0, 0, Math.PI*2);
+    ctx.stroke();
+
+    // Throat pouch (the hallmark characteristic) pulsating by breathing phase
+    let pouchPulse = 1 + 0.07 * Math.sin(runTime * 6 + s.breathingPhase * Math.PI * 2);
+    ctx.save();
+    ctx.translate(-size*0.3, size*0.4);
+    ctx.scale(1, pouchPulse);
+    ctx.fillStyle = pelicanColors.throat;
+    ctx.strokeStyle = pelicanColors.shadow;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(size*0.9, 50, size*1.1, 30, size*0.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Neck
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#fceeb3';
+    ctx.fillStyle = '#fbf3de';
+    ctx.lineWidth = size*0.08;
+    ctx.beginPath();
+    ctx.moveTo(-size*0.4, -size*0.1);
+    // neck curve with small bend
+    ctx.quadraticCurveTo(-size*0.65, size*0.1, -size*0.4, size*0.25);
+    ctx.stroke();
+
+    // Head base ellipse
+    ctx.fillStyle = pelicanColors.body;
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(-size*0.65, 0, size*0.2, size*0.23, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Eye
+    ctx.fillStyle = pelicanColors.eyeWhite;
+    ctx.beginPath();
+    ctx.ellipse(-size*0.75, -size*0.018, size*0.07, size*0.06, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = pelicanColors.pupil;
+    ctx.beginPath();
+    ctx.ellipse(-size*0.75, -size*0.015, size*0.03, size*0.035, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Beak: long, top yellow, tip darker
+    ctx.fillStyle = pelicanColors.beak;
+    ctx.strokeStyle = 'rgba(100,60,10,0.1)';
+    ctx.lineWidth = 0.8;
+
+    ctx.beginPath();
+    ctx.moveTo(-size*0.73, 0);
+    ctx.lineTo(-size*1.2, size*0.10);
+    ctx.lineTo(-size*1.22, size*0.08);
+    ctx.lineTo(-size*0.74, -0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Beak tip darker
+    ctx.fillStyle = pelicanColors.beakTip;
+    ctx.beginPath();
+    ctx.moveTo(-size*1.22, size*0.08);
+    ctx.lineTo(-size*1.3, size*0.04);
+    ctx.lineTo(-size*1.27, 0);
+    ctx.lineTo(-size*1.22, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wings flap - left and right wing, flap with sinusoidal function
+    let flap = Math.sin(runTime*12 + s.wingFlapPhase*Math.PI*2) * 0.5 + 0.5; // 0 to 1 movement
+
+    // Left wing behind body
+    ctx.fillStyle = pelicanColors.wing;
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1.2;
+    ctx.save();
+    ctx.translate(size*0.2, size*0.1);
+    ctx.rotate(-0.15 - flap * 0.15);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size*0.5, size*0.2, Math.PI/3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // wing feathers pattern
+    ctx.fillStyle = pelicanColors.wingAccent;
+    for(let i=0; i<5; i++){
+      let px = lerp(-size*0.3, size*0.3, i/4);
+      ctx.beginPath();
+      ctx.ellipse(px, size*0.05, size*0.12 - i*0.017, size*0.05, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Right wing front
+    ctx.save();
+    ctx.translate(-size*0.2, 0);
+    ctx.rotate(0.07 + flap * 0.11);
+    ctx.fillStyle = pelicanColors.wing;
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size*0.5, size*0.25, -Math.PI/5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = pelicanColors.wingAccent;
+    for(let i=0; i<6; i++){
+      let px = lerp(-size*0.28, size*0.28, i/5);
+      ctx.beginPath();
+      ctx.ellipse(px, size*0.05, size*0.12 - i*0.015, size*0.05, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Tail feathers
+    ctx.fillStyle = pelicanColors.wingAccent;
+    ctx.beginPath();
+    ctx.moveTo(size*0.38, size*0.43);
+    ctx.lineTo(size*0.65, size*0.38);
+    ctx.lineTo(size*0.73, size*0.5);
+    ctx.lineTo(size*0.5, size*0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Legs oscillate with running phase
+    let legStep = Math.sin(s.runPhase*2 * Math.PI);
+    let legLift = legStep > 0 ? legStep * 20 : 0;
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = pelicanColors.feet;
+    ctx.fillStyle = pelicanColors.legs;
+    ctx.lineWidth = size * 0.07;
+
+    // Left leg
+    ctx.save();
+    ctx.translate(-size*0.1, size*0.62 + legLift*0.1);
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, size*0.15 - legLift*0.5);
+    ctx.stroke();
+    // webbed foot detail
+    ctx.beginPath();
+    ctx.moveTo(-size*0.13, size*0.15 - legLift*0.5);
+    ctx.lineTo(size*0.1, size*0.15 - legLift*0.5);
+    ctx.lineTo(-size*0.07, size*0.27 - legLift*0.5);
+    ctx.stroke();
+    ctx.restore();
+
+    // Right leg (offset in phase for running)
+    let legLiftR = Math.sin(s.runPhase*2 * Math.PI + Math.PI) > 0 ? Math.sin(s.runPhase*2 * Math.PI + Math.PI)*20 : 0;
+    ctx.save();
+    ctx.translate(size*0.15, size*0.62 + legLiftR*0.1);
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, size*0.15 - legLiftR*0.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-size*0.13, size*0.15 - legLiftR*0.5);
+    ctx.lineTo(size*0.1, size*0.15 - legLiftR*0.5);
+    ctx.lineTo(-size*0.07, size*0.27 - legLiftR*0.5);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore(); // main translate
+  }
+
+  // === BICYCLE ===
+  // Draw detailed bicycle standing/riding on pelican back,
+  // wheels rotate with pedaling, body leans subtly, chain/pedals animate
+  // The bike is “riding” pelican: bike handle holds reins attached to pelican’s beak,
+  // back tire partly 'hooked' on pelican’s back feathers.
+  // Bike “body” bobs with pelican motion + separate wheel rotation
+
+  // Function to draw bicycle on top of pelican body
+  // Params:
+  //   ctx: canvas context
+  //   x, y: center position base (bike bottom center point)
+  //   scale: size scale multiplier
+  //   pedalRotation: radians rotating pedal crank for animation
+  //   handleBarAngle: small rotation angle for handlebar sway
+  //   pitchTilt: small degree tilt for bike leaning left/right
+  function drawBike(ctx, x, y, scale, pedalRotation, handleBarAngle, pitchTilt, pulsingChain){
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.rotate(pitchTilt);
+
+    // Colors
+    const bikeFrameColor = '#2673e6';
+    const tireColor = '#222831';
+    const rimColor = '#ffffff';
+    const spokeColor = '#d1d9e6';
+    const seatColor = '#202b3b';
+    const handleColor = '#354a7a';
+    const chainColor = `rgba(139, 69, 19, ${pulsingChain})`; //'#8b4513';
+
+    // Wheel positions relative to bike center bottom
+    let wheelBase = 180;
+    let wheelRadius = 40;
+
+    // WHEEL: draw wheel with rotating spokes & tire rim
+    function drawWheel(cx, cy, rotation){
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // Tire (black rim)
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = tireColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, wheelRadius, 0, Math.PI*2);
+      ctx.stroke();
+
+      // Rim circle (white)
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = rimColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, wheelRadius-7, 0, Math.PI*2);
+      ctx.stroke();
+
+      // Spokes (12) rotating
+      ctx.strokeStyle = spokeColor;
+      ctx.lineWidth = 2;
+      let spokesNum = 12;
+      for(let i=0; i<spokesNum; i++){
+        let angle = rotation + (i/spokesNum)*Math.PI*2;
+        let sx = Math.cos(angle) * (wheelRadius-7);
+        let sy = Math.sin(angle) * (wheelRadius-7);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // Draw wheels
+    // Rear wheel on right, front wheel on left, distance = wheelBase
+    drawWheel(-wheelBase/2, 0, pedalRotation * 0.9);
+    drawWheel(wheelBase/2, 0, pedalRotation);
+
+    // Frame geometry points
+    const bottomBracket = {x: 0, y: 0};
+    const seatTubeTop = {x: -20, y: -120};
+    const headTubeTop = {x: wheelBase/2 - 40, y: -140};
+    const handleBarTop = {x: wheelBase/2 + 10, y: -120};
+    const seatPos = {x: -15, y: -135};
+
+    // Frame tubes
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = bikeFrameColor;
+    ctx.fillStyle = bikeFrameColor;
+
+    // Down tube (bottom bracket to head tube)
+    ctx.beginPath();
+    ctx.moveTo(bottomBracket.x, bottomBracket.y);
+    ctx.lineTo(headTubeTop.x, headTubeTop.y);
+    ctx.stroke();
+
+    // Seat tube (bottom bracket to seat top)
+    ctx.beginPath();
+    ctx.moveTo(bottomBracket.x, bottomBracket.y);
+    ctx.lineTo(seatTubeTop.x, seatTubeTop.y);
+    ctx.stroke();
+
+    // Top tube (seat top to head tube)
+    ctx.beginPath();
+    ctx.moveTo(seatTubeTop.x, seatTubeTop.y);
+    ctx.lineTo(headTubeTop.x, headTubeTop.y);
+    ctx.stroke();
+
+    // Seat stays (seat top to rear wheel top)
+    ctx.beginPath();
+    ctx.moveTo(seatTubeTop.x, seatTubeTop.y);
+    ctx.lineTo(-wheelBase/2, -wheelRadius + 5);
+    ctx.stroke();
+
+    // Chain stays (rear wheel top to bottom bracket)
+    ctx.beginPath();
+    ctx.moveTo(-wheelBase/2, -wheelRadius + 5);
+    ctx.lineTo(bottomBracket.x, bottomBracket.y);
+    ctx.stroke();
+
+    // Fork (head tube to front wheel top)
+    ctx.beginPath();
+    ctx.moveTo(headTubeTop.x, headTubeTop.y);
+    ctx.lineTo(wheelBase/2, -wheelRadius + 5);
+    ctx.stroke();
+
+    // Handlebar stem (head tube to handlebar top)
+    ctx.beginPath();
+    ctx.moveTo(headTubeTop.x, headTubeTop.y);
+    ctx.lineTo(handleBarTop.x, handleBarTop.y);
+    ctx.stroke();
+
+    // Handlebar bars
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = handleColor;
+    ctx.save();
+    ctx.translate(handleBarTop.x, handleBarTop.y);
+    ctx.rotate(handleBarAngle);
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(30, 0);
+    ctx.stroke();
+
+    // Grips
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(-30, -12);
+    ctx.moveTo(30, 0);
+    ctx.lineTo(30, -12);
+    ctx.stroke();
+    ctx.restore();
+
+    // Seat post and seat
+    ctx.strokeStyle = bikeFrameColor;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(seatTubeTop.x, seatTubeTop.y);
+    ctx.lineTo(seatPos.x, seatPos.y);
+    ctx.stroke();
+
+    ctx.fillStyle = seatColor;
+    ctx.beginPath();
+    ctx.ellipse(seatPos.x, seatPos.y - 5, 28, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.stroke();
+
+    // Crank & pedals
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = bikeFrameColor;
+    ctx.fillStyle = '#555c6e';
+
+    // Crank circles
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, Math.PI*2);
+    ctx.stroke();
+
+    // Crank arms and pedals
+    const pedalArmLength = 35;
+    // Pedal rotation moves crank arms opposite sides
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(
+      Math.cos(pedalRotation)*pedalArmLength,
+      Math.sin(pedalRotation)*pedalArmLength
+    );
+    ctx.moveTo(0,0);
+    ctx.lineTo(
+      Math.cos(pedalRotation + Math.PI)*pedalArmLength,
+      Math.sin(pedalRotation + Math.PI)*pedalArmLength
+    );
+    ctx.stroke();
+
+    // Pedals
+    ctx.fillRect(
+      Math.cos(pedalRotation)*pedalArmLength - 12,
+      Math.sin(pedalRotation)*pedalArmLength - 6,
+      24, 12
+    );
+    ctx.fillRect(
+      Math.cos(pedalRotation + Math.PI)*pedalArmLength - 12,
+      Math.sin(pedalRotation + Math.PI)*pedalArmLength - 6,
+      24, 12
+    );
+
+    // Chain - simulate pulsing glow when accelerated or bell rang
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = chainColor;
+    ctx.beginPath();
+    // Chain from pedals to rear wheel cog (simplified)
+    ctx.moveTo(
+      Math.cos(pedalRotation + Math.PI) * pedalArmLength,
+      Math.sin(pedalRotation + Math.PI) * pedalArmLength
+    );
+    ctx.lineTo(-wheelBase/2 + 7, -wheelRadius + 12);
+    ctx.stroke();
+
+    // Reins: a creative detail: from handlebar grips, a thin curved line to pelican beak tip
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#b66e2e';
+    ctx.beginPath();
+    let hGripX = handleBarTop.x + 30 * Math.cos(handleBarAngle);
+    let hGripY = handleBarTop.y + 30 * Math.sin(handleBarAngle);
+    ctx.moveTo(hGripX, hGripY);
+    // Control point mid air to simulate tension/sway
+    let cpX = lerp(hGripX, wheelBase/2 - 135, 0.3);
+    let cpY = lerp(hGripY, -10, 0.7) - 30;
+    ctx.quadraticCurveTo(cpX, cpY, wheelBase/2 - 135, -10);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // === INTERACTIVE CONTROLS ===
+  const btnRinger = document.getElementById('btn-ringer');
+  const speedRange = document.getElementById('speed-range');
+  const interactionSelect = document.getElementById('interaction-select');
+
+  // Bell ring synth: Web Audio API
+  function playBellSound(){
+    const now = audioCtx.currentTime;
+    // Simple bell tone: multiple sine oscillators with different frequencies
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.frequency.setValueAtTime(880, now);
+    osc1.type = 'sine';
+    gain1.gain.setValueAtTime(0.2, now);
+    osc1.connect(gain1).connect(audioCtx.destination);
+
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.frequency.setValueAtTime(1320, now);
+    osc2.type = 'triangle';
+    gain2.gain.setValueAtTime(0.14, now);
+    osc2.connect(gain2).connect(audioCtx.destination);
+
+    const osc3 = audioCtx.createOscillator();
+    const gain3 = audioCtx.createGain();
+    osc3.frequency.setValueAtTime(1760, now);
+    osc3.type = 'square';
+    gain3.gain.setValueAtTime(0.1, now);
+    osc3.connect(gain3).connect(audioCtx.destination);
+
+    // Envelope decay
+    const decay = 0.8;
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + decay);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + decay);
+    gain3.gain.exponentialRampToValueAtTime(0.001, now + decay);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc3.start(now);
+    osc1.stop(now + decay);
+    osc2.stop(now + decay);
+    osc3.stop(now + decay);
+  }
+  // Bell vibration effect state: last ringing timestamp
+  btnRinger.addEventListener('click', () => {
+    // Unlock audio context if suspended
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+
+    playBellSound();
+    bellRingTime = 0.2; // trigger bell vibration effect for this duration
+    pelicanState.isSurprised = true;
+    pelicanState.surpriseTimer = 1.2;
+    pelicanState.stamina = Math.min(1, pelicanState.stamina + 0.16); // slight stamina boost
+  });
+
+  speedRange.addEventListener('input', e => {
+    speed = clamp(parseFloat(speedRange.value), 0, 3);
+    speedRange.setAttribute('aria-valuenow', speed.toFixed(2));
+  });
+
+  interactionSelect.addEventListener('change', e => {
+    sceneMode = interactionSelect.value;
+    if(sceneMode === 'bumpy'){
+      // When on bumpy road, bike lean and pelican jogging is more irregular, stamina drains faster
+    }
+  });
+
+  // Creative interaction: feeding small fish to restore stamina
+  // Implement a small button we blend into UI, let's add a little "🐟 投喂小鱼 Feed Fish" button below controls
+
+  const feedFishBtn = document.createElement('button');
+  feedFishBtn.textContent = "🐟 投喂小鱼 Feed Fish";
+  feedFishBtn.style.flex = '1 1 100%';
+  feedFishBtn.style.marginTop = '12px';
+  feedFishBtn.title = "恢复鹈鹕体力";
+  feedFishBtn.setAttribute('aria-label','Feed fish to restore pelican stamina');
+
+  feedFishBtn.addEventListener('click', () => {
+    if(pelicanState.stamina < 1){
+      pelicanState.stamina = Math.min(1, pelicanState.stamina + 0.3);
+      // Spawn some fish particles near pelican's beak area as feedback
+      for(let i=0; i<12; i++){
+        particles.push(new Particle(
+          pelicanBase.x - 130 + randomRange(-20,20),
+          pelicanBase.y - 30 + randomRange(-10,10),
+          randomRange(40, 120),
+          randomRange(-80, -40),
+          '#5ec2e8', randomRange(0.7,1.5),
+          'feather'
+        ));
+      }
+    }
+  });
+  document.getElementById('ui').appendChild(feedFishBtn);
+
+  // === MAIN RENDERING LOOP ===
+
+  // Animation state variables
+  let pedalRotation = 0;
+  let handleBarAngle = 0;
+  let bikeTilt = 0;
+
+  // Pelican run phase: increases faster with speed, loops 0->1
+  pelicanState.runPhase = 0;
+  pelicanState.breathingPhase = 0;
+  pelicanState.wingFlapPhase = 0;
+
+  // For bike position on pelican back: slight dynamic adjustments
+  const bikeBaseX = pelicanBase.x + 10;
+  const bikeBaseY = pelicanBase.y - 60;
+
+  // Background offset tracking runner's movement — horizontal offset to emulate running path
+  let backgroundOffsetX = 0;
+
+  // For pelvic bumpiness and bike lean on bumpy mode
+  let bumpNoisePhase = 0;
+  function noise1d(t) {
+    // simple smooth noise using sin + cos sums
+    return Math.sin(t*1.6)*0.6 + Math.cos(t*2.7)*0.4;
+  }
+
+  // Main frame: 60fps ideal
+  function frame(ts=0){
+    if(!lastTime) lastTime = ts;
+    let dt = (ts - lastTime)/1000;
+    if(dt > 0.1) dt=0.1; // Clamp large interval on tab switch etc
+    lastTime = ts;
+    runTime += dt;
+
+    // Update stamina drain: at high speed stamina drains quicker, replenished by feeding fish
+    const staminaDrainRate = speed * (sceneMode === 'bumpy' ? 0.22 : 0.12);
+    pelicanState.stamina -= staminaDrainRate * dt;
+    pelicanState.stamina = clamp(pelicanState.stamina, 0, 1);
+
+    // If stamina very low, pelican slows involuntarily
+    let effectiveSpeed = speed;
+    if(pelicanState.stamina < 0.2){
+      effectiveSpeed *= pelicanState.stamina / 0.2;
+    }
+
+    // Surprise timer countdown
+    if(pelicanState.isSurprised){
+      pelicanState.surpriseTimer -= dt;
+      if(pelicanState.surpriseTimer <= 0) {
+        pelicanState.isSurprised = false;
+      }
+      // During surprise, burst extra speed and erratic wing flaps
+      effectiveSpeed = Math.max(effectiveSpeed, 2.8);
+    }
+
+    // Update run phases
+    pelicanState.runPhase += effectiveSpeed * 1.5 * dt;
+    if(pelicanState.runPhase > 1) pelicanState.runPhase -= 1;
+    pelicanState.breathingPhase += dt * 0.6;
+    pelicanState.wingFlapPhase += effectiveSpeed * 2.8 * dt;
+    if(pelicanState.breathingPhase > 1) pelicanState.breathingPhase -= 1;
+    if(pelicanState.wingFlapPhase > 1) pelicanState.wingFlapPhase -= 1;
+
+    // Background horizontal offset
+    backgroundOffsetX += effectiveSpeed * 160 * dt;
+
+    // Bike pedal rotation speed related to pelican speed, with acceleration events pulsing chain glow
+    pedalRotation += effectiveSpeed * 20 * dt;
+
+    // Handlebar oscillate subtly with pedaling & surprise
+    handleBarAngle = Math.sin(runTime*25) * 0.05;
+    if(pelicanState.isSurprised){
+      handleBarAngle += Math.sin(runTime * 50) * 0.15;
+    }
+
+    // Bike lean angle: small sway with run phase, more on bumpy terrain, amplified by low stamina
+    bikeTilt = Math.sin(pelicanState.runPhase * Math.PI * 2) * 0.055;
+    if(sceneMode === 'bumpy'){
+      bumpNoisePhase += dt * 4;
+      bikeTilt += noise1d(bumpNoisePhase) * 0.12;
+      // Also shake pelican vertically for bumpy charging effect
+      // We'll add it as vertical translation during pelican draw cycle
+    }
+    // Bike chain glow pulse on acceleration or bell ringing
+    let pulsingChain = 0.65 + 0.35 * Math.sin(runTime * 40);
+
+    // If bell ringing (bellRingTime), override chain glow to highlight
+    if(bellRingTime > 0){
+      bellRingTime -= dt;
+      pulsingChain = 1.3;
+    }
+
+    // Clear canvas
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw background
+    drawBackground(backgroundOffsetX, dt);
+
+    // Draw pelican base position (with possible additional bumpy vertical jitter on bumpy road)
+    let pelicanYOffset = 0;
+    if(sceneMode==='bumpy'){
+      pelicanYOffset = noise1d(bumpNoisePhase*3)*10;
+    }
+
+    // Draw pelican at base position with updated Y bounce + y-pos offset for bumpy
+    drawPelican(ctx, pelicanBase.x, pelicanBase.y + pelicanYOffset, pelicanBase.baseSize, pelicanState);
+
+    // Draw bicycle riding on pelican back
+    drawBike(ctx,
+      bikeBaseX,
+      bikeBaseY + pelicanYOffset - 10,
+      1,
+      pedalRotation,
+      handleBarAngle,
+      bikeTilt,
+      pulsingChain
+    );
+
+    // Draw small particles: feathers fluttering around & pelican sweat drops if tired
+    // Spawn feathers randomly drifting from pelican and scene wind
+    if(Math.random() < 0.04){
+      // Feather spawn position slightly above pelican back, with random velocities
+      particles.push(new Particle(
+        pelicanBase.x + randomRange(-40, 110),
+        pelicanBase.y - 40 + randomRange(-30, 15),
+        randomRange(-40, 20),
+        randomRange(-40, 0),
+        '#f9f0d8',
+        randomRange(3, 4),
+        'feather',
+      ));
+    }
+    // Sweat drops spawn mostly when stamina is low and pelican running fast
+    if(pelicanState.stamina < 0.25 && effectiveSpeed > 1.3 && Math.random() < 0.05){
+      particles.push(new Particle(
+        pelicanBase.x - 30 + randomRange(-15, 15),
+        pelicanBase.y - 20 + randomRange(-10, 10),
+        randomRange(0, 15),
+        randomRange(-200,-100),
+        '#b4e0ff',
+        randomRange(0.7, 1.2),
+        'sweat'
+      ));
+    }
+
+    // Update and draw particles: keep and remove expired
+    for(let i=particles.length-1; i>=0; i--){
+      const p = particles[i];
+      p.update(dt);
+      if(p.life <= 0) {
+        particles.splice(i,1);
+        continue;
+      }
+      p.draw(ctx);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // Custom polyfill for rounded rect for some browsers (if needed)
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      // r could be number or array of 4
+      if(Array.isArray(r)){
+        var [tl, tr, br, bl] = r;
+      }else{
+        var tl = tr = br = bl = r;
+      }
+      this.beginPath();
+      this.moveTo(x + tl, y);
+      this.lineTo(x + w - tr, y);
+      this.quadraticCurveTo(x + w, y, x + w, y + tr);
+      this.lineTo(x + w, y + h - br);
+      this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+      this.lineTo(x + bl, y + h);
+      this.quadraticCurveTo(x, y + h, x, y + h - bl);
+      this.lineTo(x, y + tl);
+      this.quadraticCurveTo(x, y, x + tl, y);
+      this.closePath();
+      return this;
+    }
+  }
+
+  // Initialization
+  initBackground();
+
+  // Start animation
+  requestAnimationFrame(frame);
+
+})();
+</script>
+
+</body>
+</html>

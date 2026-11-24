@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>鹈鹕特快 · A Bicycle Riding a Pelican</title>
+<style>
+:root{color-scheme:light;--ink:#193d46;--cream:#fffaf0;--coral:#ef795f;--glass:rgba(255,252,243,.82)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;overflow-x:hidden}
+body{font-family:ui-rounded,"SF Pro Rounded","PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#e5eee9;color:var(--ink);display:grid;place-items:center;padding:22px}
+.shell{width:min(1280px,100%);position:relative}
+header{display:flex;align-items:flex-end;justify-content:space-between;padding:0 8px 14px;gap:20px}
+.eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;opacity:.58;margin-bottom:5px}
+h1{font-size:clamp(24px,3vw,40px);line-height:1;margin:0;letter-spacing:-.055em;font-weight:850}
+h1 em{font-style:normal;color:var(--coral)}
+.edition{font-size:11px;letter-spacing:.08em;opacity:.55;white-space:nowrap;padding-bottom:3px}
+.stage{position:relative;border-radius:28px;overflow:hidden;background:#bfe4df;box-shadow:0 22px 70px rgba(27,61,62,.18),0 2px 0 rgba(255,255,255,.9) inset;border:1px solid rgba(255,255,255,.75)}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none}
+.badge{position:absolute;top:18px;left:20px;background:rgba(255,252,240,.75);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.65);padding:8px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:7px;pointer-events:none}
+.dot{width:7px;height:7px;border-radius:50%;background:#4a9b76;box-shadow:0 0 0 3px rgba(74,155,118,.15)}
+.hint{position:absolute;right:20px;top:20px;color:rgba(24,59,65,.58);font-size:11px;pointer-events:none}
+.controls{margin-top:12px;padding:14px 16px;background:var(--glass);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.9);border-radius:22px;box-shadow:0 8px 30px rgba(30,60,55,.08);display:grid;grid-template-columns:auto minmax(180px,1fr) auto auto;align-items:center;gap:16px}
+button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible{outline:3px solid rgba(239,121,95,.35);outline-offset:3px}
+.primary{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fffdf4;border-radius:15px;padding:12px 17px;font-size:13px;font-weight:750;box-shadow:0 5px 12px rgba(25,61,70,.16);transition:transform .18s,background .18s}
+.primary:hover{background:#285763;transform:translateY(-2px)}.primary:active{transform:translateY(1px) scale(.97)}
+.primary svg{width:20px;height:20px}.bell-ringing svg{animation:ring .12s 5 alternate}@keyframes ring{to{transform:rotate(18deg)}}
+.speed{padding:0 4px}.speed-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:750;margin-bottom:8px}.speed-head span:last-child{font-variant-numeric:tabular-nums;color:var(--coral)}
+input[type=range]{width:100%;height:5px;display:block;appearance:none;background:linear-gradient(90deg,#ef795f var(--fill,42%),#d8dfd8 var(--fill,42%));border-radius:9px;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:18px;height:18px;background:#fff;border:5px solid #ef795f;border-radius:50%;box-shadow:0 2px 6px #0002}
+input[type=range]::-moz-range-thumb{width:10px;height:10px;background:#fff;border:4px solid #ef795f;border-radius:50%}
+.group{display:flex;gap:7px}.pill{background:#e8eee8;padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;transition:.2s;white-space:nowrap}.pill:hover{background:#dbe6df;transform:translateY(-1px)}.pill:active{transform:scale(.96)}.pill.accent{background:#f7dfd1;color:#9b4d39}
+.stamina{position:absolute;left:20px;bottom:18px;width:150px;background:rgba(255,252,240,.76);border:1px solid rgba(255,255,255,.55);border-radius:13px;padding:10px 12px;backdrop-filter:blur(8px);pointer-events:none}
+.stamina-label{display:flex;justify-content:space-between;font-size:10px;font-weight:800;margin-bottom:6px}.track{height:5px;background:#193d4620;border-radius:5px;overflow:hidden}.fill{height:100%;width:100%;background:#4a9b76;border-radius:5px;transition:background .2s}
+.toast{position:absolute;left:50%;top:20px;transform:translate(-50%,-12px);background:#193d46ed;color:#fffaf0;border-radius:99px;padding:9px 16px;font-size:12px;font-weight:650;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}.toast.show{opacity:1;transform:translate(-50%,0)}
+footer{display:flex;justify-content:space-between;padding:10px 10px 0;font-size:10px;letter-spacing:.05em;opacity:.46}
+@media(max-width:760px){body{padding:10px}.controls{grid-template-columns:1fr 1fr;gap:12px}.speed{grid-column:1/-1;grid-row:1}.primary{justify-content:center}.group{justify-content:flex-end}.stage{border-radius:20px}.hint,.edition{display:none}.stamina{width:120px;left:12px;bottom:12px}.badge{left:12px;top:12px}.pill{padding:11px 9px}h1{font-size:25px}footer{display:none}}
+@media(prefers-reduced-motion:reduce){button{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header><div><div class="eyebrow">The Pelican Express · 海陆空不靠谱运输公司</div><h1>自行车<em>骑</em>鹈鹕</h1></div><div class="edition">ILLUSTRATED INTERACTIVE № 01</div></header>
+<section class="stage" aria-label="一辆自行车用缰绳骑着鹈鹕，在海滨栈道上奔跑的交互动画">
+<canvas id="scene" width="1280" height="800"></canvas>
+<div class="badge"><i class="dot"></i><span id="status">悠哉巡航中</span></div><div class="hint">点击画面也可以按铃 ↗</div>
+<div class="stamina"><div class="stamina-label"><span>鹈鹕体力</span><span id="staminaText">100%</span></div><div class="track"><div class="fill" id="staminaFill"></div></div></div>
+<div class="toast" id="toast" role="status"></div>
+</section>
+<section class="controls" aria-label="交互控制台">
+<button class="primary" id="bell" aria-label="按车铃"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4l-2 3Z"/><path d="M10 19h4M12 3V1"/><path d="m3 5-2-2m20 2 2-2"/></svg>按车铃</button>
+<div class="speed"><div class="speed-head"><span>踩踏速度</span><span id="speedText">42 km/h</span></div><input id="speed" type="range" min="10" max="90" value="42" aria-label="调整速度"></div>
+<div class="group"><button class="pill accent" id="sprint">冲刺</button><button class="pill" id="feed">投喂小鱼</button></div>
+<div class="group"><button class="pill" id="weather">晴天</button><button class="pill" id="road">木栈道</button></div>
+</section>
+<footer><span>A BICYCLE RIDING A PELICAN — 主谓关系没有画反</span><span>纯 Canvas 绘制 · Web Audio 合成 · 无外部资源</span></footer>
+</main>
+<script>
+'use strict';
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const ui={bell:$('bell'),speed:$('speed'),speedText:$('speedText'),sprint:$('sprint'),feed:$('feed'),weather:$('weather'),road:$('road'),status:$('status'),staminaText:$('staminaText'),staminaFill:$('staminaFill'),toast:$('toast')};
+const W=1280,H=800,TAU=Math.PI*2;
+let dpr=1,last=0,time=0,world=0,speed=42,stamina=100,sprint=0,startle=0,bellKick=0,road=0,mode=0,toastTimer=0;
+let particles=[],fish=[],audio=null;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const palettes=[
+ {top:'#9edbd9',bottom:'#f8e9c7',sun:'#fff3b0',sea:'#5faeba',sea2:'#368c9d',far:'#83b4ac',sand:'#eed4a3',light:'#fff9e9'},
+ {top:'#625d91',bottom:'#f5a277',sun:'#ffd39a',sea:'#8e718e',sea2:'#4d5d7b',far:'#7c7085',sand:'#c98d77',light:'#ffe4bf'},
+ {top:'#102c46',bottom:'#35566a',sun:'#f5efcf',sea:'#234d64',sea2:'#15394f',far:'#29495a',sand:'#6a716e',light:'#c7e3e1'}
+];
+const stars=Array.from({length:55},(_,i)=>({x:(i*197.3)%W,y:25+(i*83.7)%330,r:.7+(i%3)*.5}));
+const clouds=Array.from({length:7},(_,i)=>({x:i*230+50,y:70+(i%3)*65,s:.55+(i%4)*.18}));
+function resize(){dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+resize();addEventListener('resize',resize);
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function lerp(a,b,t){return a+(b-a)*t}
+function path(points,close=true){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);if(close)ctx.closePath()}
+function ellipse(x,y,rx,ry,fill,rot=0){ctx.beginPath();ctx.ellipse(x,y,rx,ry,rot,0,TAU);if(fill){ctx.fillStyle=fill;ctx.fill()}}
+function line(x1,y1,x2,y2,color,width=2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke()}
+function roundRect(x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill()}
+function toast(s){ui.toast.textContent=s;ui.toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>ui.toast.classList.remove('show'),1800)}
+function initAudio(){if(!audio){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audio=new AC()}if(audio&&audio.state==='suspended')audio.resume().catch(()=>{})}
+function ringSound(){initAudio();if(!audio)return;const now=audio.currentTime;[1568,2093,2637].forEach((f,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.setValueAtTime(f,now);o.frequency.exponentialRampToValueAtTime(f*.985,now+.65);g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(.12/(i+1),now+.008);g.gain.exponentialRampToValueAtTime(.0001,now+.75-i*.08);o.connect(g).connect(audio.destination);o.start(now+i*.045);o.stop(now+.8)})}
+function ring(){ringSound();bellKick=1;startle=1;for(let i=0;i<12;i++)particles.push({type:'spark',x:720,y:245,vx:80+Math.random()*130,vy:-100+Math.random()*200,life:1,max:1,color:'#ffe596'});ui.bell.classList.remove('bell-ringing');void ui.bell.offsetWidth;ui.bell.classList.add('bell-ringing');toast('叮铃！鹈鹕受到了“鼓励”')}
+ui.bell.addEventListener('click',ring);canvas.addEventListener('pointerdown',ring);
+ui.speed.addEventListener('input',()=>{speed=+ui.speed.value;ui.speedText.textContent=speed+' km/h';ui.speed.style.setProperty('--fill',(speed-10)/80*100+'%')});
+ui.sprint.addEventListener('click',()=>{if(stamina<12){toast('太累了，先喂条小鱼吧！');return}sprint=3.5;toast('冲刺！抓紧车把！')});
+ui.feed.addEventListener('click',()=>{fish.push({x:1070,y:560,vx:-140,vy:-500,life:0});toast('空中飞鱼，精准投喂！')});
+ui.weather.addEventListener('click',()=>{mode=(mode+1)%3;ui.weather.textContent=['晴天','黄昏','夜晚'][mode];toast(['海风清爽，适合兜风','落日把羽毛染成橘色','夜骑也要记得开车灯'][mode])});
+ui.road.addEventListener('click',()=>{road=1-road;ui.road.textContent=road?'石子路':'木栈道';toast(road?'颠簸模式：请注意喉囊':'回到平滑木栈道')});
+function cloud(x,y,s,p){ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.fillStyle=p;ctx.beginPath();ctx.arc(-35,5,29,0,TAU);ctx.arc(0,-8,42,0,TAU);ctx.arc(43,5,31,0,TAU);ctx.roundRect(-66,0,132,34,18);ctx.fill();ctx.restore()}
+function background(p){let g=ctx.createLinearGradient(0,0,0,610);g.addColorStop(0,p.top);g.addColorStop(1,p.bottom);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ if(mode===2){ctx.fillStyle='#fff';for(const s of stars){ctx.globalAlpha=.35+.55*Math.sin(time*1.4+s.x)**2;ellipse(s.x,s.y,s.r,s.r,'#fff')}ctx.globalAlpha=1}
+ const sunX=mode===1?1020:1050,sunY=mode===1?240:120;ellipse(sunX,sunY,mode===1?62:48,mode===1?62:48,p.sun);if(mode===2){ellipse(sunX+17,sunY-12,43,43,p.top)}
+ ctx.globalAlpha=mode===2?.12:.48;for(const c of clouds){let x=((c.x-world*.035)%(W+300)+W+300)%(W+300)-150;cloud(x,c.y,c.s,p.light)}ctx.globalAlpha=1;
+ // distant coastal hills
+ ctx.fillStyle=p.far;ctx.beginPath();ctx.moveTo(0,410);for(let x=0;x<=W;x+=60)ctx.lineTo(x,385+Math.sin(x*.009+1)*25+Math.sin(x*.021)*8);ctx.lineTo(W,480);ctx.lineTo(0,480);ctx.fill();
+ // sea
+ g=ctx.createLinearGradient(0,405,0,630);g.addColorStop(0,p.sea);g.addColorStop(1,p.sea2);ctx.fillStyle=g;ctx.fillRect(0,410,W,220);
+ ctx.lineCap='round';for(let i=0;i<16;i++){let y=430+i*11,x=((i*113-world*.12)%(W+200)+W+200)%(W+200)-100;ctx.globalAlpha=.16+(i%3)*.07;line(x,y,x+45+(i%4)*18,y,p.light,2)}ctx.globalAlpha=1;
+ // tiny sailboats
+ for(let i=0;i<3;i++){let x=((150+i*430-world*.025)%(W+100)+W+100)%(W+100)-50,y=445+i*20;ctx.fillStyle=p.light;path([[x,y-30],[x,y],[x+24,y]]);ctx.fill();line(x,y-33,x,y+4,p.light,2);path([[x-8,y+4],[x+30,y+4],[x+23,y+11],[x,y+11]],true);ctx.fillStyle=p.sea2;ctx.fill()}
+ // boardwalk
+ ctx.fillStyle=p.sand;ctx.fillRect(0,610,W,190);ctx.fillStyle=mode===2?'#344e50':'#a97e5f';ctx.fillRect(0,610,W,13);
+ if(!road){for(let x=-(world*.9%105);x<W;x+=105){line(x,624,x-22,800,'rgba(71,57,46,.18)',3);line(x+8,626,x-10,800,'rgba(255,255,255,.13)',2)}for(let y=660;y<800;y+=54)line(0,y,W,y,'rgba(74,55,43,.12)',2)}else{for(let i=0;i<100;i++){let x=((i*83-world*.9)%(W+50)+W+50)%(W+50),y=630+(i*47%170);ellipse(x,y,3+i%6,2+i%3,mode===2?'#405655':'#b99a78')}}
+ // foreground grass tufts
+ for(let i=0;i<14;i++){let x=((i*109-world*1.25)%(W+100)+W+100)%(W+100)-50;ctx.strokeStyle=mode===2?'#294b49':'#6d9675';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,790);ctx.quadraticCurveTo(x-15,755,x-12,741);ctx.moveTo(x,790);ctx.quadraticCurveTo(x+10,750,x+23,743);ctx.stroke()}}
+function drawShadow(){ctx.save();ctx.globalAlpha=.17;ellipse(642,680,260,25,'#173d42');ctx.restore()}
+function wheel(x,y,r,rot){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.strokeStyle='#263e41';ctx.lineWidth=9;ctx.beginPath();ctx.arc(0,0,r,0,TAU);ctx.stroke();ctx.strokeStyle='#f3e6c8';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r-6,0,TAU);ctx.stroke();ctx.strokeStyle='#698083';ctx.lineWidth=1.5;for(let i=0;i<16;i++){ctx.rotate(TAU/16);line(0,0,r-8,0,'#698083',1.3)}ellipse(0,0,9,9,'#e66f56');ellipse(0,0,3,3,'#f9e4b8');ctx.restore()}
+function drawBike(bob,tilt,ride){ctx.save();ctx.translate(0,bob);ctx.translate(610,330);ctx.rotate(tilt);ctx.translate(-610,-330);
+ const rear={x:455,y:353},front={x:708,y:353},r=83,crank={x:574,y:357},seat={x:532,y:237},head={x:661,y:250};
+ wheel(rear.x,rear.y,r,ride*1.8);wheel(front.x,front.y,r,ride*1.8);
+ // chain, behind frame
+ ctx.strokeStyle='#34484a';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(515,356,62,19,-.02,0,TAU);ctx.stroke();
+ // frame coral tubes
+ const tubes=[[rear,seat],[seat,crank],[crank,rear],[seat,head],[head,crank],[head,front]];ctx.lineCap='round';for(const [a,b] of tubes)line(a.x,a.y,b.x,b.y,'#d95f4d',10);for(const [a,b] of tubes)line(a.x,a.y-1,b.x,b.y-1,'#f39a79',3);
+ // fork
+ line(head.x+4,head.y,front.x,front.y,'#bf4e41',7);line(head.x,head.y-7,head.x+10,head.y+23,'#334b4d',8);
+ // saddle and seatpost
+ line(seat.x,seat.y,seat.x-9,seat.y-28,'#385255',7);roundRect(seat.x-47,seat.y-39,76,15,8,'#263f42');line(seat.x-39,seat.y-34,seat.x+17,seat.y-34,'#617477',2);
+ // handlebar with curled grips
+ line(head.x,head.y,head.x+4,head.y-47,'#385255',7);ctx.strokeStyle='#385255';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(head.x+4,head.y-47);ctx.quadraticCurveTo(head.x+28,head.y-61,head.x+43,head.y-45);ctx.quadraticCurveTo(head.x+52,head.y-31,head.x+66,head.y-42);ctx.stroke();line(head.x+57,head.y-46,head.x+72,head.y-38,'#263f42',10);
+ // bell
+ ellipse(head.x+18,head.y-55,11,8,'#f6c65b');line(head.x+18,head.y-63,head.x+18,head.y-68,'#6d5535',2);
+ // crank and pedals
+ const pa=ride*2.5;ellipse(crank.x,crank.y,19,19,'#f4d9a0');ellipse(crank.x,crank.y,8,8,'#334b4d');let px=Math.cos(pa)*31,py=Math.sin(pa)*31;line(crank.x-px,crank.y-py,crank.x+px,crank.y+py,'#31494b',6);line(crank.x+px-12,crank.y+py,crank.x+px+12,crank.y+py,'#263e41',7);line(crank.x-px-12,crank.y-py,crank.x-px+12,crank.y-py,'#263e41',7);
+ // smiling headlamp gives bicycle a face
+ ellipse(686,269,21,18,'#f8e4a9');ellipse(680,265,2.8,4,'#263f42');ellipse(692,265,2.8,4,'#263f42');ctx.strokeStyle='#9a6650';ctx.lineWidth=2;ctx.beginPath();ctx.arc(686,270,7,.2,Math.PI-.2);ctx.stroke();
+ // bell vibration arcs
+ if(bellKick>.05){ctx.globalAlpha=bellKick;ctx.strokeStyle='#fff4b0';ctx.lineWidth=4;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(679,195,20+i*11,-1.3,-.1);ctx.stroke()}ctx.globalAlpha=1}
+ ctx.restore()}
+function leg(x,phase,back,bob){const a=Math.sin(phase)*.72,hipX=x,hipY=563+bob;ctx.save();ctx.translate(hipX,hipY);ctx.rotate(a);ctx.strokeStyle=back?'#bf704d':'#e18b57';ctx.lineWidth=17;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(7,48);ctx.lineTo(-6,77);ctx.stroke();ctx.translate(-6,77);ctx.rotate(-a*.7);ctx.fillStyle=back?'#bd6b49':'#df8452';ctx.beginPath();ctx.moveTo(-15,0);ctx.lineTo(36,-1);ctx.lineTo(19,11);ctx.lineTo(8,7);ctx.lineTo(-3,15);ctx.lineTo(-8,6);ctx.closePath();ctx.fill();for(let i=0;i<3;i++)line(3+i*7,1,8+i*7,9,'rgba(112,61,43,.35)',1.5);ctx.restore()}
+function drawPelican(bob,run,flap){ctx.save();
+ leg(552,run,true,bob);leg(686,run+Math.PI,true,bob);
+ ctx.translate(0,bob);
+ // tail
+ ctx.fillStyle='#d9ded3';for(let i=0;i<4;i++){ctx.save();ctx.translate(455,473);ctx.rotate(-2.9+i*.18);ctx.beginPath();ctx.ellipse(0,0,65,15,0,0,TAU);ctx.fill();ctx.restore()}
+ // body
+ let g=ctx.createLinearGradient(480,405,650,580);g.addColorStop(0,'#fff9e8');g.addColorStop(1,'#d8ddd1');ellipse(606,483,167,103,g,-.08);
+ // far wing
+ ctx.save();ctx.translate(577,453);ctx.rotate(-.25-flap*.5);ctx.fillStyle='#c9d3ca';ctx.beginPath();ctx.moveTo(-55,0);ctx.quadraticCurveTo(12,-108,97,-98);ctx.quadraticCurveTo(43,-27,-28,45);ctx.closePath();ctx.fill();ctx.restore();
+ // neck S curve
+ ctx.strokeStyle='#f5f0df';ctx.lineWidth=76;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(719,467);ctx.bezierCurveTo(793,443,734,353,802,336);ctx.stroke();ctx.strokeStyle='#fffaf0';ctx.lineWidth=51;ctx.beginPath();ctx.moveTo(721,460);ctx.bezierCurveTo(778,428,746,359,804,340);ctx.stroke();
+ // head crest
+ ctx.fillStyle='#f8f2df';for(let i=0;i<5;i++){ctx.save();ctx.translate(790+i*7,306-i%2*6);ctx.rotate(-.8+i*.17);ellipse(0,0,24,7,'#f8f2df');ctx.restore()}ellipse(810,332,53,45,'#fff8e7',-.1);
+ // huge upper bill
+ let bill=ctx.createLinearGradient(810,330,1080,375);bill.addColorStop(0,'#efaa55');bill.addColorStop(1,'#e87d4f');ctx.fillStyle=bill;ctx.beginPath();ctx.moveTo(826,330);ctx.quadraticCurveTo(955,323,1084,355);ctx.quadraticCurveTo(969,365,825,355);ctx.closePath();ctx.fill();line(853,341,1068,354,'rgba(139,73,47,.35)',2);
+ // pouch swinging
+ const pouch=Math.sin(run*.5)*5+flap*4;ctx.fillStyle='#ed9b62';ctx.beginPath();ctx.moveTo(827,352);ctx.quadraticCurveTo(943,365,1078,355);ctx.quadraticCurveTo(984,432+pouch,887,412+pouch);ctx.quadraticCurveTo(844,396,827,352);ctx.fill();ctx.strokeStyle='#d67b54';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(851,369);ctx.quadraticCurveTo(943,409+pouch,1039,371);ctx.stroke();
+ // eye + alarm expression
+ const alarm=startle>.15||sprint>0;ellipse(825,320,alarm?12:10,alarm?13:10,'#fff');ellipse(829,321,alarm?5:4,alarm?6:5,'#243f43');ellipse(831,318,1.5,1.5,'#fff');line(811,304,837,301,alarm?'#665346':'#d4c9b1',3);
+ // blush
+ ctx.globalAlpha=.25;ellipse(805,346,15,7,'#e98d76');ctx.globalAlpha=1;
+ // foreground wing, flapping from shoulder
+ ctx.save();ctx.translate(584,446);ctx.rotate(-.18+flap*.65);let wg=ctx.createLinearGradient(0,-50,40,80);wg.addColorStop(0,'#fff9e9');wg.addColorStop(1,'#cbd5cd');ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(-70,-12);ctx.quadraticCurveTo(-10,-96,86,-74);ctx.quadraticCurveTo(99,-8,26,67);ctx.quadraticCurveTo(-30,51,-70,-12);ctx.fill();ctx.strokeStyle='#b7c8c1';ctx.lineWidth=3;for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(5+i*13,32-i*9);ctx.quadraticCurveTo(47+i*8,10,75-i*3,-41-i*7);ctx.stroke()}ctx.restore();
+ // saddle blanket clearly beneath bicycle wheels
+ ctx.fillStyle='#377e83';ctx.beginPath();ctx.moveTo(465,398);ctx.quadraticCurveTo(585,368,720,405);ctx.lineTo(701,439);ctx.quadraticCurveTo(584,408,477,438);ctx.closePath();ctx.fill();ctx.strokeStyle='#f4c66a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(477,431);ctx.quadraticCurveTo(584,402,701,432);ctx.stroke();
+ ctx.restore();
+ leg(585,run+Math.PI,false,bob);leg(716,run,false,bob)}
+function reins(bob){ctx.save();ctx.translate(0,bob*.75);ctx.strokeStyle='#76533e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(726,207);ctx.bezierCurveTo(802,226+Math.sin(time*3)*5,792,289,845,337);ctx.moveTo(725,213);ctx.bezierCurveTo(815,249,831,290,870,351);ctx.stroke();ellipse(851,340,5,5,'#f6d276');ctx.restore()}
+function effects(dt){for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=80*dt;ctx.globalAlpha=clamp(p.life/p.max,0,1);if(p.type==='feather'){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(time*3+p.x);ellipse(0,0,9,3,p.color);ctx.restore()}else ellipse(p.x,p.y,3,3,p.color)}ctx.globalAlpha=1;particles=particles.filter(p=>p.life>0)}
+function drawFish(dt){for(const f of fish){f.life+=dt;f.vy+=620*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.atan2(f.vy,f.vx)+Math.PI);ellipse(0,0,20,10,'#6ab2b0');path([[17,0],[32,-12],[32,12]],true);ctx.fillStyle='#e9bf68';ctx.fill();ellipse(-10,-2,2,2,'#173e44');ctx.restore();if(f.life>1.15&&!f.fed){f.fed=true;stamina=clamp(stamina+32,0,100);toast('啊呜！体力 +32');for(let i=0;i<10;i++)particles.push({type:'spark',x:900,y:370,vx:(Math.random()-.5)*170,vy:(Math.random()-.5)*170,life:1,max:1,color:'#ffe49a'})}}fish=fish.filter(f=>f.life<1.3)}
+function drawSweat(run){if(stamina>58&&sprint<=0)return;for(let i=0;i<3;i++){let t=(time*1.7+i*.33)%1,x=834+i*10+t*45,y=293-t*75;ctx.globalAlpha=1-t;ctx.fillStyle='#c8f4f1';ctx.beginPath();ctx.moveTo(x,y-8);ctx.quadraticCurveTo(x-8,y+4,x,y+7);ctx.quadraticCurveTo(x+8,y+4,x,y-8);ctx.fill()}ctx.globalAlpha=1}
+function frame(ts){let dt=Math.min((ts-last)/1000||.016,.04);last=ts;time+=dt;const sprinting=sprint>0;sprint=Math.max(0,sprint-dt);startle=Math.max(0,startle-dt*.65);bellKick=Math.max(0,bellKick-dt*2.4);
+ let actual=speed+(sprinting?38:0)+startle*20;if(stamina<15)actual=Math.min(actual,25);world+=actual*dt*2.2;
+ if(sprinting)stamina-=dt*8;else stamina+=dt*(actual<55?1.8:.35);stamina=clamp(stamina,0,100);
+ const pace=actual/42,run=world*.047,bob=Math.abs(Math.sin(run))*(road?12:6)+Math.sin(run*2)*(road?4:1),tilt=Math.sin(run)*.018+(sprinting?-.035:0),flap=Math.sin(run*.47)*(startle>.1?1:.45);
+ if(Math.random()<dt*(sprinting?5:1)){particles.push({type:'feather',x:475+Math.random()*140,y:430+Math.random()*80,vx:-45-Math.random()*60,vy:-20-Math.random()*35,life:2.5,max:2.5,color:mode===2?'#a8c4c0':'#fff5dd'})}
+ background(palettes[mode]);drawShadow();drawPelican(bob,run,flap);drawBike(bob*.75,tilt,world*.024);reins(bob);drawSweat(run);effects(dt);drawFish(dt);
+ ui.staminaText.textContent=Math.round(stamina)+'%';ui.staminaFill.style.width=stamina+'%';ui.staminaFill.style.background=stamina<25?'#e46f58':stamina<55?'#e4a755':'#4a9b76';ui.status.textContent=stamina<18?'气喘吁吁 · 需要小鱼':sprinting?'全速冲刺中！':startle>.2?'受惊加速中':road?'颠簸也要保持优雅':'悠哉巡航中';
+ requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨代模型前端擂台赛 · 自行车骑鹈鹕</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#1a1a2e;font-family:'Segoe UI',system-ui,sans-serif}
+canvas{display:block;width:100vw;height:100vh}
+#ui{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;align-items:flex-end;gap:14px;padding:16px 20px 24px;pointer-events:none;z-index:10}
+.ctrl{pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:5px}
+.btn{background:rgba(255,255,255,.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:14px;padding:9px 18px;font-size:13px;cursor:pointer;transition:all .2s;user-select:none;letter-spacing:.5px}
+.btn:hover{background:rgba(255,255,255,.3);transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,.2)}
+.btn:active{transform:scale(.95)}
+.btn.ring{font-size:20px;padding:10px 16px}
+.btn.feed{font-size:18px;padding:10px 16px}
+.btn.speed-btn{font-size:11px;padding:7px 14px}
+#speed-wrap{display:flex;align-items:center;gap:8px}
+input[type=range]{-webkit-appearance:none;width:130px;height:6px;border-radius:3px;background:rgba(255,255,255,.2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#ff9f43;cursor:pointer;box-shadow:0 0 8px rgba(255,159,67,.5)}
+#stats{position:fixed;top:16px;right:18px;color:#fff;font-size:12px;text-align:right;z-index:10;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.bar-outer{width:110px;height:7px;background:rgba(255,255,255,.15);border-radius:4px;margin-top:3px;overflow:hidden}
+.bar-inner{height:100%;border-radius:4px;transition:width .3s}
+.energy-bar{background:linear-gradient(90deg,#ff6b6b,#ffa502)}
+.stamina-bar{background:linear-gradient(90deg,#2ed573,#7bed9f)}
+#weather-icon{font-size:22px;margin-bottom:4px}
+.title-tag{position:fixed;top:14px;left:18px;color:rgba(255,255,255,.5);font-size:11px;z-index:10;text-shadow:0 1px 3px rgba(0,0,0,.3)}
+.bell-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;color:#ffd700;font-weight:bold;z-index:20;pointer-events:none;opacity:0;text-shadow:0 0 20px rgba(255,215,0,.6);transition:all .4s}
+.bell-text.show{opacity:1;animation:bellPop .6s ease-out forwards}
+@keyframes bellPop{0%{transform:translate(-50%,-50%) scale(.5);opacity:0}30%{transform:translate(-50%,-60%) scale(1.2);opacity:1}100%{transform:translate(-50%,-80%) scale(1);opacity:0}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title-tag">🚲🦅 Bicycle Riding a Pelican</div>
+<div id="stats">
+  <div id="weather-icon">☀️</div>
+  <div style="margin-bottom:6px">⚡ <span id="spd-val">5</span> km/h</div>
+  <div>体力 <div class="bar-outer"><div class="bar-inner energy-bar" id="energy-bar" style="width:80%"></div></div></div>
+  <div style="margin-top:4px">续航 <div class="bar-outer"><div class="bar-inner stamina-bar" id="stamina-bar" style="width:100%"></div></div></div>
+</div>
+<div class="bell-text" id="bell-text">BRRR!! 🛎️</div>
+<div id="ui">
+  <div class="ctrl">
+    <button class="btn ring" id="ring-btn" title="鸣响车铃">🔔 车铃</button>
+  </div>
+  <div class="ctrl">
+    <div id="speed-wrap">
+      <button class="btn speed-btn" id="slow-btn">🐢 慢</button>
+      <input type="range" id="speed-range" min="1" max="10" value="5">
+      <button class="btn speed-btn" id="fast-btn">🐇 快</button>
+    </div>
+  </div>
+  <div class="ctrl">
+    <button class="btn feed" id="feed-btn" title="投喂小鱼恢复体力">🐟 投喂</button>
+  </div>
+  <div class="ctrl">
+    <button class="btn" id="weather-btn" title="切换天气">🌤️ 换天气</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var c=document.getElementById('c'),ctx=c.getContext('2d');
+var W,H;
+function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
+resize();
+window.addEventListener('resize',resize);
+
+// ============ AUDIO ============
+var audioCtx=null;
+function initAudio(){if(!audioCtx)try{audioCtx=new(window.AudioContext||window.webkitAudioContext)}catch(e){}}
+function playBell(){
+  if(!audioCtx)return;
+  var now=audioCtx.currentTime;
+  [830,1250,1660].forEach(function(f,i){
+    var o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='sine';o.frequency.value=f;
+    g.gain.setValueAtTime(0.25/ (i+1),now);
+    g.gain.exponentialRampToValueAtTime(0.001,now+1.2-i*0.15);
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start(now+i*0.03);o.stop(now+1.5);
+  });
+}
+
+// ============ STATE ============
+var state={
+  speed:5, targetSpeed:5, baseSpeed:5,
+  dist:0, time:0, frame:0,
+  weather:0, // 0=sunny,1=golden,2=night
+  energy:80, stamina:100,
+  sprint:false, sprintTimer:0,
+  pelicanAnim:0, bikeAnim:0,
+  bellTriggered:false, bellTimer:0,
+  fishFeedCount:0, fishTimer:0,
+  particles:[], feathers:[], sweatDrops:[],
+  pathType:0, // 0=plank,1=bumpy
+  shakeX:0,shakeY:0
+};
+
+var weathers=['☀️','🌅','🌙'];
+var skyColors=[
+  [['#4facfe','#00f2fe'],['#87CEEB','#E0F7FA']],
+  [['#f093fb','#f5576c'],['#fa709a','#fee140']],
+  [['#0c0c3d','#1a1a4e'],['#0d0d2b','#1a1a3e']]
+];
+var groundColors=[
+  ['#8B7355','#A0896C'],
+  ['#7a6850','#8B7355'],
+  ['#3d3530','#2a2522']
+];
+var seaColors=[
+  ['rgba(0,150,200,0.4)','rgba(0,120,180,0.3)'],
+  ['rgba(180,100,60,0.4)','rgba(140,80,50,0.3)'],
+  ['rgba(0,30,60,0.5)','rgba(0,20,40,0.4)']
+];
+var cloudColor=[
+  'rgba(255,255,255,0.85)',
+  'rgba(255,200,150,0.7)',
+  'rgba(100,100,120,0.3)'
+];
+var mtnColor=[
+  '#6B8E6B','#7a9a7a',
+  '#8B6914','#9a7a2a',
+  '#2a2a3a','#333344'
+];
+var sunMoonPos=[
+  {x:0.8,y:0.15,type:'sun'},
+  {x:0.7,y:0.25,type:'sun'},
+  {x:0.8,y:0.12,type:'moon'}
+];
+
+// ============ INPUT ============
+document.getElementById('ring-btn').addEventListener('click',function(){
+  initAudio();playBell();
+  state.bellTriggered=true;state.bellTimer=40;
+  state.sprint=true;state.sprintTimer=90;
+  state.energy=Math.max(0,state.energy-5);
+});
+document.getElementById('speed-range').addEventListener('input',function(){
+  state.baseSpeed=parseFloat(this.value);state.targetSpeed=state.baseSpeed;
+});
+document.getElementById('slow-btn').addEventListener('click',function(){
+  document.getElementById('speed-range').value=Math.max(1,parseInt(document.getElementById('speed-range').value)-1);
+  state.baseSpeed=parseFloat(document.getElementById('speed-range').value);state.targetSpeed=state.baseSpeed;
+});
+document.getElementById('fast-btn').addEventListener('click',function(){
+  document.getElementById('speed-range').value=Math.min(10,parseInt(document.getElementById('speed-range').value)+1);
+  state.baseSpeed=parseFloat(document.getElementById('speed-range').value);state.targetSpeed=state.baseSpeed;
+});
+document.getElementById('feed-btn').addEventListener('click',function(){
+  state.fishFeedCount++;state.fishTimer=30;
+  state.energy=Math.min(100,state.energy+25);
+  for(var i=0;i<12;i++){
+    state.feathers.push({x:W*0.5+(Math.random()-0.5)*60,y:H*0.55-Math.random()*40,
+      vx:(Math.random()-0.3)*3,vy:-Math.random()*3-1,life:60+Math.random()*30,
+      r:Math.random()*Math.PI*2,rv:(Math.random()-0.5)*0.1,color:['#fff','#eee','#f5f0e8'][Math.floor(Math.random()*3)]});
+  }
+});
+document.getElementById('weather-btn').addEventListener('click',function(){
+  state.weather=(state.weather+1)%3;
+});
+
+// ============ HELPERS ============
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v))}
+function rng(a,b){return a+Math.random()*(b-a)}
+
+// ============ UPDATE ============
+function update(){
+  var dt=1/60;
+  state.time+=dt;
+  state.frame++;
+  
+  // Speed
+  if(state.sprint){state.sprintTimer--;if(state.sprintTimer<=0)state.sprint=false;}
+  var spd=state.sprint?clamp(state.baseSpeed*1.8,1,10):state.targetSpeed;
+  state.speed=lerp(state.speed,spd,0.05);
+  state.dist+=state.speed*dt*80;
+  
+  // Energy drain
+  if(state.frame%120===0){
+    state.energy=Math.max(0,state.energy-(state.sprint?1:0.3));
+    state.stamina=Math.max(0,state.stamina-(state.sprint?0.5:0.1));
+  }
+  
+  // Animation phases
+  state.pelicanAnim+=state.speed*0.06;
+  state.bikeAnim+=state.speed*0.08;
+  
+  // Bell
+  if(state.bellTriggered){state.bellTimer--;if(state.bellTimer<=0)state.bellTriggered=false;}
+  
+  // Fish feed animation
+  if(state.fishTimer>0)state.fishTimer--;
+  
+  // Bump/shake
+  var bumpAmt=state.speed*0.4+(state.sprint?1.5:0);
+  state.shakeX=Math.sin(state.frame*0.3)*bumpAmt*0.3;
+  state.shakeY=Math.abs(Math.sin(state.frame*0.25))*bumpAmt*0.3;
+  
+  // Generate particles
+  if(state.speed>3&&state.frame%3===0){
+    state.particles.push({x:W*0.45+rng(-20,20),y:H*0.7-rng(0,30),
+      vx:-state.speed*rng(0.5,1.5),vy:rng(-0.5,0.5),
+      life:40+Math.random()*20,type:'sweat'});
+  }
+  if(state.frame%40===0){
+    state.feathers.push({x:W*0.55+rng(-30,30),y:H*0.6+rng(-20,20),
+      vx:rng(-2,0.5),vy:rng(-1,1),life:80+Math.random()*40,
+      r:Math.random()*Math.PI*2,rv:(Math.random()-0.5)*0.06,
+      color:cloudColor});
+  }
+  
+  // Update particles
+  for(var i=state.particles.length-1;i>=0;i--){
+    var p=state.particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.life--;
+    if(p.type==='rain'&&state.weather===0)p.vy+=0.05;
+    if(p.life<=0)state.particles.splice(i,1);
+  }
+  for(var j=state.feathers.length-1;j>=0;j--){
+    var f=state.feathers[j];
+    f.x+=f.vx;f.y+=f.vy;f.vy+=0.02;f.r+=f.rv;f.life--;
+    if(f.life<=0)state.feathers.splice(j,1);
+  }
+  
+  // Night particles (stars flicker)
+  
+  // UI update
+  document.getElementById('spd-val').textContent=Math.round(state.speed*state.baseSpeed/state.baseSpeed*state.speed*2)||Math.round(state.speed);
+  document.getElementById('energy-bar').style.width=state.energy+'%';
+  document.getElementById('stamina-bar').style.width=state.stamina+'%';
+  document.getElementById('weather-icon').textContent=weathers[state.weather];
+}
+
+// ============ RENDER ============
+function render(){
+  ctx.save();
+  ctx.translate(state.shakeX,state.shakeY);
+  
+  var sc=skyColors[state.weather];
+  var grd=ctx.createLinearGradient(0,0,0,H*0.55);
+  grd.addColorStop(0,sc[0][0]);grd.addColorStop(1,sc[0][1]);
+  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H*0.6);
+  
+  // Weather elements
+  drawCelestialBody();
+  if(state.weather===2)drawStars();
+  
+  // Clouds
+  drawClouds();
+  
+  // Mountains
+  drawMountains();
+  
+  // Sea
+  drawSea();
+  
+  // Ground / plank road
+  drawGround();
+  
+  // Particles behind
+  drawParticles(true);
+  
+  // PELICAN
+  drawPelican(state.dist,state.frame);
+  
+  // BIKE on top of pelican
+  drawBike(state.dist,state.frame);
+  
+  // Particles in front
+  drawParticles(false);
+  
+  // Bell visual effect
+  if(state.bellTriggered){
+    var bcx=W*0.38,bcy=H*0.28;
+    var bt=state.bellTimer/40;
+    for(var i=0;i<5;i++){
+      var rr=10+i*12+Math.sin(state.bellTimer*0.3)*5;
+      ctx.strokeStyle='rgba(255,215,0,'+(0.4-bt*0.3)+')';
+      ctx.lineWidth=2;ctx.beginPath();
+      ctx.arc(bcx,bcy,rr,state.bellTimer*0.2+i*0.5,state.bellTimer*0.2+i*0.5+Math.PI*1.2);
+      ctx.stroke();
+    }
+  }
+  
+  // Fish feed visual
+  if(state.fishTimer>15){
+    var ft=(state.fishTimer-15)/15;
+    ctx.globalAlpha=ft;
+    ctx.font='36px serif';ctx.textAlign='center';
+    ctx.fillText('🐟',W*0.5-H*0.05*(1-ft),H*0.35-H*0.3*ft);
+    ctx.globalAlpha=1;
+  }
+  
+  // Sprint effect
+  if(state.sprint){
+    ctx.globalAlpha=0.08;
+    ctx.fillStyle='#fff';
+    for(var k=0;k<8;k++){
+      var sy=H*0.3+k*30;
+      var sx=(state.dist*0.5+k*80)%W;
+      ctx.fillRect(sx,sy,W-sx,2);
+    }
+    ctx.globalAlpha=1;
+  }
+  
+  ctx.restore();
+}
+
+function drawCelestialBody(){
+  var sb=sunMoonPos[state.weather];
+  var cx=W*sb.x,cy=H*sb.y;
+  if(sb.type==='sun'){
+    var sg=ctx.createRadialGradient(cx,cy,0,cx,cy,50);
+    var colors=['#FFD700','#FFA500','#FF6347'];
+    sg.addColorStop(0,state.weather===2?'rgba(200,200,255,0.6)':'rgba(255,215,0,0.9)');
+    sg.addColorStop(0.5,state.weather===2?'rgba(150,150,200,0.3)':'rgba(255,165,0,0.4)');
+    sg.addColorStop(1,'rgba(255,0,0,0)');
+    ctx.fillStyle=sg;ctx.beginPath();ctx.arc(cx,cy,50,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=state.weather===2?'#f0f0ff':'#FFE44D';
+    ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);ctx.fill();
+  }else{
+    ctx.fillStyle='#f0f0ff';ctx.shadowColor='#c0c0ff';ctx.shadowBlur=30;
+    ctx.beginPath();ctx.arc(cx,cy,18,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    // Moon crater details
+    ctx.fillStyle='rgba(200,200,220,0.3)';
+    ctx.beginPath();ctx.arc(cx-5,cy-3,4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+6,cy+5,3,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function drawStars(){
+  for(var i=0;i<60;i++){
+    var sx=(i*137.5+state.dist*0.01)%W;
+    var sy=(i*97.3)%(H*0.4);
+    var twinkle=Math.sin(state.time*3+i*1.7)*0.5+0.5;
+    ctx.fillStyle='rgba(255,255,255,'+(0.3+twinkle*0.7)+')';
+    ctx.beginPath();ctx.arc(sx,sy,0.5+twinkle,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function drawClouds(){
+  var cc=cloudColor;
+  var co1=(state.dist*0.15)%800-100;
+  var co2=(state.dist*0.1)%600-100;
+  ctx.fillStyle=cc;
+  for(var i=0;i<6;i++){
+    var px=((i*220+co1)%(W+300))-150;
+    var py=30+i*25+Math.sin(i*2.3)*15;
+    drawCloud(px,py,40+i*8);
+  }
+  for(var j=0;j<4;j++){
+    var px=((j*280+co2)%(W+300))-150;
+    var py=80+j*20+Math.sin(j*1.7)*10;
+    drawCloud(px,py,30+j*5);
+  }
+}
+
+function drawCloud(x,y,size){
+  ctx.beginPath();
+  ctx.arc(x,y,size*0.6,0,Math.PI*2);
+  ctx.arc(x+size*0.5,y-size*0.15,size*0.45,0,Math.PI*2);
+  ctx.arc(x+size*0.9,y,size*0.5,0,Math.PI*2);
+  ctx.arc(x+size*0.4,y+size*0.15,size*0.35,0,Math.PI*2);
+  ctx.fill();
+}
+
+function drawMountains(){
+  var mc=mtnColor;
+  var mx=-((state.dist*0.3)%1200);
+  ctx.fillStyle=mc[0];
+  ctx.beginPath();ctx.moveTo(mx,H*0.48);
+  ctx.lineTo(mx+200,H*0.3);ctx.lineTo(mx+450,H*0.42);
+  ctx.lineTo(mx+700,H*0.25);ctx.lineTo(mx+950,H*0.38);
+  ctx.lineTo(mx+1200,H*0.45);ctx.lineTo(mx+1200,H*0.55);ctx.lineTo(mx,H*0.55);ctx.closePath();ctx.fill();
+  
+  // Snow caps
+  ctx.fillStyle=mc[1];
+  ctx.beginPath();ctx.moveTo(mx+190,H*0.31);ctx.lineTo(mx+200,H*0.3);ctx.lineTo(mx+210,H*0.32);ctx.fill();
+  ctx.beginPath();ctx.moveTo(mx+690,H*0.26);ctx.lineTo(mx+700,H*0.25);ctx.lineTo(mx+710,H*0.27);ctx.fill();
+  
+  // Second layer
+  var mx2=-((state.dist*0.5+400)%1400)+400;
+  ctx.fillStyle=mc[1];
+  ctx.beginPath();ctx.moveTo(mx2,H*0.5);
+  ctx.lineTo(mx2+150,H*0.38);ctx.lineTo(mx2+350,H*0.45);
+  ctx.lineTo(mx2+600,H*0.35);ctx.lineTo(mx2+800,H*0.44);
+  ctx.lineTo(mx2+1000,H*0.36);ctx.lineTo(mx2+1200,H*0.42);
+  ctx.lineTo(mx2+1400,H*0.5);ctx.closePath();ctx.fill();
+}
+
+function drawSea(){
+  var sc=seaColors[state.weather];
+  var gy=H*0.5;
+  var grd=ctx.createLinearGradient(0,gy,0,H*0.58);
+  grd.addColorStop(0,sc[0]);grd.addColorStop(1,sc[1]);
+  ctx.fillStyle=grd;ctx.fillRect(0,gy,W,H*0.08);
+  
+  // Waves
+  ctx.strokeStyle=state.weather===2?'rgba(100,120,180,0.3)':'rgba(255,255,255,0.2)';
+  ctx.lineWidth=1.5;
+  for(var w=0;w<5;w++){
+    var wy=gy+8+w*14;
+    ctx.beginPath();
+    for(var x=0;x<W;x+=4){
+      var y=wy+Math.sin((x+state.dist*(1+w*0.2)*0.05)*0.04+w)*3;
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawGround(){
+  var gc=groundColors[state.weather];
+  var gy=H*0.58;
+  
+  // Ground base
+  var grd=ctx.createLinearGradient(0,gy,0,H);
+  grd.addColorStop(0,gc[0]);grd.addColorStop(1,gc[1]);
+  ctx.fillStyle=grd;ctx.fillRect(0,gy,W,H-gy);
+  
+  // Plank texture
+  var pw=60;
+  var offset=(state.dist*2)%pw;
+  ctx.strokeStyle=state.weather===2?'rgba(60,50,40,0.5)':'rgba(90,70,50,0.4)';
+  ctx.lineWidth=2;
+  for(var x=-offset;x<W+pw;x+=pw){
+    ctx.beginPath();ctx.moveTo(x,gy+5);ctx.lineTo(x,H);ctx.stroke();
+  }
+  // Horizontal planks
+  for(var row=0;row<8;row++){
+    var ry=gy+10+row*((H-gy-10)/8);
+    ctx.beginPath();ctx.moveTo(0,ry);ctx.lineTo(W,ry);ctx.stroke();
+  }
+  
+  // Road surface highlight
+  ctx.fillStyle=state.weather===2?'rgba(80,70,60,0.3)':'rgba(200,180,150,0.2)';
+  ctx.fillRect(0,gy+2,W,3);
+}
+
+function drawParticles(forBehind){
+  for(var i=0;i<state.particles.length;i++){
+    var p=state.particles[i];
+    if(p.type==='sweat'&&forBehind)continue;
+    if(!p.type)p.type='sweat';
+    var alpha=p.life/60;
+    if(p.type==='sweat'){
+      ctx.fillStyle='rgba(150,220,255,'+alpha+')';
+      ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fill();
+    }
+  }
+  for(var j=0;j<state.feathers.length;j++){
+    var f=state.feathers[j];
+    var alpha=f.life/120;
+    ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.r);
+    ctx.fillStyle=f.color;ctx.globalAlpha=alpha;
+    ctx.beginPath();
+    ctx.ellipse(0,0,8,2.5,0,0,Math.PI*2);ctx.fill();
+    // Feather detail line
+    ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.stroke();
+    ctx.globalAlpha=1;ctx.restore();
+  }
+}
+
+function drawPelican(dist,frame){
+  var cx=W*0.48,cy=H*0.65;
+  var bob=Math.sin(frame*0.08*state.speed)*4*state.speed/5;
+  var bodyTilt=Math.sin(frame*0.06)*0.03*(state.speed/5);
+  
+  ctx.save();
+  ctx.translate(cx,cy+bob);
+  ctx.rotate(bodyTilt);
+  
+  var s=1.1; // pelican scale
+  
+  // LEGS - back
+  drawLeg(s*10,s*15,-s*45,-s*5,frame,1,s,false); // left leg back
+  drawLeg(s*10,s*15,s*25,-s*5,frame,-1,s,false); // right leg back
+  
+  // BODY
+  var bw=s*100,bh=s*55;
+  // Main body ellipse
+  var bGrd=ctx.createRadialGradient(0,-bh*0.2,10,0,0,bw*0.6);
+  bGrd.addColorStop(0,'#ffffff');bGrd.addColorStop(0.7,'#f0ece4');bGrd.addColorStop(1,'#ddd8d0');
+  ctx.fillStyle=bGrd;
+  ctx.beginPath();ctx.ellipse(0,0,bw,bh,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#c8c0b5';ctx.lineWidth=1.5;ctx.stroke();
+  
+  // Wing on side (flying/fapping)
+  var wingAngle=Math.sin(frame*0.1*state.speed)*(state.speed/5)*0.6;
+  ctx.save();
+  ctx.translate(-bw*0.3,-bh*0.5);
+  ctx.rotate(wingAngle-0.3);
+  var wg=ctx.createLinearGradient(0,0,s*70,s*40);
+  wg.addColorStop(0,'#e8e4dc');wg.addColorStop(0.5,'#d8d4cc');wg.addColorStop(1,'#c8c4bc');
+  ctx.fillStyle=wg;
+  ctx.beginPath();ctx.ellipse(s*30,s*15,s*55,s*18,-0.3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#b8b4ac';ctx.lineWidth=1;ctx.stroke();
+  // Wing feather lines
+  for(var wf=0;wf<5;wf++){
+    ctx.beginPath();ctx.moveTo(-s*20+wf*s*12,s*-5+wf*s*2);
+    ctx.quadraticCurveTo(s*10+wf*s*5,s*-2,wf*s*8,s*25);
+    ctx.strokeStyle='rgba(180,170,160,0.4)';ctx.lineWidth=0.8;ctx.stroke();
+  }
+  ctx.restore();
+  
+  // BACK legs
+  drawLeg(s*10,s*15,-s*30,s*5,frame,-1,s,true); // left leg forward
+  drawLeg(s*10,s*15,s*40,s*5,frame,1,s,true); // right leg forward
+  
+  // NECK & HEAD
+  var neckStartX=bw*0.65,neckStartY=-bh*0.3;
+  var headBob=Math.sin(frame*0.08*state.speed+1)*2*(state.speed/5);
+  
+  ctx.save();
+  ctx.translate(neckStartX,neckStartY);
+  
+  // Neck curve
+  ctx.strokeStyle='#f0ece4';ctx.lineWidth=s*22;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(0,s*5);
+  ctx.quadraticCurveTo(s*15,-s*30+s*headBob,s*10,-s*55+s*headBob);
+  ctx.stroke();
+  ctx.strokeStyle='#ddd8d0';ctx.lineWidth=s*20;
+  ctx.beginPath();ctx.moveTo(0,s*5);
+  ctx.quadraticCurveTo(s*15,-s*30+s*headBob,s*10,-s*55+s*headBob);
+  ctx.stroke();
+  
+  // HEAD
+  var hx=s*10,hy=-s*55+s*headBob;
+  ctx.fillStyle='#f8f4ec';
+  ctx.beginPath();ctx.arc(hx,hy,s*18,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#d8d4cc';ctx.lineWidth=1;ctx.stroke();
+  
+  // EYE
+  ctx.fillStyle='#1a1a1a';
+  ctx.beginPath();ctx.arc(hx+s*8,hy-s*5,s*3.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(hx+s*9,hy-s*6,s*1.2,0,Math.PI*2);ctx.fill();
+  
+  // BEAK
+  var beakLen=s*55;
+  // Upper beak
+  ctx.fillStyle='#e8b830';
+  ctx.beginPath();
+  ctx.moveTo(hx+s*16,hy-s*4);
+  ctx.lineTo(hx+beakLen,hy-s*2);
+  ctx.lineTo(hx+beakLen,hy+3);
+  ctx.lineTo(hx+s*16,hy+4);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#c89820';ctx.lineWidth=1;ctx.stroke();
+  // Beak tip (hook)
+  ctx.fillStyle='#8B7355';
+  ctx.beginPath();
+  ctx.moveTo(hx+beakLen-5,hy-s*1);
+  ctx.quadraticCurveTo(hx+beakLen+s*8,hy+3,hx+beakLen-2,hy+4);
+  ctx.fill();
+  
+  // THROAT POUCH - big and animated
+  var pouchGrowth=0.3+0.15*Math.sin(frame*0.05*state.speed);
+  var pouchW=s*35*pouchGrowth;
+  var pouchH=s*40*pouchGrowth;
+  var py2=hy+s*6;
+  var pg=ctx.createRadialGradient(hx+s*5,py2+pouchH*0.3,0,hx+s*5,py2+pouchH*0.3,pouchW);
+  pg.addColorStop(0,'rgba(255,180,120,0.7)');pg.addColorStop(0.5,'rgba(255,140,80,0.5)');pg.addColorStop(1,'rgba(230,100,60,0.3)');
+  ctx.fillStyle=pg;
+  ctx.beginPath();ctx.ellipse(hx+s*5,py2+pouchH*0.5,pouchW,pouchH*0.5,0,0,Math.PI*2);ctx.fill();
+  // Pouch outline
+  ctx.strokeStyle='rgba(200,100,50,0.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.ellipse(hx+s*5,py2+pouchH*0.5,pouchW,pouchH*0.5,0,0,Math.PI*2);ctx.stroke();
+  
+  ctx.restore(); // head
+  
+  // TAIL FEATHERS
+  ctx.save();
+  ctx.translate(-bw*0.85,bh*0.2);
+  var tailWave=Math.sin(frame*0.07*state.speed)*3*(state.speed/5);
+  ctx.rotate(tailWave*0.02);
+  ctx.fillStyle='#d8d4cc';
+  for(var tf=0;tf<4;tf++){
+    ctx.save();ctx.rotate(tf*0.15-0.2);
+    ctx.beginPath();ctx.ellipse(-s*5,s*tf*10,s*12,s*4,tf*0.15-0.2,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#c0bcb4';ctx.lineWidth=0.5;ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  
+  ctx.restore(); // main pelican transform
+}
+
+function drawLeg(baseX,baseY,footOffsetX,legMidY,frame,dir,scale,isFront){
+  var phase=Math.sin(frame*0.12*scale*state.speed+dir*(isFront?1:0)*Math.PI)*0.7;
+  var midX=baseX+phase*s*20*dir;
+  var endX=baseX+footOffsetX+phase*s*15*dir;
+  var endY=legMidY+Math.abs(phase)*s*10;
+  
+  ctx.strokeStyle='#d4c8a0';ctx.lineWidth=s*5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(baseX,baseY);
+  ctx.quadraticCurveTo(midX,legMidY,endX,endY);ctx.stroke();
+  
+  // Foot / webbed toe area
+  ctx.fillStyle='#d4c8a0';
+  ctx.beginPath();ctx.arc(endX,endY,s*4,0,Math.PI*2);ctx.fill();
+  
+  // Webbing hint
+  ctx.fillStyle='#c4b890';
+  ctx.beginPath();ctx.ellipse(endX+s*3,endY+s*3,s*6,s*2.5,0.3,0,Math.PI*2);ctx.fill();
+}
+
+// Wait, there's a scoping issue with `s` - I need to fix the leg drawing function
+// Actually let me rewrite this properly within the context where s is defined
+
+function drawBike(dist,frame){
+  var cx=W*0.48+state.shakeX*0.5;
+  var cy=H*0.65+state.shakeY*0.3-45; // Bike rides ON TOP of pelican
+  var bob=Math.sin(frame*0.08*state.speed)*4*(state.speed/5);
+  var tilt=Math.sin(frame*0.06)*(state.speed/5)*0.02;
+  
+  ctx.save();
+  ctx.translate(cx,cy+bob);
+  ctx.rotate(tilt);
+  
+  var bs=0.75; // bike scale
+  var wheelR=bs*28;
+  var wheelRot=dist*0.05;
+  
+  // ===== REAR WHEEL =====
+  var rx=-bs*35, ry=wheelR+5;
+  drawWheel(rx,ry,wheelR,wheelRot);
+  
+  // ===== FRONT WHEEL =====
+  var fx=bs*35, fy=wheelR+5;
+  drawWheel(fx,fy,wheelR,wheelRot);
+  
+  // ===== FRAME =====
+  ctx.strokeStyle='#e63946';ctx.lineWidth=bs*3.5;ctx.lineCap='round';ctx.lineJoin='round';
+  
+  // Down tube: BB to head tube bottom
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(bs*22,-bs*25);ctx.stroke();
+  // Top tube: seat post to head tube
+  ctx.beginPath();ctx.moveTo(bs*5,-bs*42);ctx.lineTo(bs*22,-bs*25);ctx.stroke();
+  // Seat tube: BB to seat
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(bs*5,-bs*42);ctx.stroke();
+  // Chain stay: BB to rear axle
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rx,ry-wheelR);ctx.stroke();
+  // Seat stay: seat to rear axle
+  ctx.beginPath();ctx.moveTo(bs*5,-bs*42);ctx.lineTo(rx,ry-wheelR);ctx.stroke();
+  // Fork: head tube to front axle
+  ctx.beginPath();ctx.moveTo(bs*22,-bs*25);ctx.lineTo(fx,fy-wheelR);ctx.stroke();
+  
+  // Handlebar stem
+  ctx.strokeStyle='#333';ctx.lineWidth=bs*3;
+  ctx.beginPath();ctx.moveTo(bs*22,-bs*25);ctx.lineTo(bs*20,-bs*45);ctx.stroke();
+  
+  // Handlebars (drops)
+  ctx.strokeStyle='#333';ctx.lineWidth=bs*3.5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(bs*16,-bs*47);
+  ctx.quadraticCurveTo(bs*18,-bs*52,bs*25,-bs*48);
+  ctx.quadraticCurveTo(bs*32,-bs*44,bs*35,-bs*48);
+  ctx.stroke();
+  
+  // Brake levers / hand positions
+  ctx.fillStyle='#222';
+  ctx.beginPath();ctx.arc(bs*16,-bs*47,bs*3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(bs*35,-bs*48,bs*3,0,Math.PI*2);ctx.fill();
+  
+  // ===== SEAT =====
+  ctx.fillStyle='#1d1d1d';
+  ctx.beginPath();
+  ctx.roundRect(bs*0,bs*46-bs*5,bs*28,bs*6,bs*3);ctx.fill();
+  // Seat post
+  ctx.strokeStyle='#555';ctx.lineWidth=bs*2.5;
+  ctx.beginPath();ctx.moveTo(bs*5,0);ctx.lineTo(bs*5,-bs*42);ctx.stroke();
+  
+  // ===== CRANKSET & PEDALS =====
+  var pedalPhase=wheelRot;
+  var crankLen=bs*12;
+  // Chainring
+  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(0,0,bs*7,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#666';ctx.lineWidth=1;ctx.stroke();
+  
+  // Pedals
+  for(var pp=0;pp<2;pp++){
+    var pa=pedalPhase+pp*Math.PI;
+    var px=Math.cos(pa)*crankLen;
+    var py=Math.sin(pa)*crankLen;
+    // Crank arm
+    ctx.strokeStyle='#777';ctx.lineWidth=bs*2.5;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(px,py);ctx.stroke();
+    // Pedal platform
+    ctx.fillStyle='#333';
+    ctx.save();ctx.translate(px,py);ctx.rotate(pa);
+    ctx.fillRect(-bs*6,-bs*2,bs*12,bs*4);
+    ctx.restore();
+  }
+  
+  // ===== CHAIN (visible section) =====
+  ctx.strokeStyle='rgba(100,100,100,0.5)';ctx.lineWidth=bs*2;
+  ctx.beginPath();ctx.moveTo(0,bs*5);ctx.lineTo(fx,bs*5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,-bs*5);ctx.lineTo(fx,-bs*5);ctx.stroke();
+  
+  // ===== RIDER'S HANDS gripping handlebars (anthropomorphic touch) =====
+  // Since the bike "rides" the pelican, let's show "arms" connecting to reins
+  ctx.strokeStyle='#e63946';ctx.lineWidth=bs*2;
+  // Left arm/rein from near seat to pelican neck area (visual suggestion)
+  ctx.setLineDash([bs*3,bs*2]);
+  ctx.beginPath();ctx.moveTo(bs*10,-bs*42);ctx.quadraticCurveTo(bs*15,-bs*15,bs*30,-bs*5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(bs*32,-bs*46);ctx.quadraticCurveTo(bs*38,-bs*10,bs*35,-bs*2);ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Bell on handlebar!
+  ctx.fillStyle='#ffd700';
+  ctx.beginPath();ctx.arc(bs*15,-bs*46,bs*4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#daa520';
+  ctx.beginPath();ctx.arc(bs*15,-bs*44,bs*2,0,Math.PI*2);ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawWheel(x,y,r,rot){
+  // Tire
+  ctx.strokeStyle='#222';ctx.lineWidth=r*0.22;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  
+  // Rim
+  ctx.strokeStyle='#aaa';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(x,y,r*0.82,0,Math.PI*2);ctx.stroke();
+  
+  // Spokes
+  ctx.strokeStyle='#ccc';ctx.lineWidth=1;
+  for(var sp=0;sp<12;sp++){
+    var a=rot+sp*Math.PI/6;
+    ctx.beginPath();
+    ctx.moveTo(x+Math.cos(a)*r*0.15,y+Math.sin(a)*r*0.15);
+    ctx.lineTo(x+Math.cos(a)*r*0.8,y+Math.sin(a)*r*0.8);
+    ctx.stroke();
+  }
+  
+  // Hub
+  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(x,y,r*0.15,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#666';ctx.beginPath();ctx.arc(x,y,r*0.08,0,Math.PI*2);ctx.fill();
+}
+
+// Polyfill roundRect if needed
+if(!ctx.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    if(typeof r==='number')r={tl:r,tr:r,br:r,bl:r};
+    this.moveTo(x+r.tl,y);
+    this.lineTo(x+w-r.tr,y);this.quadraticCurveTo(x+w,y,x+w,y+r.tr);
+    this.lineTo(x+w,y+h-r.br);this.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);
+    this.lineTo(x+r.bl,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r.bl);
+    this.lineTo(x,y+r.tl);this.quadraticCurveTo(x,y,x+r.tl,y);
+    this.closePath();
+  };
+}
+
+// ============ MAIN LOOP ============
+function loop(){
+  update();
+  render();
+  requestAnimationFrame(loop);
+}
+
+// Init bell text timeout
+var bellEl=document.getElementById('bell-text');
+setInterval(function(){
+  if(state.bellTriggered&&!bellEl.classList.contains('show')){
+    bellEl.classList.add('show');
+    setTimeout(function(){bellEl.classList.remove('show');},700);
+  }
+},100);
+
+// Start
+loop();
+
+})();
+</script>
+</body>
+</html>

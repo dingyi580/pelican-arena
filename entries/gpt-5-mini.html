@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>一辆自行车正在骑着一只鹈鹕 — 交互小作品</title>
+<style>
+  :root{
+    --ui-bg: rgba(255,255,255,0.08);
+    --ui-ink: #0b1a2b;
+    --accent: #ffb74d;
+    --glass: rgba(255,255,255,0.06);
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: linear-gradient(#cce7ff, #eaf7ff);
+    color:var(--ui-ink);
+  }
+  canvas{ display:block; width:100%; height:100vh; background:transparent; }
+  .ui {
+    position: fixed;
+    right: 18px;
+    top: 18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    z-index: 20;
+    user-select:none;
+  }
+  .panel{
+    backdrop-filter: blur(6px) saturate(1.1);
+    -webkit-backdrop-filter: blur(6px) saturate(1.1);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    border-radius:12px;
+    padding:12px;
+    box-shadow: 0 6px 18px rgba(6,20,34,0.15);
+    border:1px solid rgba(255,255,255,0.06);
+    min-width:220px;
+  }
+  .panel h3{
+    margin:0 0 8px 0;
+    font-size:14px;
+    color:#093447;
+  }
+  .row{ display:flex; align-items:center; gap:8px; }
+  .bell-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:linear-gradient(180deg,#fff 0%, #fff8e6 100%);
+    color:#003045;
+    padding:8px 12px;
+    border-radius:10px;
+    border: 1px solid rgba(0,0,0,0.06);
+    cursor:pointer;
+    font-weight:600;
+    box-shadow: 0 3px 8px rgba(3,12,20,0.08);
+  }
+  .small-btn{
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid rgba(0,0,0,0.06);
+    background:var(--glass);
+    color:#03303a;
+    cursor:pointer;
+  }
+  input[type=range]{
+    width:140px;
+    accent-color: #ffb74d;
+  }
+  .meter{
+    height:8px;
+    width:120px;
+    background:rgba(255,255,255,0.06);
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid rgba(0,0,0,0.04);
+  }
+  .meter > i{
+    display:block;
+    height:100%;
+    background: linear-gradient(90deg,#ffd08a,#ff9d57);
+    width:60%;
+  }
+  .label{
+    font-size:12px;
+    color:#063241;
+  }
+  .footer-ui{
+    position: fixed;
+    left:18px;
+    bottom:18px;
+    z-index:20;
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .chip{
+    padding:8px 10px;
+    border-radius:999px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.04);
+    color:#062f3a;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow: 0 4px 16px rgba(6,20,34,0.06);
+  }
+  .scene-title{
+    position: fixed;
+    left:50%;
+    transform: translateX(-50%);
+    top:18px;
+    z-index:20;
+    padding:8px 14px;
+    border-radius:999px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    color:#05323a;
+    font-weight:700;
+    border:1px solid rgba(255,255,255,0.04);
+    box-shadow: 0 6px 18px rgba(2,12,20,0.06);
+    backdrop-filter: blur(6px);
+  }
+  .credits{
+    position: fixed;
+    left:18px;
+    top:18px;
+    z-index:20;
+    font-size:12px;
+    color:rgba(3,12,20,0.6);
+    background: rgba(255,255,255,0.02);
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.03);
+  }
+  .hint{
+    font-size:12px;
+    color:#05323a;
+    opacity:0.85;
+    margin-top:6px;
+  }
+  @media (max-width:520px){
+    .ui{ right:10px; top:10px; }
+    .panel{ min-width:180px; padding:10px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="scene-title">「一辆自行车正在骑着一只鹈鹕」</div>
+<div class="credits">创作: AI 前端小剧场 • 鼓励点击铃铛 (需要允许音频)</div>
+
+<div class="ui" role="region" aria-label="controls">
+  <div class="panel" id="panel1">
+    <h3>交互控制</h3>
+    <div class="row" style="justify-content:space-between;">
+      <button id="bell" class="bell-btn" title="按下车铃">🔔 车铃</button>
+      <button id="feed" class="small-btn" title="投喂小鱼，恢复体力">🐟 投喂</button>
+    </div>
+    <div style="height:12px"></div>
+    <div class="row">
+      <div class="label">速度</div>
+      <input id="speedRange" type="range" min="0" max="6" step="0.1" value="2.2" aria-label="速度"/>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <div class="label">体力</div>
+      <div class="meter" title="鹈鹕体力"><i id="staminaBar"></i></div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="hint">提示：按铃会触发清脆铃声并让鹈鹕短暂加速；投喂恢复体力；拖动速度栏调整步频。</div>
+  </div>
+
+  <div class="panel" id="panel2">
+    <h3>场景 / 路况</h3>
+    <div class="row">
+      <button id="toggleTime" class="small-btn">切换 白昼/黄昏</button>
+      <button id="toggleRoad" class="small-btn">切换 路面</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="row">
+      <button id="btnReset" class="small-btn">重置位置</button>
+      <div style="flex:1"></div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-ui">
+  <div class="chip" id="help">说明</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // Canvas setup
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  function resize() {
+    DPR = Math.max(1, window.devicePixelRatio || 1);
+    const w = Math.floor(window.innerWidth);
+    const h = Math.floor(window.innerHeight);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Utility
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
+  const TAU = Math.PI * 2;
+
+  // Scene state
+  let timeOfDay = 0; // 0 day, 1 dusk
+  let roadBumpy = 0; // 0 smooth, 1 bumpy
+  let baseOffset = 0;
+
+  // Audio context for bell
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {
+        audioCtx = null;
+      }
+    }
+    return audioCtx;
+  }
+  function playBell() {
+    const ac = ensureAudio();
+    if (!ac) return;
+    // Bell-ish sound: multiple oscillators + decaying pitch
+    const now = ac.currentTime;
+    const master = ac.createGain();
+    master.connect(ac.destination);
+    master.gain.value = 0.0001;
+    master.gain.linearRampToValueAtTime(0.18, now + 0.01);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+
+    const freqs = [1200, 1700, 900];
+    freqs.forEach((f, i) => {
+      const o = ac.createOscillator();
+      o.type = i===1 ? 'sine' : 'triangle';
+      o.frequency.setValueAtTime(f, now);
+      o.frequency.exponentialRampToValueAtTime(f*0.3, now + 1.6);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.9 / (i+1), now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+      o.connect(g).connect(master);
+      o.start(now + i*0.01);
+      o.stop(now + 1.7);
+    });
+
+    // short metallic click
+    const noise = ac.createOscillator();
+    noise.type = 'square';
+    noise.frequency.setValueAtTime(3400, now);
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.06, now);
+    ng.gain.exponentialRampToValueAtTime(0.00001, now + 0.18);
+    noise.connect(ng).connect(master);
+    noise.start(now);
+    noise.stop(now + 0.2);
+  }
+
+  // Controls
+  const bellBtn = document.getElementById('bell');
+  const feedBtn = document.getElementById('feed');
+  const speedRange = document.getElementById('speedRange');
+  const staminaBar = document.getElementById('staminaBar');
+  const toggleTimeBtn = document.getElementById('toggleTime');
+  const toggleRoadBtn = document.getElementById('toggleRoad');
+  const btnReset = document.getElementById('btnReset');
+  const helpBtn = document.getElementById('help');
+
+  let uiInteracted = false;
+  function markInteraction() { if (!uiInteracted) { uiInteracted = true; ensureAudio(); } }
+
+  bellBtn.addEventListener('click', () => {
+    markInteraction();
+    playBell();
+    pelican.reactToBell();
+    // small visual ripple
+    createParticleBurst(pelican.x + 30, pelican.y - pelican.height*0.55, 'ring');
+  });
+
+  feedBtn.addEventListener('click', () => {
+    markInteraction();
+    pelican.feed();
+    createParticleBurst(pelican.x + 40, pelican.y - pelican.height*0.45, 'fish');
+  });
+
+  toggleTimeBtn.addEventListener('click', () => {
+    timeOfDay = 1 - timeOfDay;
+    toggleTimeBtn.textContent = timeOfDay ? '切换 黄昏/夜' : '切换 白昼/黄昏';
+  });
+  toggleRoadBtn.addEventListener('click', () => {
+    roadBumpy = 1 - roadBumpy;
+    toggleRoadBtn.textContent = roadBumpy ? '路面: 颠簸' : '路面: 平整';
+  });
+  btnReset.addEventListener('click', () => {
+    pelican.resetPos();
+  });
+  helpBtn.addEventListener('click', ()=>{
+    alert('玩法提示：\n\n• 点击「车铃」会发出清脆铃声并让鹈鹕短暂加速。\n• 拖动「速度」滑块改变前进节奏。\n• 点击「投喂」给鹈鹕小鱼，恢复体力并触发可爱特效。\n• 切换「路况/时间」观察不同动画细节。');
+  });
+
+  // Particle system (feathers, splashes, rings)
+  const particles = [];
+  function createParticleBurst(x,y,type='feather') {
+    if (type==='fish') {
+      for (let i=0;i<6;i++){
+        particles.push({
+          x, y,
+          vx: rand(-70,70),
+          vy: rand(-220,-50),
+          life: rand(0.8,1.6),
+          t:0,
+          type: 'fish'
+        });
+      }
+    } else if (type==='ring') {
+      for (let i=0;i<8;i++){
+        particles.push({
+          x, y,
+          vx: rand(-100,100),
+          vy: rand(-60,-6),
+          life: rand(0.6,1.2),
+          t:0,
+          type: 'feather'
+        });
+      }
+    } else {
+      for (let i=0;i<10;i++){
+        particles.push({
+          x, y,
+          vx: rand(-120,120),
+          vy: rand(-200,-40),
+          life: rand(0.7,1.6),
+          t:0,
+          type: 'feather'
+        });
+      }
+    }
+  }
+
+  // Pelican class
+  class Pelican {
+    constructor() {
+      this.resetPos();
+      this.width = 220;
+      this.height = 120;
+      this.legPhase = 0;
+      this.wingPhase = 0;
+      this.pouchBounce = 0;
+      this.speed = 120; // px/sec baseline
+      this.energy = 1.0; // 0..1
+      this.maxSpeed = 420;
+      this.minSpeed = 30;
+      this.breath = 0;
+      this.stunned = 0;
+      this.shuffle = 0;
+    }
+    resetPos() {
+      this.x = 140;
+      this.y = Math.max(280, canvas.height/ DPR * 0.62);
+      this.baseY = this.y;
+      this.facing = 1; // to right
+      this.progress = 0;
+    }
+    feed() {
+      this.energy = Math.min(1.0, this.energy + 0.45);
+      this.breath = -0.3;
+      this.stunned = 0;
+    }
+    reactToBell() {
+      // startled: brief burst of speed, feathers
+      this.energy = Math.min(1.0, this.energy + 0.06);
+      this.stunned = 0;
+      this.burst = Math.min(1.0, (this.burst||0) + 0.9);
+      for (let i=0;i<6;i++){
+        particles.push({
+          x: this.x + rand(-10,60),
+          y: this.y - this.height*0.3 + rand(-10,10),
+          vx: rand(-60,60),
+          vy: rand(-180,-30),
+          life: rand(0.6,1.2),
+          t:0,
+          type:'feather'
+        });
+      }
+    }
+    update(dt, targetSpeed, bumpy) {
+      this.legPhase += dt * (targetSpeed/120) * (1 + 0.4*(1-this.energy));
+      this.wingPhase += dt * 3.6;
+      this.pouchBounce += dt * 10;
+      this.breath += dt * 0.8;
+      this.burst = Math.max(0, (this.burst||0) - dt*1.8);
+      // Energy consumption by speed & bumpy
+      const consumption = clamp((targetSpeed/300) * (1 + bumpy*0.8), 0.002, 0.06);
+      this.energy = clamp(this.energy - consumption*dt, 0, 1);
+      // Slow down if exhausted
+      if (this.energy < 0.07) {
+        targetSpeed *= 0.5;
+        this.shuffle = Math.min(1, this.shuffle + dt*0.6);
+      } else {
+        this.shuffle = Math.max(0, this.shuffle - dt*0.8);
+      }
+      // compute effective speed
+      const eff = this.burst ? targetSpeed * (1 + 0.8 * this.burst) : targetSpeed;
+      // gravity/bumpy vertical movement
+      const stepY = Math.sin(this.legPhase*0.9) * (8 + 12*bumpy) * (1 - this.energy*0.3);
+      // some lag
+      this.y += (this.baseY + stepY - this.y) * clamp(dt*6, 0, 1);
+      this.x += eff * dt;
+      this.progress += eff * dt;
+      // generate occasional feathers when tired or bumpy
+      if (bumpy && Math.random() < 0.06 * dt*60) {
+        createParticleBurst(this.x + rand(-10,30), this.y - rand(20,50), 'feather');
+      }
+      // breathing gauge / throat pouch bounce
+      this.pouchBounce = Math.sin(this.legPhase*0.6) * (6 + 18*(1-this.energy));
+      // bound within screen horizontally
+      if (this.x > canvas.width/DPR*0.6) {
+        // pan the scene instead of moving pelican too far: center movement is handled by baseOffset
+        // keep x steady
+        this.x = canvas.width/DPR*0.45;
+      }
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+
+      // body shadow
+      ctx.fillStyle = 'rgba(8,20,32,0.08)';
+      ctx.beginPath();
+      ctx.ellipse(14, 36, 90, 26, 0, 0, TAU);
+      ctx.fill();
+
+      // torso
+      const energy = this.energy;
+      // body color
+      const main = timeOfDay ? '#ebd7b5' : '#fff7ee';
+      const stroke = '#2f2f2f';
+      // body shape
+      ctx.fillStyle = main;
+      ctx.strokeStyle = 'rgba(18,30,38,0.85)';
+      ctx.lineWidth = 1.6;
+      // torso oval
+      ctx.beginPath();
+      ctx.ellipse(12, -4, 86, 46, -0.07, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+
+      // wing - left and right
+      ctx.save();
+      const wingFold = Math.sin(this.wingPhase) * 0.5 - 0.2 + (1-energy)*0.6;
+      // left
+      ctx.translate(-12, -10);
+      ctx.rotate(-0.18 + wingFold*0.3);
+      drawWing(ctx, -1, energy, timeOfDay);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(58, -12);
+      ctx.rotate(0.18 - wingFold*0.3);
+      drawWing(ctx, 1, energy, timeOfDay);
+      ctx.restore();
+
+      // tail
+      ctx.save();
+      ctx.translate(-84, 6);
+      ctx.rotate(-0.4 + Math.sin(this.legPhase*0.5)*0.1);
+      ctx.fillStyle = '#e9e1cf';
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(-28, -6);
+      ctx.lineTo(-36, 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // legs
+      const legPhase = this.legPhase;
+      const step = Math.sin(legPhase)*12;
+      // left leg
+      ctx.strokeStyle = '#c87f4b';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-20, 22);
+      ctx.lineTo(-20 + 6, 42 + step*0.12);
+      ctx.stroke();
+      // right leg
+      ctx.beginPath();
+      ctx.moveTo(14, 22);
+      ctx.lineTo(14 - 2, 42 - step*0.12);
+      ctx.stroke();
+
+      // feet (webbed)
+      ctx.fillStyle = '#ffb05b';
+      ctx.beginPath();
+      ctx.ellipse(-20, 48, 12,6,0,0,TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(14, 48, 12,6,0,0,TAU);
+      ctx.fill();
+
+      // head & beak
+      ctx.save();
+      const headTilt = Math.sin(this.legPhase*0.8)*0.06 + (1-energy)*0.2;
+      ctx.translate(86, -48);
+      ctx.rotate(-0.04 + headTilt);
+      // neck
+      ctx.fillStyle = '#fffef8';
+      ctx.beginPath();
+      ctx.ellipse(-8, -4, 22, 28, 0.45, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      // beak
+      ctx.fillStyle = '#f7ba59';
+      ctx.beginPath();
+      ctx.moveTo(36, -8);
+      ctx.lineTo(130, -18);
+      ctx.lineTo(130, -8);
+      ctx.lineTo(44, 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // lower beak (pouch)
+      const pouchWiggle = Math.abs(Math.sin(this.pouchBounce*0.9))*0.8;
+      ctx.fillStyle = '#ffdca6';
+      ctx.beginPath();
+      ctx.moveTo(36, 6);
+      ctx.quadraticCurveTo(88 + pouchWiggle*8, 40 + (1-energy)*30, 130, 10);
+      ctx.lineTo(126, 30);
+      ctx.quadraticCurveTo(86, 46 + (1-energy)*18, 36, 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // eye
+      ctx.fillStyle = '#0b2a36';
+      ctx.beginPath();
+      ctx.ellipse(18, -18, 6,6,0,0,TAU);
+      ctx.fill();
+      ctx.restore();
+
+      // small sweat when tired
+      if (energy < 0.2) {
+        ctx.fillStyle = 'rgba(66,150,255,0.9)';
+        ctx.beginPath();
+        ctx.ellipse(20, -48, 6, 10, -0.6, 0, TAU);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      // draw bicycle on top of pelican
+      bicycle.drawOnPelican(ctx, this.x, this.y - 18 - Math.max(0, this.pouchBounce*0.5), this.legPhase, this.shuffle, energy);
+    }
+  }
+
+  function drawWing(ctx, side=1, energy=1, timeOfDay=0) {
+    // side: -1 left, 1 right
+    ctx.save();
+    ctx.scale(side,1);
+    ctx.fillStyle = timeOfDay ? '#e2d5b9' : '#fff9f0';
+    ctx.strokeStyle = 'rgba(18,30,38,0.8)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(64, -34 - (1-energy)*30, 140, -10 - (1-energy)*10);
+    ctx.quadraticCurveTo(90, -6 - (1-energy)*14, 0, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // feathers lines
+    ctx.strokeStyle = 'rgba(14,28,36,0.15)';
+    for (let i=0;i<6;i++){
+      const t = i/6;
+      ctx.beginPath();
+      ctx.moveTo(6 + t*60, 2 + t*-2);
+      ctx.quadraticCurveTo(80 + t*20, -30 + t*-6, 120 + t*8, -6 + t*-3);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // Bicycle object: drawn riding pelican
+  const bicycle = {
+    wheelRadius: 30,
+    chainPos: null,
+    drawOnPelican(ctx, px, py, legPhase, shuffle, energy) {
+      ctx.save();
+      // slight tilt and bounce depending on legPhase
+      const tilt = Math.sin(legPhase*0.9)*0.03 + (1-energy)*0.04 + shuffle*0.06;
+      ctx.translate(px + 8, py - 16);
+      ctx.rotate(tilt);
+
+      // Draw seat connection to pelican (a saddle strap)
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = '#6b4b33';
+      ctx.lineWidth = 4;
+      ctx.moveTo(-36, 6);
+      ctx.quadraticCurveTo(-12, 22, 20, 22);
+      ctx.stroke();
+      ctx.restore();
+
+      // frame
+      ctx.strokeStyle = '#163b4c';
+      ctx.lineWidth = 3.6;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      // rear wheel center
+      const rwx = -48, rwy = 22;
+      const fwX = 56, fwY = 16;
+      // frame triangle
+      ctx.beginPath();
+      ctx.moveTo(rwx, rwy);
+      ctx.lineTo(0, -8); // bottom bracket area
+      ctx.lineTo(fwX, fwY);
+      ctx.moveTo(0,-8);
+      ctx.lineTo(-20, -22); // handlebar stem
+      ctx.stroke();
+
+      // seat post & saddle
+      ctx.beginPath();
+      ctx.moveTo(-14, -18);
+      ctx.lineTo(8, -30);
+      ctx.stroke();
+      ctx.fillStyle = '#2e2e2e';
+      ctx.beginPath();
+      ctx.roundRect = ctx.roundRect || function(x,y,w,h,r){ this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r); this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); };
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.ellipse(6, -34, 26, 8, 0, 0, TAU);
+      ctx.fill();
+
+      // handlebar & reins to beak (showing bike controlling pelican)
+      ctx.strokeStyle = '#2f2f2f';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(14, -22);
+      ctx.lineTo(42, -36);
+      ctx.stroke();
+      // reins from handlebar to pelican beak: curved line
+      ctx.beginPath();
+      ctx.strokeStyle = '#8b4b2b';
+      ctx.lineWidth = 2;
+      ctx.moveTo(52, -34);
+      ctx.quadraticCurveTo(80, -50, px + 92, py - 68); // approximate connection to beak tip
+      ctx.stroke();
+
+      // chain: simple loop
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, -8, 8, 8, 0, 0, TAU);
+      ctx.stroke();
+
+      // pedals / crank animation
+      const wheelSpeed = (parseFloat(speedRange.value) || 2.2) * 2.8 + legPhase*0.2;
+      const pedalAngle = legPhase * 2.4;
+      // Draw crank
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo( Math.cos(pedalAngle)*14, Math.sin(pedalAngle)*14 -8);
+      ctx.stroke();
+      // pedal
+      ctx.fillStyle = '#111';
+      ctx.save();
+      ctx.translate(Math.cos(pedalAngle)*14, Math.sin(pedalAngle)*14 -8);
+      ctx.rotate(pedalAngle);
+      ctx.fillRect(-4,-2,10,4);
+      ctx.restore();
+
+      // wheels
+      const drawWheel = (x,y,r,spin) => {
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0b2a36';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0,0,r+2,r+2,0,0,TAU);
+        ctx.fill();
+        ctx.stroke();
+        // rim
+        ctx.strokeStyle = '#dfe7ea';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0,0,r,r,0,0,TAU);
+        ctx.stroke();
+        // spokes
+        ctx.strokeStyle = 'rgba(12,36,48,0.85)';
+        ctx.lineWidth = 1.2;
+        const spokes = 10;
+        for (let i=0;i<spokes;i++){
+          const a = i/spokes*TAU + spin;
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+          ctx.stroke();
+        }
+        // tire
+        ctx.beginPath();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#0b2a36';
+        ctx.arc(0,0,r+4,0,TAU);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      // rear wheel
+      drawWheel(rwx, rwy, 30, -legPhase*1.6);
+      // front wheel
+      drawWheel(fwX, fwY, 30, -legPhase*1.6);
+
+      // basket or bike body details (funny face)
+      ctx.fillStyle = '#ffd7a8';
+      ctx.beginPath();
+      ctx.ellipse(34, -12, 16, 10, 0, 0, TAU);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  };
+
+  // Parallax layers
+  const layers = {
+    sky: {speed: 0.02, clouds: []},
+    distantSea: {speed:0.06},
+    midHorizon: {speed:0.12},
+    boardwalk: {speed:0.28}
+  };
+
+  // generate clouds
+  for (let i=0;i<8;i++){
+    layers.sky.clouds.push({x: rand(0, canvas.width/DPR*2), y: rand(30, 160), s: rand(60,180), v: rand(6,18)});
+  }
+
+  // create a pelican
+  const pelican = new Pelican();
+
+  // main loop
+  let last = performance.now();
+  let running = true;
+  function loop(t) {
+    const now = t;
+    const dt = Math.min(0.04, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
+    if (running) requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    // handle pseudo camera movement (baseOffset) so pelican feels moving forward
+    const targetSpeed = clamp((parseFloat(speedRange.value) || 2.2) * 60, 10, 900);
+    // road effect
+    const bumpy = roadBumpy ? 1 : 0;
+    pelican.update(dt, targetSpeed, bumpy);
+
+    // baseOffset moves with target speed but smoothed
+    baseOffset += (pelican.progress/300) * dt * 60;
+    baseOffset += (targetSpeed/600) * dt * 2;
+    // progress wrap to produce continuous sea/planks
+    pelican.progress = pelican.progress % 10000;
+
+    // stamina metrics update UI
+    staminaBar.style.width = (pelican.energy*100|0) + '%';
+
+    // update particles
+    for (let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.t += dt;
+      if (p.t > p.life) {
+        particles.splice(i,1);
+        continue;
+      }
+      // physics
+      p.vy += 400 * dt; // gravity
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 1 - dt*0.2;
+      // if touch ground, reduce life
+      if (p.y > canvas.height/DPR - 40) {
+        p.vx *= 0.6;
+        p.vy *= -0.35;
+      }
+    }
+  }
+
+  function render() {
+    const W = canvas.width/DPR;
+    const H = canvas.height/DPR;
+    // background gradient depending on timeOfDay
+    if (timeOfDay === 0) {
+      // day
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0, '#bfe9ff');
+      g.addColorStop(0.5, '#eaf9ff');
+      g.addColorStop(1, '#f7f6f2');
+      ctx.fillStyle = g;
+    } else {
+      // dusk
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0, '#ffbfa0');
+      g.addColorStop(0.6, '#d6a2f0');
+      g.addColorStop(1, '#5f84a8');
+      ctx.fillStyle = g;
+    }
+    ctx.fillRect(0,0,W,H);
+
+    // parallax sky clouds
+    drawSky(ctx, W, H);
+
+    // horizon sea
+    drawSea(ctx, W, H);
+
+    // boardwalk / ground
+    drawBoardwalk(ctx, W, H);
+
+    // draw pelican and bike (center stage)
+    pelican.draw(ctx);
+
+    // draw particles (feathers / fish)
+    for (const p of particles) {
+      if (p.type === 'feather') {
+        ctx.save();
+        ctx.globalAlpha = clamp(1 - p.t/p.life, 0, 1);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, 6, 3, Math.sin(p.t*4)*0.8, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      } else if (p.type === 'fish') {
+        ctx.save();
+        ctx.globalAlpha = clamp(1 - p.t/p.life, 0, 1);
+        ctx.fillStyle = '#7fe3ff';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, 8,4, Math.sin(p.x*0.1)*0.5,0,TAU);
+        ctx.fill();
+        // tail
+        ctx.beginPath();
+        ctx.moveTo(p.x-8, p.y);
+        ctx.lineTo(p.x-14, p.y-4);
+        ctx.lineTo(p.x-14, p.y+4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // HUD overlay - speed indicator
+    ctx.save();
+    ctx.font = '700 14px/1 "Segoe UI", Arial';
+    ctx.fillStyle = 'rgba(4,22,32,0.9)';
+    ctx.fillText('速度: ' + parseFloat(speedRange.value).toFixed(1), 18, canvas.height/DPR - 24);
+    ctx.restore();
+  }
+
+  function drawSky(ctx, W, H) {
+    // clouds
+    layers.sky.clouds.forEach((c,i)=>{
+      c.x -= (0.02 + 0.02*i*0.06) * (parseFloat(speedRange.value)||2.2);
+      if (c.x < -300) c.x = W + rand(20,280);
+      const x = (c.x - baseOffset*layers.sky.speed*40) % (W + 400) - 120;
+      ctx.save();
+      const sy = c.y;
+      // soft cloud
+      ctx.fillStyle = timeOfDay ? 'rgba(255,230,200,0.9)' : 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      const s = c.s;
+      ctx.ellipse(x, sy, s*0.7, s*0.45, 0, 0, TAU);
+      ctx.ellipse(x+ s*0.2, sy-10, s*0.45, s*0.28, 0, 0, TAU);
+      ctx.ellipse(x- s*0.25, sy-6, s*0.4, s*0.25, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // sun/moon
+    ctx.save();
+    const cx = W*0.85 - (timeOfDay?40:0);
+    const cy = H*0.15 + (timeOfDay?20:0);
+    if (!timeOfDay) {
+      // sun
+      const grad = ctx.createRadialGradient(cx,cy,10,cx,cy,80);
+      grad.addColorStop(0,'#fff7db');
+      grad.addColorStop(1,'rgba(255,255,255,0.0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx,cy,60,0,TAU);
+      ctx.fill();
+    } else {
+      // dusk orb
+      const grad = ctx.createRadialGradient(cx,cy,8,cx,cy,80);
+      grad.addColorStop(0,'#ffd5b7');
+      grad.addColorStop(1,'rgba(218,165,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx,cy,60,0,TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawSea(ctx, W, H) {
+    const horizon = H*0.62;
+    // sea gradient
+    ctx.save();
+    const seaGrad = ctx.createLinearGradient(0,horizon,0,horizon + 240);
+    seaGrad.addColorStop(0, timeOfDay ? '#7aa1c6' : '#81d4f8');
+    seaGrad.addColorStop(1, timeOfDay ? '#3b6d8a' : '#54bde7');
+    ctx.fillStyle = seaGrad;
+    ctx.fillRect(0, horizon, W, H - horizon - 100);
+
+    // waves: simple moving sine lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    for (let j=0;j<3;j++){
+      ctx.beginPath();
+      const amp = 4 + j*1.6;
+      const freq = 0.008 + j*0.003;
+      for (let x=0;x<=W;x+=6){
+        const y = horizon + j*12 + Math.sin((x/30 + baseOffset*0.002*(j+1)) * (1 + j*0.05)) * amp;
+        if (x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBoardwalk(ctx, W, H) {
+    const y0 = H*0.76;
+    // planks pattern
+    ctx.save();
+    ctx.translate(- (baseOffset*0.6 % 120), 0);
+    const plankW = 120;
+    for (let i=-2;i<Math.ceil(W/plankW)+4;i++){
+      const x = i * plankW;
+      // wood planks
+      ctx.fillStyle = '#b08457';
+      ctx.fillRect(x, y0, plankW-6, H - y0);
+      // plank grooves
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x+6, y0 + 6);
+      ctx.lineTo(x+6, H - 12);
+      ctx.stroke();
+      // knots
+      for (let k=0;k<3;k++){
+        const ky = y0 + 12 + k*40 + ((i%2)?10:0);
+        ctx.fillStyle = 'rgba(0,0,0,0.03)';
+        ctx.beginPath();
+        ctx.ellipse(x + 20 + (k*24)%80, ky, 8,4, 0, 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // foreground sand/edge
+    ctx.fillStyle = timeOfDay ? '#e9d6c1' : '#fff1e0';
+    ctx.fillRect(0, y0 + (roadBumpy?26:20), W, H - y0 - (roadBumpy?26:20));
+  }
+
+  // kick it off
+  requestAnimationFrame(loop);
+
+  // No console errors: guard
+  window.addEventListener('error', e => {
+    console.log('捕获错误：', e.message);
+  });
+
+  // small UX: resume audio on any user gesture (due to autoplay policy)
+  ['click', 'pointerdown', 'keydown', 'touchstart'].forEach(evt => {
+    document.addEventListener(evt, ()=> {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(()=>{});
+      }
+    }, { once: true, passive: true });
+  });
+
+  // expose for debugging (safe)
+  window.__pelicanScene = { pelican, bicycle };
+
+})();
+</script>
+</body>
+</html>

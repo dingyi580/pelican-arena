@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>自行车骑鹈鹕 - 单文件交互作品</title>
+  <style>
+    :root{
+      --bg1:#8fd3ff;
+      --bg2:#eaf7ff;
+      --ink:#17324a;
+      --panel: rgba(255,255,255,.72);
+      --panel2: rgba(255,255,255,.86);
+      --accent:#ffcc4d;
+      --accent2:#ff7f50;
+      --good:#40c057;
+      --shadow: 0 20px 60px rgba(0,0,0,.18);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:linear-gradient(#9ad8ff,#f4fbff);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+    body{display:flex;align-items:center;justify-content:center}
+    .wrap{
+      position:relative;
+      width:min(1400px,100vw);
+      height:min(900px,100vh);
+      overflow:hidden;
+      background:radial-gradient(circle at 50% 25%, rgba(255,255,255,.9), rgba(255,255,255,.1) 35%, transparent 60%),
+                 linear-gradient(180deg, #9ddcff 0%, #c9efff 40%, #f6fbff 100%);
+    }
+    canvas{position:absolute;inset:0;width:100%;height:100%}
+    .hud{
+      position:absolute;left:18px;top:18px;
+      width:min(420px,calc(100vw - 36px));
+      padding:14px 14px 12px;
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.5);
+      border-radius:var(--radius);
+      backdrop-filter: blur(10px);
+      box-shadow:var(--shadow);
+    }
+    .title{font-weight:800;font-size:18px;letter-spacing:.5px;margin:0 0 6px}
+    .sub{font-size:12px;line-height:1.45;opacity:.85;margin:0 0 10px}
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .chip{
+      background:rgba(255,255,255,.75);
+      border-radius:999px;
+      padding:8px 10px;
+      font-size:12px;
+      display:flex;justify-content:space-between;gap:8px;
+      border:1px solid rgba(0,0,0,.04);
+    }
+    .bar{height:10px;border-radius:999px;background:rgba(0,0,0,.08);overflow:hidden}
+    .bar>i{display:block;height:100%;width:50%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),#ff8f6b)}
+    .controls{
+      position:absolute;right:18px;top:18px;
+      width:min(340px,calc(100vw - 36px));
+      padding:14px;
+      background:var(--panel2);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      border:1px solid rgba(255,255,255,.6);
+      backdrop-filter: blur(10px);
+    }
+    .controls h2{margin:0 0 10px;font-size:15px}
+    .row{display:flex;gap:10px;align-items:center;margin:10px 0}
+    .row label{font-size:12px;min-width:68px;opacity:.85}
+    input[type="range"]{width:100%}
+    button, select{
+      appearance:none;border:none;outline:none;
+      background:linear-gradient(180deg,#fff,#eef6ff);
+      color:var(--ink);
+      border-radius:12px;
+      padding:10px 12px;
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      border:1px solid rgba(0,0,0,.06);
+      cursor:pointer;
+      font-size:13px;
+    }
+    button:active{transform:translateY(1px)}
+    .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btns .wide{grid-column:1/-1}
+    .footer{
+      position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+      font-size:12px;opacity:.72;background:rgba(255,255,255,.55);
+      padding:7px 12px;border-radius:999px;backdrop-filter: blur(8px)
+    }
+    .hint{
+      position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);
+      text-align:center;color:rgba(23,50,74,.72);pointer-events:none;
+      font-weight:700;text-shadow:0 2px 10px rgba(255,255,255,.7);
+    }
+    .hint span{display:block;font-size:16px}
+    .hint small{display:block;margin-top:6px;font-size:12px;font-weight:600}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <div class="title">🚲 自行车骑鹈鹕</div>
+    <p class="sub">请注意：是“自行车骑着鹈鹕”，不是反过来。按车铃、调速度、喂小鱼，看它们一起冲刺。</p>
+    <div class="stats">
+      <div class="chip">速度 <b id="speedText">1.0x</b></div>
+      <div class="chip">体力 <b id="staminaText">100%</b></div>
+      <div class="chip" style="grid-column:1/-1">
+        <span>状态</span><b id="stateText">悠闲巡航</b>
+      </div>
+      <div class="bar" style="grid-column:1/-1"><i id="staminaBar"></i></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <h2>趣味控制</h2>
+    <div class="row">
+      <label>速度</label>
+      <input id="speed" type="range" min="0.5" max="2.5" step="0.01" value="1">
+    </div>
+    <div class="btns">
+      <button id="bell">🔔 按车铃</button>
+      <button id="dash">💨 冲刺</button>
+      <button id="feed">🐟 投喂小鱼</button>
+      <button id="mode" class="wide">🌤 切换天气：晴天</button>
+    </div>
+  </div>
+
+  <div class="hint" id="hint">
+    <span>一辆自行车正在骑着一只鹈鹕</span>
+    <small>车轮会转，鹈鹕会喘，别让它累坏了</small>
+  </div>
+
+  <div class="footer">单文件 · 原生 Canvas + Web Audio · 断网可运行</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  let W=0,H=0, t=0, speed=1, stamina=1, bellPulse=0, dashPulse=0, fishPulse=0;
+  let weather=0; // 0 sunny 1 dusk 2 night
+  const stateText=document.getElementById('stateText');
+  const speedText=document.getElementById('speedText');
+  const staminaText=document.getElementById('staminaText');
+  const staminaBar=document.getElementById('staminaBar');
+
+  function resize(){
+    W = canvas.width = Math.floor(innerWidth*dpr);
+    H = canvas.height = Math.floor(innerHeight*dpr);
+    canvas.style.width = innerWidth+'px';
+    canvas.style.height = innerHeight+'px';
+  }
+  addEventListener('resize', resize, {passive:true}); resize();
+
+  const fishParticles=[]; const feathers=[]; const bubbles=[]; const dust=[];
+  function rand(a,b){return a+Math.random()*(b-a);}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+  let audioCtx;
+  function beep(){
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    const o2 = audioCtx.createOscillator();
+    const g2 = audioCtx.createGain();
+    o.type='square'; o.frequency.value=880;
+    o2.type='triangle'; o2.frequency.value=1320;
+    g.gain.value=0.0001; g2.gain.value=0.0001;
+    o.connect(g); o2.connect(g2); g.connect(audioCtx.destination); g2.connect(audioCtx.destination);
+    const now=audioCtx.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.14, now+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.25);
+    g2.gain.exponentialRampToValueAtTime(0.08, now+0.01);
+    g2.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
+    o.start(now); o2.start(now);
+    o.stop(now+0.28); o2.stop(now+0.2);
+  }
+
+  document.getElementById('bell').onclick = () => { bellPulse = 1; dashPulse = Math.min(1, dashPulse+0.22); beep(); stamina = clamp(stamina-0.03,0,1); };
+  document.getElementById('dash').onclick = () => { dashPulse = 1; stamina = clamp(stamina-0.08,0,1); };
+  document.getElementById('feed').onclick = () => { fishPulse = 1; stamina = clamp(stamina+0.22,0,1); for(let i=0;i<16;i++) fishParticles.push({x:rand(.15,.35),y:rand(.6,.75),vx:rand(1.5,3.2),vy:rand(-1.6,-.3),r:rand(3,7)}); };
+  document.getElementById('mode').onclick = () => { weather=(weather+1)%3; document.getElementById('mode').textContent=['🌤 切换天气：晴天','🌇 切换天气：黄昏','🌙 切换天气：夜晚'][weather]; };
+
+  document.getElementById('speed').oninput = e => speed = +e.target.value;
+
+  function drawSky(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    if(weather===0){ g.addColorStop(0,'#9ad9ff'); g.addColorStop(.5,'#dff6ff'); g.addColorStop(1,'#f8fdff'); }
+    if(weather===1){ g.addColorStop(0,'#ffb07d'); g.addColorStop(.5,'#ffd7aa'); g.addColorStop(1,'#fff4e5'); }
+    if(weather===2){ g.addColorStop(0,'#1f355f'); g.addColorStop(.5,'#355c8a'); g.addColorStop(1,'#8ec2ff'); }
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(let i=0;i<4;i++){
+      const x=((t*0.015*(i+1)*speed*80)+(i*320*dpr))%(W+500*dpr)-250*dpr;
+      ctx.fillStyle=`rgba(255,255,255,${weather===2?.18:.45})`;
+      ctx.beginPath(); ctx.ellipse(x,120*dpr+i*40*dpr,85*dpr,28*dpr,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x+60*dpr,110*dpr+i*40*dpr,110*dpr,34*dpr,0,0,Math.PI*2); ctx.fill();
+    }
+    const sunX = W*0.18, sunY = H*0.16;
+    if(weather!==2){
+      ctx.fillStyle = weather===1 ? '#ffcf6e' : '#fff6b0';
+      ctx.beginPath(); ctx.arc(sunX,sunY,36*dpr,0,Math.PI*2); ctx.fill();
+    } else {
+      for(let i=0;i<70;i++){
+        const a=i*12.3, r=40+Math.sin(i)*18;
+        ctx.fillStyle='rgba(255,255,255,.8)';
+        ctx.fillRect(W*0.78+Math.cos(a)*r*dpr,H*0.16+Math.sin(a*1.7)*r*.5*dpr,2*dpr,2*dpr);
+      }
+    }
+  }
+
+  function drawSea(){
+    const horizon = H*0.62;
+    const grd = ctx.createLinearGradient(0,horizon,0,H);
+    grd.addColorStop(0,'rgba(82,176,226,.0)');
+    grd.addColorStop(.15,'rgba(72,156,206,.25)');
+    grd.addColorStop(1,'rgba(41,118,160,.95)');
+    ctx.fillStyle=grd; ctx.fillRect(0,horizon,W,H-horizon);
+    for(let y=0;y<8;y++){
+      const yy = horizon + y*22*dpr;
+      ctx.strokeStyle = `rgba(255,255,255,${0.08+y*0.01})`;
+      ctx.lineWidth = 2*dpr;
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=26*dpr){
+        ctx.lineTo(x, yy + Math.sin((x*0.01)+(t*0.002*speed*140)+y)*5*dpr);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawBoardwalk(){
+    const y = H*0.72;
+    ctx.fillStyle='#b07a4b'; ctx.fillRect(0,y,W,H-y);
+    for(let i=0;i<24;i++){
+      const x=((i*120*dpr)-(t*0.03*speed*160*dpr))%(W+120*dpr)-120*dpr;
+      ctx.fillStyle='rgba(94,58,32,.55)';
+      ctx.fillRect(x,y,86*dpr,8*dpr);
+      ctx.fillStyle='rgba(255,255,255,.10)';
+      ctx.fillRect(x,y+12*dpr,86*dpr,2*dpr);
+    }
+  }
+
+  function drawPelican(x,y,scale,bob){
+    const sway=Math.sin(t*0.006*speed)*0.08 + dashPulse*0.08;
+    const flap=(Math.sin(t*0.022*speed)+1)/2;
+    ctx.save(); ctx.translate(x,y+bob); ctx.scale(scale,scale); ctx.rotate(sway);
+    ctx.fillStyle='#f7f1e8'; ctx.strokeStyle='#6c584a'; ctx.lineWidth=3*dpr;
+    ctx.beginPath(); ctx.ellipse(0,0,120*dpr,42*dpr,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-12*dpr,-24*dpr,92*dpr,30*dpr,-0.1,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff8ef'; ctx.beginPath(); ctx.ellipse(-70*dpr,-26*dpr,38*dpr,18*dpr,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#f3d9a6'; ctx.beginPath(); ctx.moveTo(55*dpr,-10*dpr); ctx.quadraticCurveTo(120*dpr,-2*dpr,170*dpr,10*dpr); ctx.lineTo(122*dpr,24*dpr); ctx.quadraticCurveTo(78*dpr,16*dpr,55*dpr,4*dpr); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#e7b95d'; ctx.beginPath(); ctx.ellipse(132*dpr,8*dpr,22*dpr,10*dpr,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#2b2b2b'; ctx.beginPath(); ctx.arc(-90*dpr,-34*dpr,4*dpr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.25)'; ctx.beginPath(); ctx.ellipse(10*dpr,16*dpr,68*dpr,22*dpr,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#6c584a'; ctx.lineWidth=4*dpr;
+    ctx.beginPath(); ctx.moveTo(-42*dpr,25*dpr); ctx.lineTo(-52*dpr,66*dpr); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2*dpr,25*dpr); ctx.lineTo(8*dpr,66*dpr); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(52*dpr,22*dpr); ctx.lineTo(46*dpr,64*dpr); ctx.stroke();
+    ctx.fillStyle='#3d3d3d';
+    ctx.beginPath(); ctx.moveTo(-58*dpr,66*dpr); ctx.lineTo(-36*dpr,66*dpr); ctx.lineTo(-41*dpr,78*dpr); ctx.lineTo(-64*dpr,78*dpr); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0*dpr,66*dpr); ctx.lineTo(22*dpr,66*dpr); ctx.lineTo(18*dpr,79*dpr); ctx.lineTo(-4*dpr,79*dpr); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = weather===2 ? '#ffe6a7' : '#fff';
+    ctx.beginPath(); ctx.ellipse(-86*dpr,-38*dpr,2.5*dpr,2.5*dpr,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,120,120,.7)';
+    ctx.beginPath(); ctx.arc(155*dpr,8*dpr,3*dpr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.38)';
+    ctx.beginPath(); ctx.ellipse(-22*dpr,-8*dpr,36*dpr,12*dpr,0,0,Math.PI*2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(20*dpr,38*dpr); ctx.rotate(-0.35 + flap*0.8);
+    ctx.fillStyle='rgba(243,232,215,.92)';
+    ctx.beginPath(); ctx.ellipse(0,0,55*dpr,16*dpr,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(-20*dpr,36*dpr); ctx.rotate(0.55 - flap*1.0);
+    ctx.fillStyle='rgba(243,232,215,.92)';
+    ctx.beginPath(); ctx.ellipse(0,0,60*dpr,17*dpr,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function drawBike(x,y,scale,bob){
+    const tilt=Math.sin(t*0.01*speed)*0.05 + bellPulse*0.12 - dashPulse*0.04;
+    const wheelSpin=t*0.02*speed + dashPulse*3;
+    ctx.save(); ctx.translate(x,y+bob-92*dpr); ctx.scale(scale,scale); ctx.rotate(tilt);
+    const r=42*dpr, rearX=-70*dpr, frontX=80*dpr, wheelY=80*dpr;
+    function wheel(cx,cy){
+      ctx.strokeStyle='#2f3b46'; ctx.lineWidth=6*dpr;
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=2*dpr;
+      for(let i=0;i<10;i++){
+        const a=wheelSpin+i*Math.PI/5;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); ctx.stroke();
+      }
+      ctx.fillStyle='#cfd8e3'; ctx.beginPath(); ctx.arc(cx,cy,7*dpr,0,Math.PI*2); ctx.fill();
+    }
+    wheel(rearX,wheelY); wheel(frontX,wheelY);
+    ctx.strokeStyle='#3b4a58'; ctx.lineWidth=5*dpr;
+    ctx.beginPath(); ctx.moveTo(rearX,wheelY); ctx.lineTo(-8*dpr,35*dpr); ctx.lineTo(frontX,wheelY); ctx.lineTo(10*dpr,35*dpr); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8*dpr,35*dpr); ctx.lineTo(-34*dpr,16*dpr); ctx.lineTo(-70*dpr,wheelY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10*dpr,35*dpr); ctx.lineTo(32*dpr,16*dpr); ctx.lineTo(80*dpr,wheelY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8*dpr,35*dpr); ctx.lineTo(38*dpr,35*dpr); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8*dpr,35*dpr); ctx.lineTo(28*dpr,10*dpr); ctx.stroke();
+    ctx.fillStyle='#fffbf0';
+    ctx.beginPath(); ctx.roundRect(-20*dpr,5*dpr,42*dpr,12*dpr,6*dpr); ctx.fill();
+    ctx.fillStyle='#35424f';
+    ctx.beginPath(); ctx.roundRect(-18*dpr,4*dpr,28*dpr,8*dpr,4*dpr); ctx.fill();
+    ctx.strokeStyle='#3b4a58'; ctx.lineWidth=4*dpr;
+    ctx.beginPath(); ctx.moveTo(28*dpr,10*dpr); ctx.lineTo(46*dpr,-4*dpr); ctx.lineTo(62*dpr,-2*dpr); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(46*dpr,-4*dpr); ctx.lineTo(54*dpr,-20*dpr); ctx.stroke();
+    ctx.fillStyle='#3b4a58';
+    ctx.beginPath(); ctx.arc(50*dpr,-22*dpr,4*dpr,0,Math.PI*2); ctx.fill();
+    const pedal=(wheelSpin*1.8)% (Math.PI*2);
+    ctx.strokeStyle='#3b4a58'; ctx.lineWidth=4*dpr;
+    ctx.beginPath(); ctx.arc(2*dpr,38*dpr,14*dpr,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2*dpr,38*dpr); ctx.lineTo(2*dpr+Math.cos(pedal)*18*dpr,38*dpr+Math.sin(pedal)*18*dpr); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2*dpr,38*dpr); ctx.lineTo(2*dpr+Math.cos(pedal+Math.PI)*18*dpr,38*dpr+Math.sin(pedal+Math.PI)*18*dpr); ctx.stroke();
+    ctx.fillStyle='#666';
+    ctx.beginPath(); ctx.arc(2*dpr+Math.cos(pedal)*18*dpr,38*dpr+Math.sin(pedal)*18*dpr,4*dpr,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2*dpr+Math.cos(pedal+Math.PI)*18*dpr,38*dpr+Math.sin(pedal+Math.PI)*18*dpr,4*dpr,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#7a5b42'; ctx.lineWidth=4*dpr;
+    ctx.beginPath(); ctx.moveTo(44*dpr,-18*dpr); ctx.quadraticCurveTo(66*dpr,-34*dpr,96*dpr,-30*dpr); ctx.stroke();
+    ctx.fillStyle='#ffcf4d';
+    ctx.beginPath(); ctx.arc(88*dpr,-31*dpr,10*dpr,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2*dpr;
+    ctx.beginPath(); ctx.arc(88*dpr,-31*dpr,6*dpr,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function particles(){
+    for(let i=fishParticles.length-1;i>=0;i--){
+      const p=fishParticles[i]; p.x+=p.vx*0.01*speed; p.y+=p.vy*0.01; p.vy+=0.03; p.r*=0.995;
+      ctx.fillStyle='rgba(90,160,255,.95)';
+      ctx.beginPath(); ctx.ellipse(p.x*W,p.y*H,p.r*dpr,p.r*.45*dpr,0,0,Math.PI*2); ctx.fill();
+      if(p.y>0.82 || p.r<1) fishParticles.splice(i,1);
+    }
+    if(Math.random()<0.16){
+      feathers.push({x:0.2+Math.random()*0.6,y:0.33+Math.random()*0.2,vx:rand(-.2,.5),vy:rand(.2,1),r:rand(5,10)});
+    }
+    for(let i=feathers.length-1;i>=0;i--){
+      const p=feathers[i]; p.x+=p.vx*0.003*speed; p.y+=p.vy*0.003; p.vx+=Math.sin(t*0.002+i)*0.0005; p.vy+=0.0008;
+      ctx.fillStyle='rgba(255,255,255,.75)';
+      ctx.beginPath(); ctx.ellipse(p.x*W,p.y*H,p.r*dpr,p.r*.28*dpr,0,0,Math.PI*2); ctx.fill();
+      if(p.y>1.05) feathers.splice(i,1);
+    }
+    if(Math.random()<0.2) dust.push({x:.36+Math.random()*.25,y:.75+Math.random()*.03,vx:rand(-.2,.5),vy:rand(-.6,-.2),a:1,size:rand(2,5)});
+    for(let i=dust.length-1;i>=0;i--){
+      const p=dust[i]; p.x+=p.vx*0.01*speed; p.y+=p.vy*0.01; p.a-=0.012;
+      ctx.fillStyle=`rgba(255,240,200,${Math.max(0,p.a)})`;
+      ctx.beginPath(); ctx.arc(p.x*W,p.y*H,p.size*dpr,0,Math.PI*2); ctx.fill();
+      if(p.a<=0) dust.splice(i,1);
+    }
+  }
+
+  function loop(){
+    t++;
+    const sw = speed*(0.7+dashPulse*0.7);
+    stamina = clamp(stamina - 0.00012*sw + fishPulse*0.0008, 0, 1);
+    bellPulse *= 0.93; dashPulse *= 0.95; fishPulse *= 0.92;
+
+    drawSky(); drawSea(); drawBoardwalk();
+    const bob = Math.sin(t*0.03*sw)*10*dpr + (1-stamina)*10*dpr;
+    const baseX = W*0.46, baseY = H*0.72;
+    drawPelican(baseX, baseY, 1.15*dpr, bob);
+    drawBike(baseX+8*dpr, baseY-54*dpr, 1.05*dpr, bob-26*dpr);
+    particles();
+
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.ellipse(W*0.56,H*0.67,170*dpr,24*dpr,0,0,Math.PI*2); ctx.fill();
+
+    if(bellPulse>0.15){
+      ctx.strokeStyle=`rgba(255,210,90,${bellPulse})`; ctx.lineWidth=4*dpr;
+      ctx.beginPath(); ctx.arc(baseX+88*dpr, baseY-72*dpr, 18*dpr*(1+bellPulse), 0, Math.PI*2); ctx.stroke();
+    }
+
+    speedText.textContent = speed.toFixed(1)+'x';
+    staminaText.textContent = Math.round(stamina*100)+'%';
+    staminaBar.style.width = Math.round(stamina*100)+'%';
+    stateText.textContent = stamina>0.7 ? '悠闲巡航' : stamina>0.35 ? '喘气小跑' : '全力冲刺（鹈鹕在咕噜咕噜）';
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨代模型前端擂台赛：自行车骑鹈鹕</title>
+    <style>
+        :root {
+            --sky-top: #87CEEB;
+            --sky-bottom: #E0F7FA;
+            --sea-color: #006994;
+            --ground-color: #D2B48C;
+            --pelican-body: #FFFFFF;
+            --pelican-beak: #FFA500;
+            --bike-frame: #D32F2F;
+            --text-color: #333;
+            --ui-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Sunset Theme Override */
+        body.sunset-mode {
+            --sky-top: #4a1c1c;
+            --sky-bottom: #ff7e5f;
+            --sea-color: #2c1e1e;
+            --ground-color: #5d4037;
+            --pelican-body: #ffe0b2;
+            --pelican-beak: #ffcc80;
+            --bike-frame: #ef5350;
+            --text-color: #fff;
+            --ui-bg: rgba(0, 0, 0, 0.6);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 1s ease;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 800px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+            border-radius: 8px;
+        }
+
+        /* Parallax Layers */
+        .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .clouds {
+            background-image: radial-gradient(circle, rgba(255,255,255,0.8) 20%, transparent 20%),
+                              radial-gradient(circle, rgba(255,255,255,0.8) 20%, transparent 20%);
+            background-size: 300px 300px;
+            background-position: 0 0, 150px 150px;
+            opacity: 0.6;
+            animation: cloudMove 20s linear infinite;
+        }
+
+        .sea {
+            bottom: 0;
+            height: 30%;
+            background: var(--sea-color);
+            opacity: 0.8;
+            transform-origin: bottom;
+            animation: waveMove 4s ease-in-out infinite alternate;
+        }
+
+        .ground {
+            bottom: 0;
+            height: 15%;
+            background: var(--ground-color);
+            z-index: 10;
+        }
+
+        /* Main Stage */
+        #stage {
+            position: absolute;
+            bottom: 15%; /* Sit on ground */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 400px;
+            z-index: 20;
+        }
+
+        /* UI Controls */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--ui-bg);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+            color: var(--text-color);
+            min-width: 200px;
+        }
+
+        h2 { margin: 0 0 10px 0; font-size: 16px; text-align: center; }
+        
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            background: #eee;
+            color: #333;
+        }
+        
+        button:hover { transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:active { transform: translateY(0); }
+
+        .btn-bell { background: #FFD700; color: #555; }
+        .btn-sun { background: #FF9800; color: white; }
+        
+        label { font-size: 12px; display: block; margin-bottom: 5px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+
+        /* Animations */
+        @keyframes cloudMove { from { background-position: 0 0, 150px 150px; } to { background-position: 1000px 0, 1150px 150px; } }
+        @keyframes waveMove { from { transform: scaleY(1); } to { transform: scaleY(1.05); } }
+
+        /* SVG Elements Classes for JS Control */
+        .wheel { transform-origin: center; }
+        .pedal-arm { transform-origin: center; }
+        .leg { transform-origin: top; }
+        .wing { transform-origin: center; }
+        .head-group { transform-origin: 100px 150px; } /* Pivot point for head bobbing */
+        .pouch { transform-origin: center; }
+        
+        /* Shake Effect Class */
+        .shake { animation: shakeAnim 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .status-text {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.8);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Background Layers -->
+    <div class="layer clouds"></div>
+    <div class="layer sea"></div>
+    <div class="layer ground"></div>
+    
+    <div class="status-text" id="status-display">状态：悠闲巡航</div>
+
+    <!-- Main Character Stage -->
+    <svg id="stage" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+        <!-- Shadows -->
+        <ellipse cx="300" cy="380" rx="200" ry="20" fill="rgba(0,0,0,0.2)" />
+
+        <!-- PELICAN GROUP -->
+        <g id="pelican">
+            <!-- Tail Feathers -->
+            <path d="M150 200 L100 180 L120 220 Z" fill="#FFF" stroke="#DDD" stroke-width="2"/>
+            
+            <!-- Back Leg (Left) -->
+            <g class="leg" id="leg-back-left" transform="translate(200, 220)">
+                <line x1="0" y1="0" x2="0" y2="40" stroke="#FFA500" stroke-width="6" />
+                <polyline points="0,40 -10,50 10,50" fill="none" stroke="#FFA500" stroke-width="4" />
+            </g>
+
+            <!-- Body -->
+            <ellipse cx="250" cy="200" rx="100" ry="60" fill="var(--pelican-body)" stroke="#EEE" stroke-width="2"/>
+            
+            <!-- Front Wing (Right) -->
+            <path class="wing" id="wing-right" d="M280 180 Q380 150 420 200 Q380 230 280 200" fill="var(--pelican-body)" stroke="#DDD" stroke-width="2"/>
+            
+            <!-- Back Wing (Left) -->
+            <path class="wing" id="wing-left" d="M220 180 Q120 150 80 200 Q120 230 220 200" fill="var(--pelican-body)" stroke="#DDD" stroke-width="2"/>
+
+            <!-- Neck & Head Group -->
+            <g class="head-group" id="head-group" transform="translate(250, 160)">
+                <path d="M0 0 Q-20 50 0 100" fill="none" stroke="var(--pelican-body)" stroke-width="25" />
+                <!-- Head -->
+                <circle cx="-10" cy="110" r="25" fill="var(--pelican-body)" />
+                <!-- Eye -->
+                <circle cx="-15" cy="105" r="3" fill="black" />
+                <!-- Beak Top -->
+                <path d="M10 100 L120 90 L110 110 Z" fill="var(--pelican-beak)" />
+                <!-- Throat Pouch -->
+                <path class="pouch" id="pouch" d="M10 110 Q70 180 110 110 Z" fill="#FFCC80" opacity="0.8" />
+            </g>
+
+            <!-- Front Leg (Right) -->
+            <g class="leg" id="leg-front-right" transform="translate(280, 220)">
+                <line x1="0" y1="0" x2="0" y2="40" stroke="#FFA500" stroke-width="6" />
+                <polyline points="0,40 -10,50 10,50" fill="none" stroke="#FFA500" stroke-width="4" />
+            </g>
+        </g>
+
+        <!-- BICYCLE GROUP (Riding the Pelican) -->
+        <g id="bicycle" transform="translate(250, 140)">
+            <!-- Chain Guard -->
+            <path d="M100 150 Q150 150 180 150" stroke="#CCC" stroke-width="4" fill="none" opacity="0.5"/>
+            
+            <!-- Rear Wheel -->
+            <g class="wheel" id="wheel-rear" transform="translate(100, 150)">
+                <circle r="40" fill="none" stroke="#333" stroke-width="4" />
+                <circle r="35" fill="none" stroke="#AAA" stroke-width="1" />
+                <line x1="0" y1="-40" x2="0" y2="40" stroke="#AAA" stroke-width="1" />
+                <line x1="-40" y1="0" x2="40" y2="0" stroke="#AAA" stroke-width="1" />
+                <line x1="-28" y1="-28" x2="28" y2="28" stroke="#AAA" stroke-width="1" />
+                <line x1="28" y1="-28" x2="-28" y2="28" stroke="#AAA" stroke-width="1" />
+            </g>
+
+            <!-- Front Wheel -->
+            <g class="wheel" id="wheel-front" transform="translate(300, 150)">
+                <circle r="40" fill="none" stroke="#333" stroke-width="4" />
+                <circle r="35" fill="none" stroke="#AAA" stroke-width="1" />
+                <line x1="0" y1="-40" x2="0" y2="40" stroke="#AAA" stroke-width="1" />
+                <line x1="-40" y1="0" x2="40" y2="0" stroke="#AAA" stroke-width="1" />
+                <line x1="-28" y1="-28" x2="28" y2="28" stroke="#AAA" stroke-width="1" />
+                <line x1="28" y1="-28" x2="-28" y2="28" stroke="#AAA" stroke-width="1" />
+            </g>
+
+            <!-- Frame -->
+            <path d="M100 150 L150 150 L200 100 L100 150" fill="none" stroke="var(--bike-frame)" stroke-width="6" />
+            <path d="M200 100 L300 150 L200 150 Z" fill="none" stroke="var(--bike-frame)" stroke-width="6" />
+            <path d="M300 150 L300 100 L250 100" fill="none" stroke="var(--bike-frame)" stroke-width="6" /> <!-- Fork -->
+            
+            <!-- Seat Post & Saddle -->
+            <line x1="150" y1="150" x2="150" y2="110" stroke="#333" stroke-width="4" />
+            <path d="M130 110 L170 110 L160 100 L140 100 Z" fill="#333" />
+
+            <!-- Handlebars -->
+            <path d="M250 100 L250 80 L280 80" fill="none" stroke="#333" stroke-width="4" />
+            <circle cx="280" cy="80" r="5" fill="#333" /> <!-- Bell mount -->
+            
+            <!-- Bell -->
+            <circle id="bell" cx="280" cy="70" r="8" fill="#FFD700" stroke="#DAA520" stroke-width="1" />
+            
+            <!-- Pedals & Crank -->
+            <g class="pedal-arm" id="crank">
+                <circle cx="200" cy="150" r="10" fill="#555" />
+                <line x1="200" y1="150" x2="220" y2="170" stroke="#555" stroke-width="4" />
+                <rect x="215" y="165" width="10" height="10" fill="#333" />
+            </g>
+        </g>
+    </svg>
+
+    <!-- UI Panel -->
+    <div id="ui-panel">
+        <h2>🚲 骑行控制台 🦤</h2>
+        
+        <button class="btn-bell" onclick="ringBell()">按车铃 🔔</button>
+        
+        <div>
+            <label for="speedRange">速度控制 (巡航 -> 冲刺)</label>
+            <input type="range" id="speedRange" min="1" max="5" step="0.1" value="1" oninput="updateSpeed(this.value)">
+        </div>
+
+        <button class="btn-sun" onclick="toggleSunset()">切换昼夜 ☀️</button>
+        
+        <div style="font-size: 11px; color: #666; margin-top: 5px;">
+            * 提示：按铃会惊吓到鹈鹕，导致它加速！
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Game State ---
+    const state = {
+        speedMultiplier: 1,
+        isSprinting: false,
+        time: 0,
+        pelicanState: 'idle' // idle, sprint, eat
+    };
+
+    // --- DOM Elements ---
+    const els = {
+        wheelFront: document.getElementById('wheel-front'),
+        wheelRear: document.getElementById('wheel-rear'),
+        crank: document.getElementById('crank'),
+        legBackLeft: document.getElementById('leg-back-left'),
+        legFrontRight: document.getElementById('leg-front-right'),
+        wingLeft: document.getElementById('wing-left'),
+        wingRight: document.getElementById('wing-right'),
+        pouch: document.getElementById('pouch'),
+        headGroup: document.getElementById('head-group'),
+        stage: document.getElementById('stage'),
+        statusText: document.getElementById('status-display')
+    };
+
+    // --- Audio Context (Web Audio API) ---
+    let audioCtx;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playBellSound() {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc.type = 'sine';
+        // High pitched bell frequency
+        osc.frequency.setValueAtTime(2000, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    // --- Interaction Functions ---
+
+    function ringBell() {
+        playBellSound();
+        
+        // Visual Shake
+        els.stage.classList.remove('shake');
+        void els.stage.offsetWidth; // trigger reflow
+        els.stage.classList.add('shake');
+
+        // Reaction: Pelican gets scared and sprints briefly
+        state.isSprinting = true;
+        state.speedMultiplier = 3;
+        els.statusText.innerText = "状态：受惊狂奔！！";
+        
+        setTimeout(() => {
+            state.isSprinting = false;
+            state.speedMultiplier = parseFloat(document.getElementById('speedRange').value);
+            els.statusText.innerText = "状态：恢复平静";
+        }, 2000);
+    }
+
+    function updateSpeed(val) {
+        state.speedMultiplier = parseFloat(val);
+        if(state.speedMultiplier > 2.5) {
+            els.statusText.innerText = "状态：全力冲刺";
+        } else {
+            els.statusText.innerText = "状态：悠闲巡航";
+        }
+    }
+
+    function toggleSunset() {
+        document.body.classList.toggle('sunset-mode');
+    }
+
+    // --- Animation Loop ---
+
+    function animate() {
+        state.time += 0.05 * state.speedMultiplier;
+
+        // 1. Wheels Rotation
+        const wheelRot = state.time * 57.29; // degrees
+        els.wheelFront.style.transform = `rotate(${wheelRot}deg)`;
+        els.wheelRear.style.transform = `rotate(${wheelRot}deg)`;
+
+        // 2. Pedals Rotation
+        const pedalRot = state.time * 57.29;
+        els.crank.style.transform = `rotate(${pedalRot}deg)`;
+
+        // 3. Pelican Legs (Running Cycle)
+        // Legs move opposite to each other
+        const legAngle = Math.sin(state.time) * 30; 
+        els.legBackLeft.style.transform = `translate(200, 220) rotate(${legAngle}deg)`;
+        els.legFrontRight.style.transform = `translate(280, 220) rotate(${-legAngle}deg)`;
+
+        // 4. Wings Flapping
+        const flapSpeed = state.isSprinting ? 15 : 5;
+        const wingAngle = Math.sin(state.time * flapSpeed) * 15;
+        els.wingLeft.style.transform = `rotate(${wingAngle}deg)`;
+        els.wingRight.style.transform = `rotate(${-wingAngle}deg)`;
+
+        // 5. Head Bobbing & Pouch Vibrating
+        // If sprinting, head bobs more violently
+        const bobAmount = state.isSprinting ? 10 : 2;
+        const bobY = Math.abs(Math.sin(state.time * 10)) * bobAmount;
+        
+        // Translate Y only, keep X constant relative to group pivot
+        els.headGroup.style.transform = `translate(250, ${160 + bobY})`;
+        
+        // Pouch vibrates when running fast
+        if(state.speedMultiplier > 2) {
+             els.pouch.style.transform = `scale(${1 + Math.sin(state.time * 20)*0.05})`;
+        } else {
+             els.pouch.style.transform = `scale(1)`;
+        }
+
+        // 6. Bike Bounce (Suspension effect)
+        // The bike sits on the bird, so it moves up/down with the bird's motion
+        const bounce = Math.sin(state.time * 10) * (state.speedMultiplier * 1.5);
+        els.stage.style.transform = `translateX(-50%) translateY(${bounce}px)`;
+
+        requestAnimationFrame(animate);
+    }
+
+    // Start
+    animate();
+
+</script>
+</body>
+</html>

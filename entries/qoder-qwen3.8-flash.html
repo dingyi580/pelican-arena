@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>自行车骑鹈鹕 · A Bicycle Riding a Pelican</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:#0b1030;overflow:hidden;color:#233;
+    -webkit-user-select:none;user-select:none;
+  }
+  #wrap{position:fixed;inset:0}
+  #bg,#fx{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #bg{z-index:1}
+  #stage{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    height:min(100vh,66.67vw);aspect-ratio:3/2;z-index:2;display:block;
+    pointer-events:none;
+  }
+  #fx{z-index:3}
+  .card{
+    background:rgba(255,255,255,.72);
+    backdrop-filter:blur(14px) saturate(1.4);
+    -webkit-backdrop-filter:blur(14px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 10px 32px rgba(20,30,60,.18);
+    border-radius:16px;
+  }
+  #title{position:absolute;left:18px;top:16px;z-index:10;padding:12px 16px;max-width:340px}
+  #title h1{font-size:17px;letter-spacing:1px;color:#1d2b4a}
+  #title p{font-size:11px;color:#5a6a8a;margin-top:4px;line-height:1.5}
+  #panel{position:absolute;right:18px;top:16px;z-index:10;width:252px;padding:14px 16px 12px;display:flex;flex-direction:column;gap:10px}
+  #panel .row{display:flex;gap:8px;align-items:center}
+  .label{font-size:11px;color:#5a6a8a;letter-spacing:1px;display:flex;justify-content:space-between;width:100%}
+  .label b{color:#1d2b4a;font-weight:600}
+  .chip{
+    font-size:12px;padding:7px 10px;border-radius:10px;border:1px solid rgba(60,80,120,.18);
+    background:rgba(255,255,255,.55);color:#2c3c5c;cursor:pointer;transition:all .15s;
+    font-family:inherit;flex:1;
+  }
+  .chip:hover{background:#fff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(30,50,90,.12)}
+  .chip:active{transform:translateY(0)}
+  .chip.on{background:#1d2b4a;color:#fff;border-color:#1d2b4a}
+  #bell{flex:2;background:linear-gradient(135deg,#ffb84d,#ff8a5c);color:#fff;border:none;font-size:13px;font-weight:600;letter-spacing:1px}
+  #bell:hover{filter:brightness(1.06)}
+  #bell:active{transform:scale(.97)}
+  input[type=range]{width:100%;height:22px;appearance:none;-webkit-appearance:none;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#7fb6e8,#ff8a5c)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #ff8a5c;margin-top:-5px;box-shadow:0 2px 6px rgba(0,0,0,.2);cursor:pointer}
+  input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#7fb6e8,#ff8a5c)}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #ff8a5c;cursor:pointer}
+  #staminaWrap{width:100%;height:8px;border-radius:4px;background:rgba(40,60,90,.14);overflow:hidden}
+  #stamina{height:100%;width:100%;border-radius:4px;background:linear-gradient(90deg,#39c07f,#8fd45e);transition:width .12s linear}
+  #stamina.low{background:linear-gradient(90deg,#ff6b57,#ffa25b)}
+  #status{font-size:12px;color:#2c3c5c;line-height:1.55;padding:8px 10px;background:rgba(29,43,74,.06);border-radius:10px}
+  #hint{font-size:10px;color:#8492ad;text-align:center;letter-spacing:.5px}
+  .seg{display:flex;gap:6px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="bg"></canvas>
+
+  <svg id="stage" viewBox="0 0 960 640" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="birdClip"><rect x="250" y="240" width="520" height="400"/></clipPath>
+    </defs>
+
+    <g id="shadowG"><ellipse id="shadow" cx="510" cy="622" rx="140" ry="13" fill="#26355a" opacity="0.16"/></g>
+
+    <!-- far leg -->
+    <g id="legFar">
+      <g id="legFar2">
+        <path d="M542,566 l0,32" stroke="#c97f38" stroke-width="10" stroke-linecap="round"/>
+        <path d="M542,598 l0,18" stroke="#c97f38" stroke-width="8" stroke-linecap="round"/>
+        <g transform="translate(542,616)">
+          <path d="M0,0 L26,6 L19,10 L13,6 L7,11 L1,7 Z" fill="#c97f38"/>
+          <path d="M0,0 L-10,5" stroke="#c97f38" stroke-width="4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <circle cx="542" cy="566" r="9" fill="#e29348"/>
+    </g>
+
+    <!-- far wing -->
+    <g id="wingFar">
+      <path d="M455,522 C405,492 342,494 302,520 C338,532 368,534 396,532 C358,542 330,556 312,576 C358,568 414,558 452,546 Z" fill="#d7e0ee"/>
+    </g>
+
+    <!-- tail -->
+    <g id="tail">
+      <path d="M415,540 C375,528 345,524 322,530 C352,540 382,547 414,551 Z" fill="#e7ecf4"/>
+      <path d="M414,548 C372,544 340,546 318,554 C352,558 386,557 415,556 Z" fill="#dbe2ec"/>
+      <path d="M414,554 C378,558 350,564 332,574 C364,570 394,564 417,561 Z" fill="#cfd8e4"/>
+    </g>
+
+    <!-- bird body / neck / head -->
+    <g id="birdBody">
+      <g id="birdBodyTilt">
+        <ellipse cx="505" cy="540" rx="97" ry="58" fill="#FFFFFF" stroke="#cfd8e4" stroke-width="1.5"/>
+        <path d="M430,565 Q470,590 520,585 Q560,580 585,558" fill="none" stroke="#dbe2ec" stroke-width="5" stroke-linecap="round"/>
+        <path d="M560,512 C552,455 562,395 590,352" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
+        <path d="M560,512 C552,455 562,395 590,352" fill="none" stroke="#eef2f8" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+      </g>
+      <g id="neckLag">
+        <g id="headRot">
+          <circle cx="615" cy="332" r="28" fill="#FFFFFF"/>
+          <path d="M596,312 Q588,296 598,286 M606,308 Q602,292 614,286" fill="none" stroke="#cfd8e4" stroke-width="3" stroke-linecap="round"/>
+          <circle id="eyeW" cx="627" cy="322" r="7.5" fill="#fff" opacity="0"/>
+          <circle cx="627" cy="322" r="4.5" fill="#fff"/>
+          <circle id="pupil" cx="628.5" cy="322.5" r="2.6" fill="#17233f"/>
+          <path id="brow" d="M618,312 L635,314" stroke="#41506f" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+          <g id="beak">
+            <g id="beakLag">
+              <g id="upper">
+                <path d="M636,322 C678,320 718,326 742,336 C746,338 745,344 740,345 C702,340 664,338 636,336 Z" fill="#f2a33c"/>
+                <path d="M660,326 q12,2 22,6" stroke="#d98722" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                <path d="M644,326 q8,-1 14,0" stroke="#c97f38" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                <g id="tongue" opacity="0">
+                  <path d="M652,342 q24,7 46,5 q-6,8 -22,8 q-16,-1 -24,-8 Z" fill="#e46b7a"/>
+                </g>
+              </g>
+              <g id="pouchG">
+                <path id="pouch" d="M640,338 C652,378 672,398 700,396 C722,394 735,368 740,345 C714,340 676,338 640,338 Z" fill="#f8c579" opacity="0.95"/>
+                <path d="M656,362 Q682,386 716,372" fill="none" stroke="#e6a54f" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+                <path d="M650,350 Q676,372 706,362" fill="none" stroke="#e6a54f" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+              </g>
+            </g>
+          </g>
+          <path d="M600,318 A28,28 0 0 1 640,316" stroke="#8a6a48" stroke-width="3" fill="none"/>
+          <path d="M636,332 L650,333" stroke="#8a6a48" stroke-width="3" fill="none"/>
+          <circle cx="652" cy="334" r="3" fill="#c9b48a" stroke="#8a6a48" stroke-width="1.5"/>
+        </g>
+      </g>
+    </g>
+
+    <path id="reinA" fill="none" stroke="#8a6a48" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+    <path id="reinB" fill="none" stroke="#7a5c3e" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+
+    <g id="blanket">
+      <path d="M438,470 Q444,492 462,500 L512,502 Q506,478 500,466 Z" fill="#5a76b8"/>
+      <path d="M446,486 l8,10 M460,492 l6,11 M474,496 l4,11" stroke="#3f5a94" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- ============ THE BICYCLE (the rider) ============ -->
+    <g id="bike">
+      <g id="bikeTilt">
+        <g id="crankFar">
+          <path d="M525,426 L525,452" stroke="#55607a" stroke-width="5" stroke-linecap="round"/>
+          <g id="pedFar"><rect x="-9" y="-2.5" width="18" height="5" rx="2" fill="#3a4258"/></g>
+        </g>
+        <g transform="translate(462,412)">
+          <g id="wheelR"><circle r="47" fill="none" stroke="#2e3648" stroke-width="7"/><circle r="38.5" fill="none" stroke="#b8c2d2" stroke-width="2.5"/><g id="spokesR"></g><circle r="4.5" fill="#55607a"/></g>
+        </g>
+        <g transform="translate(592,412)">
+          <g id="wheelF"><circle r="47" fill="none" stroke="#2e3648" stroke-width="7"/><circle r="38.5" fill="none" stroke="#b8c2d2" stroke-width="2.5"/><g id="spokesF"></g><circle r="4.5" fill="#55607a"/></g>
+        </g>
+        <path d="M525,426 L493,350 M600,296 L525,426 M600,296 L592,360 M462,412 L525,426 M462,412 L493,350"
+              stroke="#e0454f" stroke-width="7" stroke-linecap="round" fill="none"/>
+        <path d="M466,402 L516,414 M466,422 L516,438" stroke="#6a7288" stroke-width="3" stroke-dasharray="4 3" fill="none"/>
+        <circle cx="525" cy="426" r="14" fill="none" stroke="#8892a6" stroke-width="4"/>
+        <circle id="cog" cx="462" cy="412" r="7.5" fill="none" stroke="#8892a6" stroke-width="4"/>
+        <path d="M493,350 L489,328" stroke="#55607a" stroke-width="5" stroke-linecap="round"/>
+        <path d="M472,326 Q490,314 512,322 Q520,326 514,330 Q492,334 474,332 Q468,330 472,326 Z" fill="#5a3d2e"/>
+        <path d="M600,296 L592,360" stroke="#e0454f" stroke-width="7" stroke-linecap="round"/>
+        <path d="M600,296 L608,290" stroke="#55607a" stroke-width="6" stroke-linecap="round"/>
+        <path d="M608,290 Q618,286 628,292" stroke="#3b4358" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <path d="M608,290 Q600,280 590,282" stroke="#3b4358" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <path d="M624,290 l8,3" stroke="#d94f5c" stroke-width="7" stroke-linecap="round"/>
+        <path d="M594,281 l-8,2" stroke="#d94f5c" stroke-width="7" stroke-linecap="round"/>
+        <g id="bellG">
+          <path d="M612,284 A7,7 0 0 1 626,284 Z" fill="#ffc25e" stroke="#d99a2b" stroke-width="1.5"/>
+          <circle cx="619" cy="285" r="1.8" fill="#d99a2b"/>
+        </g>
+        <g id="gloveF"><circle r="8" fill="#d94f5c" stroke="#a92f3e" stroke-width="1.5"/></g>
+        <g id="gloveB"><circle r="8" fill="#c94450" stroke="#a92f3e" stroke-width="1.5"/></g>
+        <g id="crankNear">
+          <path d="M525,426 L525,400" stroke="#8892a6" stroke-width="5" stroke-linecap="round"/>
+          <g id="pedNear"><rect x="-10" y="-3" width="20" height="6" rx="2.5" fill="#232a3c"/><rect x="-10" y="-3" width="20" height="2" rx="1" fill="#55607a"/></g>
+        </g>
+        <g transform="rotate(14 500 380)">
+          <rect x="496" y="352" width="8" height="42" rx="4" fill="#3f7fbf"/>
+          <rect x="497" y="346" width="6" height="7" rx="2" fill="#2b2f3d"/>
+          <path d="M500,394 q5,10 14,11" stroke="#2b2f3d" stroke-width="2.5" fill="none"/>
+        </g>
+        <g id="kick"><path d="M525,426 L548,454" stroke="#55607a" stroke-width="5" stroke-linecap="round"/></g>
+      </g>
+    </g>
+
+    <!-- near wing -->
+    <g id="wingNear">
+      <path d="M505,505 C472,500 438,512 420,538 C446,540 470,534 490,526 C472,548 462,566 458,584 C486,568 508,544 518,518 Z" fill="#ffffff" stroke="#cfd8e4" stroke-width="1.5"/>
+      <path d="M440,528 q18,-8 38,-10 M446,548 q16,-10 30,-24" stroke="#dbe2ec" stroke-width="2" fill="none"/>
+    </g>
+
+    <!-- near leg -->
+    <g id="legNear">
+      <g id="legNear2">
+        <path d="M498,572 l0,34" stroke="#e29348" stroke-width="11" stroke-linecap="round"/>
+        <path d="M498,604 l0,16" stroke="#e29348" stroke-width="9" stroke-linecap="round"/>
+        <g transform="translate(498,620)">
+          <path d="M0,0 L28,6 L21,11 L14,6 L7,12 L1,7 Z" fill="#e29348"/>
+          <path d="M0,0 L-11,6" stroke="#e29348" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M4,2 L22,7" stroke="#c97f38" stroke-width="2" opacity="0.6"/>
+        </g>
+      </g>
+      <circle cx="498" cy="572" r="12" fill="#f0d9c0"/>
+    </g>
+
+    <g id="quizz" opacity="0">
+      <circle cx="700" cy="250" r="26" fill="#fff" opacity="0.92" stroke="#cfd8e4"/>
+      <text x="700" y="258" text-anchor="middle" font-size="20" fill="#5a6a8a">鱼?</text>
+      <circle cx="670" cy="290" r="6" fill="#fff" opacity="0.85"/>
+      <circle cx="658" cy="304" r="3.5" fill="#fff" opacity="0.8"/>
+    </g>
+
+    <g id="tintG" opacity="0" style="pointer-events:none">
+      <rect x="250" y="240" width="520" height="400" fill="#5a4a8a" clip-path="url(#birdClip)"/>
+    </g>
+  </svg>
+
+  <canvas id="fx"></canvas>
+
+  <div id="title" class="card">
+    <h1>骑在鹈鹕背上的自行车</h1>
+    <p>A BICYCLE RIDING A PELICAN —— 主角是一辆自行车，坐骑是一只卖力狂奔的鹈鹕。（真的不是反过来！）</p>
+  </div>
+
+  <div id="panel" class="card">
+    <button id="bell" class="chip">按车铃（叮铃铃！）</button>
+    <div>
+      <div class="label"><span>前进速度</span><b id="spdTxt">32 mph</b></div>
+      <input id="spd" type="range" min="0" max="100" value="32"/>
+    </div>
+    <div>
+      <div class="label"><span>鹈鹕体力</span><b id="stamTxt">100%</b></div>
+      <div id="staminaWrap"><div id="stamina"></div></div>
+    </div>
+    <div class="row">
+      <button id="fish" class="chip">投喂小鱼</button>
+      <button id="dash" class="chip">冲刺</button>
+    </div>
+    <div class="seg">
+      <button class="chip mode on" data-mode="0">晴天</button>
+      <button class="chip mode" data-mode="1">黄昏</button>
+      <button class="chip mode" data-mode="2">夜晚</button>
+    </div>
+    <div class="seg">
+      <button class="chip terr on" data-t="0">平路</button>
+      <button class="chip terr" data-t="1">石子路</button>
+    </div>
+    <div id="status">状态：悠闲小跑…</div>
+    <div id="hint">空格=铃 · ↑↓=调速 · F=喂鱼 · 1/2/3 换场景</div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var SVGNS="http://www.w3.org/2000/svg";
+function clamp(v,a,b){return v<a?a:(v>b?b:v);}
+function mod(v,m){return ((v%m)+m)%m;}
+var TAU=Math.PI*2;
+function rnd(a,b){return a+Math.random()*(b-a);}
+
+/* ---- spokes ---- */
+function buildSpokes(g,n){
+  for(var i=0;i<n;i++){
+    var l=document.createElementNS(SVGNS,"line");
+    l.setAttribute("x1",0);l.setAttribute("y1",0);
+    l.setAttribute("x2",(37*Math.cos(i*TAU/n)).toFixed(2));
+    l.setAttribute("y2",(37*Math.sin(i*TAU/n)).toFixed(2));
+    l.setAttribute("stroke","#a9b4c6");l.setAttribute("stroke-width","1.6");
+    g.appendChild(l);
+  }
+}
+buildSpokes($("spokesR"),9);
+buildSpokes($("spokesF"),9);
+
+/* ---- palettes for the canvas backdrop ---- */
+var PAL=[
+ {sky:["#8fd3f4","#dff1fb","#f7fcff"],sea:["#2f7fb8","#63aede"],deck:["#c98f5a","#a06a3e"],post:"#7c5230",cloud:"#ffffff",sun:"#ffd35e",glow:"#ffe9a8",star:0,sand:"#e8cf9a",accent:"#ffedb0"},
+ {sky:["#312a5e","#c8576b","#ffb36b"],sea:["#43306a","#a04e63"],deck:["#96604a","#63382f"],post:"#4a2b33",cloud:"#f0b6c8",sun:"#ff8a4d",glow:"#ff9e6d",star:0.25,sand:"#c79a74",accent:"#ffd9a0"},
+ {sky:["#050a24","#101c46","#1c2b5c"],sea:["#0a1330","#1d2f5e"],deck:["#39406a","#232849"],post:"#1b2140",cloud:"#33406e",sun:"#e9eeff",glow:"#9fb2ff",star:1,sand:"#4a5178",accent:"#aebfff"}
+];
+function hx(h){h=h.replace("#","");return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function mixC(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)];}
+function rgb(c){return "rgb("+c[0]+","+c[1]+","+c[2]+")";}
+var PC=[PAL.map(function(p){var o={};for(var k in p){o[k]=(typeof p[k]==="string")?[hx(p[k])]:(p[k] instanceof Array?p[k].map(hx):p[k]);}return o;})][0];
+
+/* ---- state ---- */
+var S={
+  slider:32, target:32, speed:0,      // px-ish world speed
+  stamina:100, exhausted:false,
+  phase:0, runPh:0, dist:0, time:0,
+  bob:0, tilt:0, headBob:0, pouchRot:0, beakOpen:0,
+  startle:0, dash:0, bellRing:0, wingFlap:0,
+  mode:0, modeMix:[1,0,0],           // weights of PAL
+  terrain:0, bumpMix:0,
+  quizz:0, pant:0, feedGlow:0, chompT:0, wheelAng:0, crankAng:0
+};
+var particles=[], rings=[], fishes=[];
+
+/* stars (fixed random) */
+var stars=[];
+for(var i=0;i<90;i++){stars.push({x:Math.random(),y:Math.random()*0.55,r:rnd(0.5,1.8),tw:rnd(0,TAU),sp:rnd(1.5,4)});}
+/* clouds */
+var clouds=[];
+for(i=0;i<6;i++){clouds.push({x:Math.random()*1400,y:rnd(40,180),s:rnd(0.6,1.3),v:rnd(4,12)});}
+/* pebbles on bumpy road */
+var pebbles=[];
+for(i=0;i<60;i++){pebbles.push({x:Math.random()*2000,y:rnd(6,30),r:rnd(2,5.5),c:Math.random()});}
+
+/* ---- audio (Web Audio synth) ---- */
+var AC=null;
+function ac(){
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=null;}}
+  if(AC&&AC.state==="suspended"){AC.resume();}
+  return AC;
+}
+function bellSound(){
+  var a=ac();if(!a)return;
+  var t=a.currentTime;
+  [[1760,0.5,1.6],[2210,0.32,1.2],[2640,0.18,0.9],[3520,0.1,0.6]].forEach(function(p){
+    var o=a.createOscillator(),g=a.createGain();
+    o.type="sine";o.frequency.value=p[0];
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(p[1]*0.25,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+p[2]);
+    o.connect(g);g.connect(a.destination);
+    o.start(t);o.stop(t+p[2]+0.05);
+  });
+  // tiny hammer clack
+  var o2=a.createOscillator(),g2=a.createGain();
+  o2.type="square";o2.frequency.value=5200;
+  g2.gain.setValueAtTime(0.04,t);g2.gain.exponentialRampToValueAtTime(0.0001,t+0.04);
+  o2.connect(g2);g2.connect(a.destination);o2.start(t);o2.stop(t+0.06);
+}
+function munchSound(){
+  var a=ac();if(!a)return;
+  var t=a.currentTime;
+  for(var k=0;k<3;k++){
+    var o=a.createOscillator(),g=a.createGain();
+    o.type="triangle";o.frequency.setValueAtTime(320-k*60,t+k*0.13);
+    o.frequency.exponentialRampToValueAtTime(140,t+k*0.13+0.1);
+    g.gain.setValueAtTime(0.12,t+k*0.13);
+    g.gain.exponentialRampToValueAtTime(0.001,t+k*0.13+0.11);
+    o.connect(g);g.connect(a.destination);o.start(t+k*0.13);o.stop(t+k*0.13+0.13);
+  }
+}
+function whooshSound(){
+  var a=ac();if(!a)return;
+  var t=a.currentTime,len=0.5;
+  var buf=a.createBuffer(1,a.sampleRate*len,a.sampleRate);
+  var d=buf.getChannelData(0);
+  for(var i2=0;i2<d.length;i2++){d[i2]=(Math.random()*2-1)*Math.pow(1-i2/d.length,2);}
+  var src=a.createBufferSource();src.buffer=buf;
+  var f=a.createBiquadFilter();f.type="bandpass";f.frequency.setValueAtTime(400,t);f.frequency.exponentialRampToValueAtTime(2400,t+len);f.Q.value=1.2;
+  var g=a.createGain();g.gain.setValueAtTime(0.25,t);g.gain.exponentialRampToValueAtTime(0.001,t+len);
+  src.connect(f);f.connect(g);g.connect(a.destination);src.start(t);
+}
+function splashSound(){
+  var a=ac();if(!a)return;
+  var t=a.currentTime;
+  var o=a.createOscillator(),g=a.createGain();
+  o.type="sine";o.frequency.setValueAtTime(880,t);o.frequency.exponentialRampToValueAtTime(1600,t+0.09);
+  g.gain.setValueAtTime(0.08,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+0.14);
+}
+
+/* ---- UI wiring ---- */
+var spdEl=$("spd"),statusEl=$("status");
+spdEl.addEventListener("input",function(){S.slider=+spdEl.value;});
+$("bell").addEventListener("click",function(){ringBell();});
+$("dash").addEventListener("click",function(){doDash();});
+$("fish").addEventListener("click",function(){throwFish();});
+var modeBtns=document.querySelectorAll(".mode"),terrBtns=document.querySelectorAll(".terr");
+modeBtns.forEach(function(b){b.addEventListener("click",function(){
+  S.mode=+b.dataset.mode;
+  modeBtns.forEach(function(x){x.classList.toggle("on",+x.dataset.mode===S.mode);});
+});});
+terrBtns.forEach(function(b){b.addEventListener("click",function(){
+  S.terrain=+b.dataset.t;
+  terrBtns.forEach(function(x){x.classList.toggle("on",+x.dataset.t===S.terrain);});
+  if(S.terrain===1){addStatusBlink("石子路！扶稳车把——");}
+});});
+
+document.addEventListener("keydown",function(e){
+  if(e.code==="Space"){e.preventDefault();ringBell();}
+  else if(e.key==="ArrowUp"){spdEl.value=S.slider=clamp(S.slider+6,0,100);}
+  else if(e.key==="ArrowDown"){spdEl.value=S.slider=clamp(S.slider-6,0,100);}
+  else if(e.key==="f"||e.key==="F"){throwFish();}
+  else if(e.key==="1"||e.key==="2"||e.key==="3"){var m=+e.key-1;S.mode=m;modeBtns.forEach(function(x){x.classList.toggle("on",+x.dataset.mode===m);});}
+});
+
+function addStatusBlink(txt){statusEl.textContent="状态："+txt;blinkUntil=S.time+2.2;}
+var blinkUntil=0;
+
+/* ---- interactions ---- */
+function ringBell(){
+  bellSound();
+  S.bellRing=1;               // bell shake amplitude
+  S.startle=Math.min(1,S.startle+0.9);
+  S.dash=Math.max(S.dash,0.55); // startled mini-burst
+  spawnRings();
+  // a few startled feathers
+  for(var i=0;i<7;i++){spawnFeather(rnd(430,560),rnd(470,540));}
+  addStatusBlink("受惊了！车把一拧，鹈鹕撒腿狂奔！！");
+}
+function doDash(){
+  if(S.stamina<10){addStatusBlink("体力见底…先喂条小鱼吧 🐟".replace(" 🐟",""));return;}
+  whooshSound();
+  S.dash=1.15;
+  S.startle=Math.min(1,S.startle+0.4);
+  addStatusBlink("冲刺！鹈鹕翅膀都扇出残影了！");
+}
+function throwFish(){
+  splashSound();
+  fishes.push({x:rnd(-40,-10),y:rnd(120,180),vx:rnd(300,360),vy:rnd(-420,-360),rot:0,vr:rnd(-6,6),state:"fly",t:0});
+}
+
+/* ---- particles ---- */
+function spawnFeather(x,y){
+  particles.push({k:"f",x:x,y:y,vx:rnd(-40,-10),vy:rnd(-30,-5),r:rnd(0,TAU),vr:rnd(-3,3),a:1,s:rnd(7,12),sw:rnd(0,TAU)});
+}
+function spawnSweat(x,y){
+  particles.push({k:"s",x:x,y:y,vx:rnd(-10,15),vy:rnd(-60,-30),a:1,s:rnd(3,5)});
+}
+function spawnDust(x,y){
+  particles.push({k:"d",x:x,y:y,vx:rnd(-70,-25),vy:rnd(-25,-5),a:0.6,s:rnd(3,7)});
+}
+function spawnRings(){
+  for(var i=0;i<3;i++){rings.push({x:620,y:278,r:6+i*4,a:0.9,d:0.55+i*0.22});}
+}
+
+/* ---- canvases ---- */
+var bgC=$("bg"),fxC=$("fx"),bx=bgC.getContext("2d"),fx=fxC.getContext("2d");
+var W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  W=window.innerWidth;H=window.innerHeight;
+  bgC.width=W*DPR;bgC.height=H*DPR;fxC.width=W*DPR;fxC.height=H*DPR;
+}
+window.addEventListener("resize",resize);resize();
+
+// svg-space -> screen mapping (stage is centered, aspect 3/2)
+function svg2scr(){
+  var sh=Math.min(H,W*2/3);
+  var sw=sh*3/2;
+  return {ox:(W-sw)/2,oy:(H-sh)/2,sc:sh/640};
+}
+
+/* current palette (mix weights) */
+function curPal(){
+  var o={};
+  ["sky","sea"].forEach(function(k){
+    o[k]=[];
+    for(var s=0;s<PAL[k2Index(k)].length;s++){}
+  });
+  // simpler: blend each color list by weights
+  var w=[S.modeMix[0],S.modeMix[1],S.modeMix[2]];
+  function blend(arrKey,idx){
+    var c=[0,0,0];
+    for(var m=0;m<3;m++){
+      if(w[m]<=0.001)continue;
+      var base=PC[m][arrKey];
+      var col=(base instanceof Array&&typeof base[0]==="object")?base[Math.min(idx,base.length-1)]:base;
+      c=mixC(c,col,w[m]);
+    }
+    return c;
+  }
+  o.sky=[blend("sky",0),blend("sky",1),blend("sky",2)];
+  o.sea=[blend("sea",0),blend("sea",1)];
+  o.deck=[blend("deck",0),blend("deck",1)];
+  o.post=blend("post",0);o.cloud=blend("cloud",0);o.sun=blend("sun",0);o.glow=blend("glow",0);o.sand=blend("sand",0);o.accent=blend("accent",0);
+  o.star=w[0]*PAL[0].star+w[1]*PAL[1].star+w[2]*PAL[2].star;
+  return o;
+}
+function k2Index(k){return 0;}
+
+/* ---- background drawing ---- */
+function drawBG(p){
+  bx.setTransform(DPR,0,0,DPR,0,0);
+  var horizon=H*0.52;
+  // sky
+  var g=bx.createLinearGradient(0,0,0,horizon);
+  g.addColorStop(0,rgb(p.sky[0]));g.addColorStop(0.7,rgb(p.sky[1]));g.addColorStop(1,rgb(p.sky[2]));
+  bx.fillStyle=g;bx.fillRect(0,0,W,horizon+2);
+  // stars
+  if(p.star>0.02){
+    for(var i=0;i<stars.length;i++){
+      var st=stars[i];
+      var tw=0.5+0.5*Math.sin(S.time*st.sp+st.tw);
+      bx.globalAlpha=p.star*tw*0.9;
+      bx.fillStyle="#e8eeff";
+      bx.beginPath();bx.arc(st.x*W,st.y*H,st.r,0,TAU);bx.fill();
+    }
+    bx.globalAlpha=1;
+  }
+  // sun / moon
+  var cx=W*0.16,cy=horizon*0.36;
+  var gg=bx.createRadialGradient(cx,cy,4,cx,cy,90);
+  gg.addColorStop(0,rgb(p.glow));gg.addColorStop(1,"rgba(0,0,0,0)");
+  bx.fillStyle=gg;bx.beginPath();bx.arc(cx,cy,90,0,TAU);bx.fill();
+  bx.fillStyle=rgb(p.sun);bx.beginPath();bx.arc(cx,cy,30,0,TAU);bx.fill();
+  if(S.mode===2||S.modeMix[2]>0.5){ // carve crescent at night
+    bx.globalAlpha=S.modeMix[2];
+    bx.fillStyle=rgb(p.sky[0]);bx.beginPath();bx.arc(cx+12,cy-8,26,0,TAU);bx.fill();
+    bx.globalAlpha=1;
+  }
+  // clouds (parallax slow)
+  for(i=0;i<clouds.length;i++){
+    var c=clouds[i];
+    var x=mod(c.x-S.dist*0.02*0.2*(1+c.v*0.03),W+300)-150;
+    drawCloud(x,c.y,c.s,p);
+  }
+  // sea
+  var seaG=bx.createLinearGradient(0,horizon,0,H*0.66);
+  seaG.addColorStop(0,rgb(p.sea[0]));seaG.addColorStop(1,rgb(p.sea[1]));
+  bx.fillStyle=seaG;bx.fillRect(0,horizon,W,H*0.14+2);
+  // wave glints
+  bx.strokeStyle=rgb(p.accent);
+  for(i=0;i<14;i++){
+    var wy=horizon+6+i*(H*0.14/14);
+    bx.globalAlpha=0.10+0.06*Math.sin(S.time*2+i);
+    bx.lineWidth=1.5;
+    bx.beginPath();
+    for(var x2=0;x2<=W;x2+=26){
+      var yy=wy+Math.sin(x2*0.03+S.time*1.6+i*2)*2;
+      if(x2===0)bx.moveTo(x2,yy);else bx.lineTo(x2,yy);
+    }
+    bx.stroke();
+  }
+  bx.globalAlpha=1;
+  // boardwalk sand strip
+  bx.fillStyle=rgb(p.sand);bx.fillRect(0,H*0.66,W,H*0.04);
+  // deck
+  var deckY=H*0.70;
+  var dg=bx.createLinearGradient(0,deckY,0,H);
+  dg.addColorStop(0,rgb(p.deck[0]));dg.addColorStop(1,rgb(p.deck[1]));
+  bx.fillStyle=dg;bx.fillRect(0,deckY,W,H-deckY);
+  // moving plank seams (parallax = ground speed)
+  bx.strokeStyle="rgba(30,20,10,0.18)";bx.lineWidth=2;
+  var gap=90,off=mod(-S.dist*1.0,gap);
+  for(x2=off;x2<W+gap;x2+=gap){
+    bx.beginPath();bx.moveTo(x2,deckY+4);bx.lineTo(x2-14,H);bx.stroke();
+  }
+  bx.strokeStyle="rgba(255,255,255,0.06)";
+  bx.beginPath();bx.moveTo(0,deckY+(H-deckY)*0.45);bx.lineTo(W,deckY+(H-deckY)*0.45);bx.stroke();
+  // railing posts scrolling mid-speed (parallax layer)
+  var pgap=160,poff=mod(-S.dist*0.45,pgap);
+  bx.fillStyle=rgb(p.post);
+  for(x2=poff-pgap;x2<W+pgap;x2+=pgap){
+    bx.fillRect(x2,H*0.66-46,7,48);
+    bx.fillRect(x2-3,H*0.66-50,13,6);
+  }
+  bx.fillRect(0,H*0.66-50,W,5);
+  bx.fillRect(0,H*0.66-28,W,4);
+  // pebbles when bumpy
+  if(S.bumpMix>0.03){
+    for(i=0;i<pebbles.length;i++){
+      var pb=pebbles[i];
+      var px=mod(pb.x-S.dist*1.05,2000);
+      px=px/2000*(W+400)-200;
+      var py=deckY+8+pb.y/30*(H-deckY-16);
+      bx.globalAlpha=S.bumpMix*0.9;
+      bx.fillStyle=pb.c<0.5?"rgba(60,50,40,0.8)":"rgba(240,235,225,0.55)";
+      bx.beginPath();bx.ellipse(px,py,pb.r,pb.r*0.7,0,0,TAU);bx.fill();
+    }
+    bx.globalAlpha=1;
+  }
+}
+function drawCloud(x,y,s,p){
+  bx.fillStyle=rgb(p.cloud);bx.globalAlpha=0.85;
+  bx.beginPath();
+  bx.arc(x,y,22*s,0,TAU);
+  bx.arc(x+24*s,y-8*s,17*s,0,TAU);
+  bx.arc(x+46*s,y,20*s,0,TAU);
+  bx.arc(x+22*s,y+8*s,16*s,0,TAU);
+  bx.fill();
+  bx.globalAlpha=1;
+}
+
+/* ---- fx overlay (speedlines / particles live in svg coords) ---- */
+function drawFX(p){
+  fx.setTransform(DPR,0,0,DPR,0,0);
+  fx.clearRect(0,0,W,H);
+  var m=svg2scr();
+  fx.setTransform(DPR*m.sc,0,0,DPR*m.sc,DPR*m.ox,DPR*m.oy);
+  // speed lines
+  var sl=S.speed/100;
+  if(sl>0.08){
+    fx.strokeStyle=rgb(p.accent);
+    fx.globalAlpha=clamp(sl*0.5,0,0.45);
+    fx.lineWidth=2.5;fx.lineCap="round";
+    for(var i=0;i<9;i++){
+      var yy=300+i*34+Math.sin(S.time*7+i*3)*6;
+      var len=40+sl*110+((i*53)%40);
+      var xx=mod(-S.dist*(2.2+i*0.3)+i*211,1100)-70;
+      fx.beginPath();fx.moveTo(xx,yy);fx.lineTo(xx+len,yy);fx.stroke();
+    }
+    fx.globalAlpha=1;
+  }
+  // particles
+  for(i=0;i<particles.length;i++){
+    var pt=particles[i];
+    fx.globalAlpha=clamp(pt.a,0,1);
+    if(pt.k==="f"){
+      fx.save();fx.translate(pt.x,pt.y);fx.rotate(pt.r);
+      fx.fillStyle="#ffffff";fx.strokeStyle="#b9c6d9";fx.lineWidth=1;
+      fx.beginPath();fx.ellipse(0,0,pt.s,pt.s*0.42,0,0,TAU);fx.fill();fx.stroke();
+      fx.beginPath();fx.moveTo(-pt.s*0.8,0);fx.lineTo(pt.s*0.8,0);fx.strokeStyle="#9fb0c8";fx.stroke();
+      fx.restore();
+    }else if(pt.k==="s"){
+      fx.fillStyle="rgba(150,200,255,0.9)";
+      fx.beginPath();
+      fx.moveTo(pt.x,pt.y-pt.s*1.6);
+      fx.quadraticCurveTo(pt.x+pt.s,pt.y,pt.x,pt.y+pt.s);
+      fx.quadraticCurveTo(pt.x-pt.s,pt.y,pt.x,pt.y-pt.s*1.6);
+      fx.fill();
+    }else{
+      fx.fillStyle="rgba(210,180,130,0.8)";
+      fx.beginPath();fx.arc(pt.x,pt.y,pt.s,0,TAU);fx.fill();
+    }
+  }
+  // bell rings
+  for(i=0;i<rings.length;i++){
+    var rg=rings[i];
+    fx.globalAlpha=clamp(rg.a,0,1);
+    fx.strokeStyle="#ffc25e";fx.lineWidth=2.5;
+    fx.beginPath();fx.arc(rg.x,rg.y,rg.r,0,TAU);fx.stroke();
+    fx.strokeStyle="#ff8a5c";
+    fx.beginPath();fx.arc(rg.x,rg.y,rg.r*0.72,0,TAU);fx.stroke();
+  }
+  // fishes
+  for(i=0;i<fishes.length;i++){
+    var f=fishes[i];
+    fx.save();fx.translate(f.x,f.y);fx.rotate(f.rot);
+    fx.fillStyle="#7fb6e8";
+    fx.beginPath();fx.ellipse(0,0,13,6,0,0,TAU);fx.fill();
+    fx.beginPath();fx.moveTo(-12,0);fx.lineTo(-20,-6);fx.lineTo(-20,6);fx.closePath();fx.fill();
+    fx.fillStyle="#17233f";fx.beginPath();fx.arc(7,-1,1.6,0,TAU);fx.fill();
+    fx.restore();
+  }
+  fx.globalAlpha=1;
+}
+
+/* ---- main loop ---- */
+var last=performance.now();
+function frame(now){
+  var dt=Math.min(0.05,(now-last)/1000);last=now;
+  S.time+=dt;
+  update(dt);
+  render();
+  drawBG(curPal());
+  drawFX(curPal());
+  requestAnimationFrame(frame);
+}
+
+function update(dt){
+  // palette mixing ease toward target mode
+  for(var m=0;m<3;m++){
+    var tv=(m===S.mode)?1:0;
+    S.modeMix[m]+=(tv-S.modeMix[m])*clamp(dt*2.2,0,1);
+  }
+  // terrain bump ease
+  var tb=S.terrain===1?1:0;
+  S.bumpMix+=(tb-S.bumpMix)*clamp(dt*2,0,1);
+
+  // startle / dash decay
+  S.startle=Math.max(0,S.startle-dt*0.35);
+  S.bellRing=Math.max(0,S.bellRing-dt*2.2);
+  S.dash=Math.max(0,S.dash-dt*0.8);
+  S.feedGlow=Math.max(0,S.feedGlow-dt*1.5);
+
+  // effective target speed: slider * (1 + dash + startle)
+  var mult=1+S.dash*0.9+S.startle*0.5;
+  var tgt=S.slider*mult;
+  if(S.exhausted)tgt=Math.min(tgt,12);
+  S.speed+=(tgt-S.speed)*clamp(dt*(S.exhausted?1.2:2.4),0,1);
+
+  // stamina: drains at high load, recovers at low; fish restores
+  var load=clamp(S.speed/70,0,1.8);
+  if(load>0.75)S.stamina-=(load-0.75)*dt*16;
+  else S.stamina+=dt*(0.75-load+0.15)*9;
+  if(S.feedGlow>0)S.stamina+=dt*6;
+  S.stamina=clamp(S.stamina,0,100);
+  if(S.stamina<=0.5&&!S.exhausted){S.exhausted=true;addStatusBlink("累瘫了…狂喘气，急需一条小鱼！");}
+  if(S.exhausted&&S.stamina>45){S.exhausted=false;addStatusBlink("缓过来了，重新上路！");}
+  S.pant+=( (S.exhausted?1:(S.speed>70?0.6:0)) - S.pant )*clamp(dt*3,0,1);
+
+  // distances and gait phase
+  S.dist+=S.speed*dt*3.2;
+  var strideHz=1.4+S.speed*0.045;
+  S.runPh+=dt*TAU*strideHz;
+  S.phase=S.runPh;
+  // wheel spin
+  S.wheelAng=(S.wheelAng||0)+S.speed*dt*1.4;
+  // crank cadence tied to wheel (chain-driven)
+  S.crankAng=(S.crankAng||0)+S.speed*dt*0.55;
+
+  // bob: gallop bounce, larger with speed + bumps
+  var bumpAmp=S.bumpMix*(2+Math.sin(S.dist*0.09)*0.6);
+  S.bob=Math.sin(S.phase)*(2.5+S.speed*0.055)+Math.sin(S.phase*2)*bumpAmp*2.2;
+  S.tilt=Math.sin(S.phase+0.9)*(S.speed*0.012+S.bumpMix*1.8);
+  // delayed layers (spring feel)
+  S.headBob+=( (Math.sin(S.phase-0.8)*(2+S.speed*0.03)-S.headBob)*clamp(dt*10,0,1));
+  S.pouchRot+=( (Math.sin(S.phase-1.1)*(2+S.speed*0.05)+S.startle*4)-S.pouchRot )*clamp(dt*9,0,1);
+  S.wingFlap+=dt*(1.5+S.speed*0.08);
+
+  // beak open: panting, chomp, startled gasp
+  var wantOpen=S.pant*(0.5+0.5*Math.sin(S.time*7))+S.chompT*8+S.startle*2;
+  S.beakOpen+=(clamp(wantOpen,0,9)-S.beakOpen)*clamp(dt*12,0,1);
+  if(S.chompT>0)S.chompT=Math.max(0,S.chompT-dt*7);
+
+  // idle quizzical look-back when stopped
+  if(S.speed<6){S.quizz=Math.min(1,S.quizz+dt*1.2);}else{S.quizz=Math.max(0,S.quizz-dt*3);}
+
+  // dust while running on pebbles or fast
+  if(S.speed>35&&Math.random()<S.speed*dt*0.06){
+    spawnDust(rnd(420,540),rnd(600,615));
+  }
+  if(S.speed>80&&Math.random()<dt*6){spawnFeather(rnd(380,480),rnd(490,540));}
+  if(S.pant>0.3&&Math.random()<dt*8){spawnSweat(rnd(600,640),rnd(300,325));}
+
+  // physics-ish particles
+  updateParticles(dt);
+  updateFish(dt);
+  updateRings(dt);
+
+  // UI text
+  $("spdTxt").textContent=Math.round(S.speed)+" mph";
+  $("stamTxt").textContent=Math.round(S.stamina)+"%";
+  var stamBar=$("stamina");
+  stamBar.style.width=S.stamina+"%";
+  stamBar.classList.toggle("low",S.stamina<35);
+  if(S.time>blinkUntil){
+    var msg;
+    if(S.exhausted)msg="累瘫了，扑翅喘气…投喂小鱼恢复体力 →";
+    else if(S.speed>85)msg="风驰电掣！鹈鹕蹼都要擦出火星！";
+    else if(S.speed>50)msg="快速奔驰，车铃在风中乱颤～";
+    else if(S.speed>15)msg="悠闲小跑，喉囊一晃一晃。";
+    else if(S.speed<=2)msg="停下来歇脚，鹈鹕回头一脸问号…";
+    else msg="散步模式，链条咔哒咔哒。";
+    statusEl.textContent="状态："+msg;
+  }
+}
+
+function updateParticles(dt){
+  for(var i=particles.length-1;i>=0;i--){
+    var p=particles[i];
+    if(p.k==="f"){
+      p.sw+=dt*5;
+      p.x+=p.vx*dt+Math.sin(p.sw)*30*dt;
+      p.y+=p.vy*dt+28*dt;
+      p.r+=p.vr*dt;
+      p.a-=dt*0.35;
+    }else if(p.k==="s"){
+      p.vy+=300*dt;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.a-=dt*1.2;
+      if(p.y>612)p.a=0;
+    }else{ // dust
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.vy-=20*dt;p.s+=dt*10;
+      p.a-=dt*1.4;
+    }
+    if(p.a<=0||p.y>660||p.x<-40)particles.splice(i,1);
+  }
+  if(particles.length>140)particles.splice(0,particles.length-140);
+}
+function updateRings(dt){
+  for(var i=rings.length-1;i>=0;i--){
+    var r=rings[i];
+    r.r+=dt*95;r.a-=dt*1.6;
+    if(r.a<=0)rings.splice(i,1);
+  }
+}
+function updateFish(dt){
+  for(var i=fishes.length-1;i>=0;i--){
+    var f=fishes[i];
+    if(f.state==="fly"){
+      f.vy+=520*dt;
+      f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.vr*dt;
+      // catch at beak tip (~735,330 svg)
+      var dx=f.x-700,dy=f.y-345;
+      if(dx*dx+dy*dy<38*38){
+        f.state="eaten";
+        S.stamina=clamp(S.stamina+30,0,100);
+        S.feedGlow=1;S.chompT=1;
+        munchSound();
+        addStatusBlink("啊呜！一口吞下小鱼，喉囊咕嘟咕嘟～ (+30 体力)");
+        for(var k=0;k<4;k++){spawnSweat(rnd(660,720),rnd(340,370));}
+      }else if(f.x>1000||f.y>700){fishes.splice(i,1);}
+    }else{
+      fishes.splice(i,1);
+    }
+  }
+}
+
+/* ---- render SVG transforms ---- */
+function setT(id,tf){var el=$(id);if(el)el.setAttribute("transform",tf);}
+function render(){
+  var sp=S.speed;
+  // whole bird bounce
+  setT("birdBody","translate(0,"+(S.bob*0.8).toFixed(2)+")");
+  setT("birdBodyTilt","rotate("+((-4+sp*0.03+S.tilt*0.6).toFixed(2))+",505,540)");
+  // neck + head follow with lag
+  setT("neckLag","translate(0,"+(S.headBob*-0.5).toFixed(2)+") rotate("+(-S.startle*4).toFixed(2)+",560,500)");
+  setT("headRot","rotate("+(-S.startle*6+S.tilt*0.5).toFixed(2)+",615,332)");
+  // eye: startled wide
+  $("eyeW").setAttribute("opacity",(S.startle).toFixed(2));
+  var pr=2.6+S.startle*1.4;
+  $("pupil").setAttribute("r",pr.toFixed(2));
+  // brow raises when startled / exhausted
+  $("brow").setAttribute("transform","translate(0,"+(-S.startle*4).toFixed(2)+") rotate("+(-S.startle*14).toFixed(2)+",626,313)");
+  // beak open for pant / chomp
+  setT("beak","rotate("+(-S.beakOpen).toFixed(2)+",640,334)");
+  setT("beakLag","rotate("+(-S.pouchRot*0.4).toFixed(2)+",640,334)");
+  $("tongue").setAttribute("opacity",(clamp(S.pant*1.2,0,1)).toFixed(2));
+  // pouch swings + bulges after feeding
+  var bulge=1+S.feedGlow*0.35+S.pant*0.1;
+  setT("pouchG","translate(640,338) rotate("+S.pouchRot.toFixed(2)+") scale(1,"+bulge.toFixed(3)+") translate(-640,-338)");
+  // legs: two-phase gallop
+  var cA=Math.sin(S.phase),cB=Math.sin(S.phase+Math.PI*0.85);
+  setT("legNear","rotate("+(20*cA+6).toFixed(2)+",498,572)");
+  setT("legNear2","rotate("+(-26*Math.max(0,-cA)).toFixed(2)+",498,606)");
+  setT("legFar","rotate("+(20*cB+6).toFixed(2)+",542,566)");
+  setT("legFar2","rotate("+(-26*Math.max(0,-cB)).toFixed(2)+",542,598)");
+  // wings flap (more when dashing/exhausted)
+  var flapAmp=6+sp*0.14+S.dash*16+S.pant*8;
+  setT("wingNear","rotate("+(Math.sin(S.wingFlap*2)*-flapAmp+8).toFixed(2)+",498,516)");
+  setT("wingFar","rotate("+(Math.sin(S.wingFlap*2+0.6)*flapAmp*0.9-4).toFixed(2)+",455,528)");
+  setT("tail","rotate("+(Math.sin(S.phase*0.5)*4-3-sp*0.04).toFixed(2)+",415,548)");
+
+  // ---- bicycle: rides on top, own bounce with lag ----
+  var bikeBob=S.bob+Math.sin(S.phase+0.5)*S.bumpMix*3.5;
+  var bikeRot=S.tilt*0.9+Math.sin(S.phase+0.3)*(0.5+S.bumpMix*2.5);
+  setT("bike","translate(0,"+(bikeBob*1.1-2).toFixed(2)+")");
+  setT("bikeTilt","rotate("+bikeRot.toFixed(2)+",525,426)");
+  setT("wheelR","rotate("+mod(S.wheelAng,360).toFixed(2)+")");
+  setT("wheelF","rotate("+mod(S.wheelAng,360).toFixed(2)+")");
+  setT("cog","rotate("+mod(-S.wheelAng*0.6,360).toFixed(2)+",462,412)");
+  // cranks: pedals stay level
+  var ca=S.crankAng;
+  setT("crankNear","rotate("+ca.toFixed(2)+",525,426)");
+  setT("crankFar","rotate("+(ca+180).toFixed(2)+",525,426)");
+}
+function renderBikePedals(){
+  var ca=S.crankAng,rad=ca*Math.PI/180;
+  var nx=525+26*Math.sin(rad),ny=426-26*Math.cos(rad);
+  var px=525-26*Math.sin(rad),py=426+26*Math.cos(rad);
+  setT("pedNear","translate("+nx.toFixed(2)+","+ny.toFixed(2)+") rotate("+(-ca).toFixed(2)+")");
+  setT("pedFar","translate("+px.toFixed(2)+","+py.toFixed(2)+") rotate("+(-ca-180).toFixed(2)+")");
+}
+
+/* rein paths (handlebar -> bridle), sag depends on speed */
+function renderReins(){
+  var sag=18-S.speed*0.10+Math.sin(S.phase)*4;
+  var hx1=600,hy1=316;
+  var hx2=596,hy2=284;
+  var b1=652,b2=654,by=334,by2=318;
+  var mx=(hx1+b1)/2,my=(hy1+by)/2+sag;
+  $("reinA").setAttribute("d","M"+hx1+","+hy1+" Q"+mx+","+(my+6)+" "+b1+","+by);
+  var mx2=(hx2+b2)/2,my2=(hy2+by2)/2+sag*0.8;
+  $("reinB").setAttribute("d","M"+hx2+","+hy2+" Q"+mx2+","+(my2-14)+" "+b2+","+by2);
+}
+
+/* bell shake */
+function renderBell(){
+  var a=S.bellRing;
+  setT("bellG","translate(0,0) rotate("+(Math.sin(S.time*60)*10*a).toFixed(2)+",619,284)");
+}
+/* gloves on the bars grip+shake */
+function renderGloves(){
+  var a=S.bellRing;
+  setT("gloveF","translate(634,"+(292+Math.sin(S.time*50)*2*a).toFixed(2)+")");
+  setT("gloveB","translate(584,"+(282+Math.sin(S.time*50+1)*2*a).toFixed(2)+")");
+}
+/* kickstand pops out at rest, bird looks back */
+function renderIdle(){
+  var q=S.quizz;
+  setT("kick","rotate("+(28*q).toFixed(2)+",525,426)");
+  $("quizz").setAttribute("opacity",(q*q).toFixed(2));
+  // head turn look-back (shift pupil + slight yaw illusion)
+  $("pupil").setAttribute("cx",(628.5-5*q).toFixed(2));
+  // shadow squash
+  $("shadow").setAttribute("rx",(140-S.speed*0.25).toFixed(1));
+  $("shadow").setAttribute("ry",(13+S.bob*0.4).toFixed(1));
+}
+
+var last2=performance.now();
+function loop(now){
+  var dt=Math.min(0.05,(now-last2)/1000);last2=now;
+  S.time+=dt;
+  update(dt);
+  render();
+  renderBikePedals();
+  renderReins();
+  renderBell();
+  renderGloves();
+  renderIdle();
+  var p=curPal();
+  drawBG(p);
+  drawFX(p);
+  // tint over bird at dusk/night
+  $("tintG").setAttribute("opacity",(S.modeMix[1]*0.10+S.modeMix[2]*0.18).toFixed(3));
+  requestAnimationFrame(loop);
+}
+S.wheelAng=0;S.crankAng=0;
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

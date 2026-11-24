@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Bicycle Riding a Pelican</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(to bottom, #87CEEB, #005082);
+    font-family: sans-serif;
+  }
+  canvas {
+    display: block;
+  }
+  .controls {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  }
+  .controls button, .controls input {
+    margin: 5px 0;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .controls button {
+    background: #4CAF50;
+    color: white;
+  }
+  .controls input[type="range"] {
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="controls">
+  <button id="ringBell">🔔 Ring Bell</button>
+  <label>
+    Speed:
+    <input type="range" id="speedControl" min="1" max="20" value="10">
+  </label>
+  <button id="feedPelican">🐟 Feed Pelican</button>
+</div>
+<canvas id="scene"></canvas>
+
+<script>
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d');
+  let width, height, speed, pelicanEnergy;
+
+  // Initialize scene dimensions and variables
+  function init() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    pelicanEnergy = 100; // Initialize pelican's energy
+    speed = 10; // Default speed
+  }
+
+  window.onload = () => {
+    init();
+    animate();
+  };
+
+  // Event listeners for controls
+  document.getElementById('ringBell').addEventListener('click', ringBell);
+  document.getElementById('speedControl').addEventListener('input', (e) => {
+    speed = parseInt(e.target.value);
+  });
+  document.getElementById('feedPelican').addEventListener('click', feedPelican);
+
+  // Ring bell handler
+  function ringBell() {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
+    oscillator.connect(audioCtx.destination);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.2);
+
+    // Adjust pelican reaction
+    pelicanEnergy -= 10; // Startled
+    speed += 5; // Temporary burst
+    setTimeout(() => {
+      speed -= 5; // Calm down after sprint
+    }, 1000);
+  }
+
+  // Feed pelican handler
+  function feedPelican() {
+    pelicanEnergy = Math.min(pelicanEnergy + 20, 100); // Restore some energy
+  }
+
+  // Animation parameters
+  let bikeTilt = 0, bikeAngle = 0, bgOffset = 0;
+  const bikeParts = {
+    tireRadius: 40,
+    frame: { width: 150, height: 60 }
+  };
+
+  // Draw the bicycle (on top of pelican)
+  function drawBike(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(bikeTilt);
+    ctx.strokeStyle = '#000';
+
+    // Tires
+    ctx.beginPath();
+    ctx.arc(-bikeParts.frame.width / 2, 0, bikeParts.tireRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(bikeParts.frame.width / 2, 0, bikeParts.tireRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Frame
+    ctx.beginPath();
+    ctx.moveTo(-bikeParts.frame.width / 2, 0);
+    ctx.lineTo(0, -bikeParts.frame.height);
+    ctx.lineTo(bikeParts.frame.width / 2, 0);
+    ctx.stroke();
+
+    // Handlebars
+    ctx.beginPath();
+    ctx.moveTo(0, -bikeParts.frame.height);
+    ctx.lineTo(-20, -bikeParts.frame.height - 20);
+    ctx.lineTo(20, -bikeParts.frame.height - 20);
+    ctx.stroke();
+
+    // Pedals (rotating)
+    bikeAngle += speed / 25;
+    const pedalRadius = 15;
+    ctx.beginPath();
+    ctx.arc(0, 0, pedalRadius, bikeAngle, bikeAngle + Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, pedalRadius, bikeAngle + Math.PI, bikeAngle + Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Draw pelican
+  function drawPelican(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = '#000';
+    ctx.fillStyle = '#FFC107';
+
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 80, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -55, 25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Beak
+    ctx.fillStyle = '#FF9300';
+    ctx.beginPath();
+    ctx.moveTo(-10, -60);
+    ctx.lineTo(-60, -50);
+    ctx.lineTo(-10, -40);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Wings
+    ctx.beginPath();
+    ctx.moveTo(-50, 0);
+    ctx.lineTo(-100, -30);
+    ctx.lineTo(-50, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(50, 0);
+    ctx.lineTo(100, -30);
+    ctx.lineTo(50, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Feet
+    ctx.fillStyle = '#FF9300';
+    ctx.beginPath();
+    ctx.ellipse(-60, 40, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(60, 40, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Animate the scene
+  function animate() {
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw background
+    bgOffset += speed / 50;
+    ctx.fillStyle = '#005082';
+    ctx.fillRect(0, height - 100, width, 100); // Ground
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(0, 0, width, height - 100); // Sky
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = '#FFF';
+      ctx.beginPath();
+      ctx.arc((bgOffset + i * 200) % width, height / 2 - i * 40, 40, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Pelican animation
+    const pelicanX = width / 2;
+    const pelicanY = height - 120;
+    drawPelican(pelicanX, pelicanY);
+
+    // Bicycle animation
+    const bikeX = pelicanX;
+    const bikeY = pelicanY - 50;
+    drawBike(bikeX, bikeY);
+
+    requestAnimationFrame(animate);
+  }
+
+  window.onresize = init;
+</script>
+</body>
+</html>

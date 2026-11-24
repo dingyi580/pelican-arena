@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        body {
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 50%, #D2B48C 100%);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #stage {
+            width: 90vw;
+            height: 75vh;
+            position: relative;
+            background: url('') repeat-x 0 0;
+            background-size: cover;
+        }
+        #controls {
+            width: 90vw;
+            height: 15vh;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: rgba(255,255,255,0.8);
+            border-radius: 10px;
+            margin-top: 10px;
+            padding: 10px;
+        }
+        .control-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: #FF6B6B;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .control-btn:hover {
+            transform: scale(1.05);
+            background: #FF5252;
+        }
+        .control-slider {
+            width: 200px;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #E0E0E0;
+            border-radius: 4px;
+            outline: none;
+        }
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4ECDC4;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #feathers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .feather {
+            position: absolute;
+            width: 20px;
+            height: 10px;
+            background: white;
+            border-radius: 50% 0;
+            opacity: 0.7;
+            transform: rotate(-30deg);
+            animation: float 8s linear infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.7; }
+            100% { transform: translateY(-100px) rotate(-30deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage">
+        <!-- 羽毛粒子容器 -->
+        <div id="feathers"></div>
+        <!-- SVG主体：鹈鹕和自行车 -->
+        <svg id="canvas" width="100%" height="100%" viewBox="0 0 1000 600">
+            <!-- 背景：海水和栈道 -->
+            <rect id="sea" x="0" y="300" width="1000" height="300" fill="#48D1CC"/>
+            <path id="boardwalk" d="M0,500 Q250,520 500,500 T1000,520 L1000,600 L0,600 Z" fill="#8B4513"/>
+            
+            <!-- 鹈鹕：下方坐骑 -->
+            <g id="pelican">
+                <!-- 身体 -->
+                <ellipse cx="500" cy="500" rx="60" ry="40" fill="#FFA07A"/>
+                <!-- 翅膀 -->
+                <path id="wing" d="M500,480 Q550,450 520,510 Q500,530 500,500" fill="#FF8C00"/>
+                <!-- 长喙和喉囊 -->
+                <path id="beak" d="M560,500 L620,490 L620,510 Z" fill="#FFD700"/>
+                <path id="throat" d="M620,490 L650,500 L620,510 Z" fill="#FFB6C1" opacity="0.8"/>
+                <!-- 眼睛 -->
+                <circle cx="580" cy="480" r="5" fill="black"/>
+                <!-- 腿和蹼 -->
+                <g id="legs">
+                    <path id="leg1" d="M480,540 L480,580" stroke="#8B4513" stroke-width="5" fill="none"/>
+                    <path id="foot1" d="M470,580 L490,580 L480,590 Z" fill="#8B4513"/>
+                    <path id="leg2" d="M520,540 L520,580" stroke="#8B4513" stroke-width="5" fill="none"/>
+                    <path id="foot2" d="M510,580 L530,580 L520,590 Z" fill="#8B4513"/>
+                </g>
+            </g>
+            
+            <!-- 自行车：上方骑手，骑在鹈鹕背上 -->
+            <g id="bicycle">
+                <!-- 前轮 -->
+                <circle id="wheel1" cx="500" cy="450" r="30" fill="none" stroke="black" stroke-width="3"/>
+                <circle cx="500" cy="450" r="25" fill="none" stroke="black" stroke-width="1"/>
+                <!-- 后轮 -->
+                <circle id="wheel2" cx="560" cy="450" r="30" fill="none" stroke="black" stroke-width="3"/>
+                <circle cx="560" cy="450" r="25" fill="none" stroke="black" stroke-width="1"/>
+                <!-- 车架 -->
+                <path d="M500,450 L530,400 L560,450" stroke="black" stroke-width="4" fill="none"/>
+                <path d="M530,400 L530,380" stroke="black" stroke-width="4" fill="none"/>
+                <!-- 车把 -->
+                <path d="M510,380 L550,380" stroke="black" stroke-width="3" fill="none"/>
+                <!-- 车座 -->
+                <ellipse cx="530" cy="420" rx="8" ry="4" fill="black"/>
+                <!-- 链条和脚踏（简化） -->
+                <circle id="pedal" cx="530" cy="450" r="8" fill="black"/>
+                <!-- 缰绳连到鹈鹕头 -->
+                <path id="reins" d="M510,380 L580,480" stroke="brown" stroke-width="2" fill="none"/>
+            </g>
+        </svg>
+    </div>
+    
+    <!-- 控件区 -->
+    <div id="controls">
+        <button class="control-btn" id="bellBtn">按车铃</button>
+        <div>
+            <span>速度: <span id="speedVal">1.0</span></span>
+            <input type="range" min="0.5" max="2" step="0.1" value="1" class="control-slider" id="speedSlider">
+        </div>
+        <button class="control-btn" id="terrainBtn">切换石子路</button>
+    </div>
+
+    <script>
+        // 全局变量
+        let speed = 1;
+        let isAccelerating = false;
+        let terrain = 'flat'; // flat or bumpy
+        let audioCtx;
+        
+        // DOM元素
+        const stage = document.getElementById('stage');
+        const pelican = document.getElementById('pelican');
+        const bicycle = document.getElementById('bicycle');
+        const bellBtn = document.getElementById('bellBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speedVal');
+        const terrainBtn = document.getElementById('terrainBtn');
+        const feathersContainer = document.getElementById('feathers');
+        
+        // 初始化音频
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+        
+        // 播放车铃音效
+        function playBell() {
+            initAudio();
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc1.type = 'sine';
+            osc1.frequency.value = 800;
+            osc2.type = 'sine';
+            osc2.frequency.value = 1100;
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            
+            osc1.connect(gainNode);
+            osc2.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc1.start();
+            osc2.start();
+            osc1.stop(audioCtx.currentTime + 0.3);
+            osc2.stop(audioCtx.currentTime + 0.3);
+            
+            // 触发鹈鹕受惊
+            triggerStartle();
+        }
+        
+        // 鹈鹕受惊反应
+        function triggerStartle() {
+            isAccelerating = true;
+            pelican.style.transition = 'transform 0.2s';
+            pelican.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                pelican.style.transform = 'translateY(0)';
+                isAccelerating = false;
+            }, 300);
+            // 翅膀快速扇动
+            const wing = document.getElementById('wing');
+            wing.style.animation = 'none';
+            setTimeout(() => {
+                wing.style.animation = 'fly 0.1s linear 3';
+            }, 50);
+        }
+        
+        // 切换地形
+        function toggleTerrain() {
+            terrain = terrain === 'flat' ? 'bumpy' : 'flat';
+            terrainBtn.textContent = terrain === 'flat' ? '切换石子路' : '切换平路';
+        }
+        
+        // 创建羽毛粒子
+        function createFeather() {
+            const feather = document.createElement('div');
+            feather.classList.add('feather');
+            feather.style.left = Math.random() * 100 + '%';
+            feather.style.animationDuration = (Math.random() * 5 + 5) + 's';
+            feather.style.backgroundColor = Math.random() > 0.5 ? 'white' : '#FFE4B5';
+            feathersContainer.appendChild(feather);
+            setTimeout(() => {
+                feather.remove();
+            }, 8000);
+        }
+        
+        // 动画循环
+        function animate() {
+            // 更新速度
+            speed = parseFloat(speedSlider.value);
+            speedVal.textContent = speed.toFixed(1);
+            
+            // 车轮转动
+            const wheel1 = document.getElementById('wheel1');
+            const wheel2 = document.getElementById('wheel2');
+            const pedal = document.getElementById('pedal');
+            const currentRot = parseFloat(wheel1.getAttribute('transform')?.replace('rotate(', '').replace(')', '') || 0);
+            const newRot = currentRot + (10 * speed * (isAccelerating ? 2 : 1));
+            wheel1.setAttribute('transform', `rotate(${newRot}, 500, 450)`);
+            wheel2.setAttribute('transform', `rotate(${newRot}, 560, 450)`);
+            pedal.setAttribute('transform', `rotate(${newRot}, 530, 450)`);
+            
+            // 鹈鹕腿部和翅膀动画
+            const legs = document.getElementById('legs');
+            const wing = document.getElementById('wing');
+            const legOffset = Math.sin(Date.now() * 0.005 * speed) * (isAccelerating ? 5 : 3);
+            if (terrain === 'bumpy') {
+                pelican.style.transform = `translateY(${Math.sin(Date.now() * 0.01 * speed) * 5}px)`;
+                bicycle.style.transform = `translateY(${Math.sin(Date.now() * 0.01 * speed) * -5}px)`;
+            } else {
+                pelican.style.transform = 'translateY(0)';
+                bicycle.style.transform = 'translateY(0)';
+            }
+            
+            // 缰绳随车身晃动
+            const reins = document.getElementById('reins');
+            const sway = Math.sin(Date.now() * 0.003 * speed) * 2;
+            reins.setAttribute('d', `M510,380 L580,${480 + sway}`);
+            
+            // 随机生成羽毛
+            if (Math.random() < 0.02 * speed) {
+                createFeather();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 事件监听
+        bellBtn.addEventListener('click', playBell);
+        terrainBtn.addEventListener('click', toggleTerrain);
+        
+        // 添加翅膀飞行动画到CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fly {
+                0% { d: path("M500,480 Q550,450 520,510 Q500,530 500,500"); }
+                50% { d: path("M500,520 Q550,480 520,550 Q500,570 500,520"); }
+                100% { d: path("M500,480 Q550,450 520,510 Q500,530 500,500"); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // 启动动画
+        window.addEventListener('load', () => {
+            // 预创建一些羽毛
+            for (let i = 0; i < 5; i++) {
+                createFeather();
+            }
+            animate();
+        });
+    </script>
+</body>
+</html>

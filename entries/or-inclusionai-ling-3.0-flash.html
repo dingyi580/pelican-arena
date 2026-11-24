@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自行车骑鹈鹕</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0d1b2a;font-family:'Segoe UI',system-ui,sans-serif;user-select:none}
+canvas{display:block;position:fixed;top:0;left:0}
+#ui{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:14px 28px;background:rgba(13,27,42,0.75);backdrop-filter:blur(16px);border-radius:20px;border:1px solid rgba(255,255,255,0.1);z-index:10;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.btn{padding:10px 18px;border:none;border-radius:12px;background:linear-gradient(135deg,#FF6B35,#FF8C5A);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);letter-spacing:.5px;white-space:nowrap;box-shadow:0 4px 15px rgba(255,107,53,0.3)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,107,53,0.5)}
+.btn:active{transform:translateY(0);box-shadow:0 2px 8px rgba(255,107,53,0.3)}
+.btn.secondary{background:linear-gradient(135deg,#4a90d9,#67b8e7);box-shadow:0 4px 15px rgba(74,144,217,0.3)}
+.btn.secondary:hover{box-shadow:0 6px 20px rgba(74,144,217,0.5)}
+.btn.green{background:linear-gradient(135deg,#27ae60,#52d689);box-shadow:0 4px 15px rgba(39,174,96,0.3)}
+.btn.green:hover{box-shadow:0 6px 20px rgba(39,174,96,0.5)}
+.btn.purple{background:linear-gradient(135deg,#8e44ad,#bb6bd9);box-shadow:0 4px 15px rgba(142,68,173,0.3)}
+.btn.purple:hover{box-shadow:0 6px 20px rgba(142,68,173,0.5)}
+.slider-group{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:120px}
+.slider-group label{color:rgba(255,255,255,0.8);font-size:11px;font-weight:500}
+.slider-group .val{color:#FF6B35;font-size:12px;font-weight:700}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:#FF6B35;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(255,107,53,0.4)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;background:#FF6B35;border-radius:50%;cursor:pointer;border:none}
+.title-bar{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(13,27,42,0.75);backdrop-filter:blur(16px);border-radius:12px;border:1px solid rgba(255,255,255,0.1);z-index:10;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.title-bar h1{color:#fff;font-size:18px;font-weight:700;letter-spacing:1px}
+.title-bar p{color:rgba(255,255,255,0.5);font-size:11px;margin-top:2px}
+.stat{position:fixed;top:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:10}
+.stat-item{display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(13,27,42,0.75);backdrop-filter:blur(16px);border-radius:10px;border:1px solid rgba(255,255,255,0.08)}
+.stat-item .icon{font-size:16px}
+.stat-item .label{color:rgba(255,255,255,0.6);font-size:11px}
+.stat-item .value{color:#fff;font-size:13px;font-weight:700}
+.bar-bg{width:60px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.bar-fill.energy{background:linear-gradient(90deg,#27ae60,#52d689)}
+.bar-fill.speed{background:linear-gradient(90deg,#FF6B35,#FFB347)}
+.theme-btn{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;transition:all .2s}
+.theme-btn:hover{transform:scale(1.15);border-color:rgba(255,255,255,0.5)}
+.theme-btn.active{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.3)}
+@media(max-width:768px){
+#ui{flex-wrap:wrap;justify-content:center;bottom:12px;padding:10px 16px;gap:8px}
+.btn{padding:8px 12px;font-size:12px}
+.slider-group{min-width:80px}
+.title-bar h1{font-size:14px}
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="title-bar"><h1>🚲 自行车骑鹈鹕</h1><p>A Bicycle Riding a Pelican</p></div>
+<div class="stat">
+<div class="stat-item"><span class="icon">⚡</span><span class="label">速度</span><div class="bar-bg"><div class="bar-fill speed" id="speedBar" style="width:50%"></div></div><span class="value" id="speedVal">50</span></div>
+<div class="stat-item"><span class="icon">❤️</span><span class="label">体力</span><div class="bar-bg"><div class="bar-fill energy" id="energyBar" style="width:100%"></div></div><span class="value" id="energyVal">100</span></div>
+</div>
+<div id="ui">
+<button class="btn" id="bellBtn">🔔 车铃</button>
+<div class="slider-group"><label>速度</label><input type="range" id="speedSlider" min="0" max="100" value="50"><span class="val" id="speedLabel">50</span></div>
+<button class="btn secondary" id="sprintBtn">⚡ 冲刺</button>
+<button class="btn green" id="feedBtn">🐟 投喂</button>
+<button class="btn purple" id="themeBtn">🌙 切换天气</button>
+</div>
+<script>
+(function(){
+'use strict';
+const canvas=document.getElementById('scene');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+window.addEventListener('resize',resize);resize();
+
+// 状态
+let speed=0.5,isSprinting=false,bellCooldown=0,pelicanState='normal',pelicanEnergy=100,time=0;
+let weather='sunset',weatherTimer=0;
+let pelicanStartleTimer=0;
+let distance=0;
+let particles=[];
+let ripples=[];
+
+// 音频
+let audioCtx;
+function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
+function playBellSound(){
+initAudio();
+for(let i=0;i<3;i++){
+setTimeout(()=>{
+const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+o.connect(g);g.connect(audioCtx.destination);
+o.frequency.value=1200+i*300;o.type='triangle';
+g.gain.setValueAtTime(0.15,audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.4);
+o.start();o.stop(audioCtx.currentTime+0.4);
+},i*70);
+}
+}
+function playSprintSound(){
+initAudio();
+const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+o.connect(g);g.connect(audioCtx.destination);
+o.frequency.value=200;o.type='sawtooth';
+g.gain.setValueAtTime(0.08,audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+o.start();o.stop(audioCtx.currentTime+0.3);
+}
+function playFeedSound(){
+initAudio();
+for(let i=0;i<4;i++){
+setTimeout(()=>{
+const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+o.connect(g);g.connect(audioCtx.destination);
+o.frequency.value=600+i*100;o.type='sine';
+g.gain.setValueAtTime(0.1,audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.2);
+o.start();o.stop(audioCtx.currentTime+0.2);
+},i*60);
+}
+}
+
+// 粒子
+function spawnFeather(){
+particles.push({x:W+10,y:Math.random()*H*0.5,vx:-(0.5+Math.random()*1.5),vy:Math.random()*0.3,rot:Math.random()*Math.PI*2,rotV:(Math.random()-0.5)*0.05,size:4+Math.random()*6,type:'feather',life:1});
+}
+function spawnSweat(){
+particles.push({x:W*0.3+Math.random()*W*0.4,y:H*0.25+Math.random()*20,vx:(Math.random()-0.5)*0.3,vy:0.5+Math.random(),size:1.5+Math.random()*2,type:'sweat',life:1});
+}
+function spawnFeedParticle(){
+particles.push({x:W/2+Math.random()*60-30,y:H*0.55,vx:(Math.random()-0.5)*2,vy:-1-Math.random()*2,size:3+Math.random()*4,type:'fish',life:1});
+}
+function spawnRipple(x,y){ripples.push({x,y,r:0,maxR:40,life:1})}
+function updateParticles(){
+for(let i=particles.length-1;i>=0;i--){
+const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.rot+=p.rotV;p.life-=0.008;
+if(p.life<=0||p.x<-20||p.y>H+20)particles.splice(i,1);
+}
+for(let i=ripples.length-1;i>=0;i--){
+const r=ripples[i];r.r+=1.5;r.life-=0.02;
+if(r.life<=0)ripples.splice(i,1);
+}
+}
+function drawParticles(){
+particles.forEach(p=>{
+ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=p.life;
+if(p.type==='feather'){ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(0,0,p.size,p.size*0.3,0,0,Math.PI*2);ctx.fill();
+}else if(p.type==='sweat'){ctx.fillStyle='rgba(150,200,255,0.5)';ctx.beginPath();ctx.arc(0,0,p.size,0,Math.PI*2);ctx.fill();
+}else if(p.type==='fish'){ctx.fillStyle='#FFD700';ctx.beginPath();ctx.ellipse(0,0,p.size,p.size*0.5,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#FFA500';ctx.beginPath();ctx.moveTo(-p.size,0);ctx.lineTo(-p.size*1.5,-p.size*0.3);ctx.lineTo(-p.size*1.5,p.size*0.3);ctx.fill();
+}
+ctx.restore();
+});
+ripples.forEach(r=>{
+ctx.save();ctx.globalAlpha=r.life*0.3;ctx.strokeStyle='#87CEEB';ctx.lineWidth=2;
+ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();ctx.restore();
+});
+}
+
+// 背景
+function drawSky(){
+let colors;
+if(weather==='sunset')colors=['#0d1b2a','#1b263b','#FF6B35','#FFB347','#87CEEB'];
+else if(weather==='night')colors=['#020510','#0a1628','#1a1a3e','#2d2d5e','#4a4a8a'];
+else colors=['#87CEEB','#B0E0E6','#E0F7FA','#FFF8E7','#FFE0B2'];
+const grad=ctx.createLinearGradient(0,0,0,H*0.55);
+colors.forEach((c,i)=>grad.addColorStop(i/(colors.length-1),c));
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H*0.55);
+}
+function drawSun(){
+const sx=W*0.78,sy=H*0.22;
+if(weather==='night')return;
+const r=weather==='sunset'?55:40;
+const sg=ctx.createRadialGradient(sx,sy,0,sx,sy,r*3);
+sg.addColorStop(0,'rgba(255,220,50,0.9)');sg.addColorStop(0.3,'rgba(255,180,50,0.4)');sg.addColorStop(1,'rgba(255,150,0,0)');
+ctx.fillStyle=sg;ctx.beginPath();ctx.arc(sx,sy,r*3,0,Math.PI*2);ctx.fill();
+ctx.fillStyle=weather==='sunset'?'#FFD700':'#FFF';ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+}
+function drawStars(){
+if(weather!=='night')return;
+for(let i=0;i<60;i++){
+const sx=(i*137.5+50)%W,sy=(i*97.3+20)%(H*0.4);
+const br=0.3+Math.sin(time*2+i)*0.3;
+ctx.fillStyle=`rgba(255,255,255,${br})`;ctx.beginPath();ctx.arc(sx,sy,1+Math.random(),0,Math.PI*2);ctx.fill();
+}
+}
+function drawClouds(){
+const clouds=[{x:W*0.1,y:H*0.08,s:1},{x:W*0.35,y:H*0.12,s:0.8},{x:W*0.6,y:H*0.06,s:1.1},{x:W*0.85,y:H*0.1,s:0.7}];
+clouds.forEach((c,i)=>{
+const off=(time*0.3*speed+i*300)%(W+300)-150;
+const cx=c.x+off,cy=c.y,s=c.s;
+const alpha=weather==='night'?0.15:0.6;
+ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+ctx.beginPath();ctx.arc(cx,cy,35*s,0,Math.PI*2);ctx.arc(cx+30*s,cy-8*s,28*s,0,Math.PI*2);ctx.arc(cx+55*s,cy,32*s,0,Math.PI*2);ctx.arc(cx+25*s,cy+8*s,22*s,0,Math.PI*2);ctx.fill();
+});
+}
+function drawOcean(){
+const oy=H*0.55;
+const og=ctx.createLinearGradient(0,oy,0,H);
+og.addColorStop(0,weather==='night'?'#0a1628':'#1a3a5c');og.addColorStop(1,weather==='night'?'#020510':'#0d1b2a');
+ctx.fillStyle=og;ctx.fillRect(0,oy,W,H-oy);
+for(let layer=0;layer<4;layer++){
+ctx.beginPath();ctx.moveTo(0,oy);
+for(let x=0;x<=W;x+=4){
+const y=oy+8+layer*10+Math.sin(x*0.008+time*(1.2+layer*0.2)+layer)*5+Math.sin(x*0.015+time*1.8)*3;
+ctx.lineTo(x,y);
+}
+ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+ctx.fillStyle=`rgba(74,144,217,${0.12-layer*0.025})`;ctx.fill();
+}
+// 月光反射
+if(weather==='night'){
+ctx.fillStyle='rgba(200,220,255,0.03)';
+for(let i=0;i<5;i++){
+const rx=W*0.2+i*W*0.15+Math.sin(time+i)*20;
+ctx.beginPath();ctx.ellipse(rx,oy+20,40+i*10,3,0,0,Math.PI*2);ctx.fill();
+}
+}
+}
+function drawPier(){
+const py=H*0.72;
+const pg=ctx.createLinearGradient(0,py,0,H);
+pg.addColorStop(0,'#6B4226');pg.addColorStop(1,'#4a2e14');
+ctx.fillStyle=pg;ctx.fillRect(0,py,W,H-py);
+for(let i=0;i<W;i+=55){
+ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(i,py);ctx.lineTo(i,H);ctx.stroke();
+}
+for(let i=0;i<W;i+=90){
+ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(i,py);ctx.lineTo(i,H);ctx.stroke();
+}
+// 护栏
+ctx.strokeStyle='#8B6914';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();
+for(let i=0;i<W;i+=70){
+ctx.fillStyle='#8B6914';ctx.fillRect(i-3,py-22,6,22);
+ctx.fillStyle='#A0782C';ctx.beginPath();ctx.arc(i,py-22,5,0,Math.PI*2);ctx.fill();
+}
+// 栈道上的光影
+const lightOff=(time*30*speed)%W;
+for(let i=-1;i<3;i++){
+const lx=lightOff+i*W;
+const lg=ctx.createRadialGradient(lx,py,0,lx,py,80);
+lg.addColorStop(0,'rgba(255,200,100,0.08)');lg.addColorStop(1,'rgba(255,200,100,0)');
+ctx.fillStyle=lg;ctx.fillRect(lx-80,py-40,160,80);
+}
+}
+
+// 鹈鹕
+function drawPelican(x,y,t,state){
+ctx.save();ctx.translate(x,y);
+const wingFlap=Math.sin(t*8)*0.45;
+const breath=Math.sin(t*2)*3;
+const runBob=Math.sin(t*12*speed)*4;
+const neckTilt=state==='startled'?Math.sin(t*15)*0.25:0;
+const energyFactor=Math.max(0.3,pelicanEnergy/100);
+
+// 身体
+ctx.fillStyle='#F0EDE8';ctx.beginPath();ctx.ellipse(0,0,48,30,0,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#D8D4CE';ctx.lineWidth=1;ctx.stroke();
+
+// 翅膀
+ctx.save();ctx.translate(-8,-8);ctx.rotate(wingFlap-0.3);
+const wingGrad=ctx.createLinearGradient(0,0,-35,0);
+wingGrad.addColorStop(0,'#E8E4E0');wingGrad.addColorStop(1,'#D0CCC8');
+ctx.fillStyle=wingGrad;ctx.beginPath();ctx.ellipse(0,0,42,18,-0.2,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#C0BCB8';ctx.lineWidth=0.8;
+for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(-32,i*6);ctx.lineTo(30,i*6);ctx.stroke();}
+ctx.restore();
+
+// 头
+ctx.save();ctx.translate(42,-18);ctx.rotate(neckTilt);
+ctx.fillStyle='#FAFAF8';ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#E0DDD8';ctx.lineWidth=0.8;ctx.stroke();
+
+// 眼
+ctx.fillStyle='#2C3E50';ctx.beginPath();ctx.arc(9,-3,3.5,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#FFF';ctx.beginPath();ctx.arc(10,-4.5,1.2,0,Math.PI*2);ctx.fill();
+
+// 喙
+ctx.fillStyle='#FFA726';
+ctx.beginPath();ctx.moveTo(12,-6);ctx.lineTo(32,-10);ctx.lineTo(32,-3);ctx.lineTo(12,-2);ctx.closePath();ctx.fill();
+ctx.beginPath();ctx.moveTo(12,-2);ctx.lineTo(32,1);ctx.lineTo(32,5);ctx.lineTo(12,3);ctx.closePath();ctx.fill();
+ctx.strokeStyle='#E69500';ctx.lineWidth=0.5;ctx.stroke();
+
+// 喉囊
+const pouchSize=state==='feeding'?20+breath*0.5:15+breath*0.3;
+const pouchColor=state==='startled'?'#FF7B7B':state==='feeding'?'#FF8A80':'#FFB6C1';
+ctx.fillStyle=pouchColor;ctx.beginPath();ctx.ellipse(16,8,pouchSize,pouchSize*0.55,0.15,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='rgba(200,100,100,0.4)';ctx.lineWidth=0.8;ctx.stroke();
+
+ctx.restore(); // head
+
+// 尾羽
+ctx.fillStyle='#E0DDD8';ctx.beginPath();ctx.moveTo(-40,0);ctx.lineTo(-60,-8);ctx.lineTo(-58,5);ctx.lineTo(-40,3);ctx.closePath();ctx.fill();
+ctx.beginPath();ctx.moveTo(-40,0);ctx.lineTo(-58,0);ctx.lineTo(-56,8);ctx.lineTo(-40,4);ctx.closePath();ctx.fill();
+
+// 腿
+const legOff=runBob;
+ctx.strokeStyle='#FFA726';ctx.lineWidth=3.5;ctx.lineCap='round';
+ctx.beginPath();ctx.moveTo(-18,24);ctx.quadraticCurveTo(-22,38+legOff,-28,48+legOff);ctx.stroke();
+ctx.beginPath();ctx.moveTo(18,24);ctx.quadraticCurveTo(22,38+legOff,28,48+legOff);ctx.stroke();
+
+// 蹼
+ctx.fillStyle='#FFA726';
+ctx.beginPath();ctx.ellipse(-28,50+legOff,11,5,-0.2,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.moveTo(-28,50+legOff);ctx.lineTo(-40,48+legOff);ctx.lineTo(-34,53+legOff);ctx.fill();
+ctx.beginPath();ctx.ellipse(28,50+legOff,11,5,0.2,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.moveTo(28,50+legOff);ctx.lineTo(40,48+legOff);ctx.lineTo(34,53+legOff);ctx.fill();
+
+ctx.restore();
+}
+
+// 自行车
+function drawBicycle(x,y,t,state){
+ctx.save();ctx.translate(x,y);
+const wheelAngle=t*(state==='sprinting'?28:14)*speed;
+const bounce=Math.sin(t*12*speed)*3;
+const lean=Math.sin(t*8*speed)*0.04;
+ctx.rotate(lean);
+
+// 车架
+ctx.strokeStyle='#607D8B';ctx.lineWidth=5;ctx.lineCap='round';ctx.lineJoin='round';
+ctx.beginPath();ctx.moveTo(0,-12+bounce);ctx.lineTo(-30,38+bounce);ctx.lineTo(30,38+bounce);ctx.lineTo(0,12+bounce);ctx.closePath();ctx.stroke();
+ctx.beginPath();ctx.moveTo(0,12+bounce);ctx.lineTo(-30,38+bounce);ctx.stroke();
+ctx.beginPath();ctx.moveTo(0,-12+bounce);ctx.lineTo(30,38+bounce);ctx.stroke();
+
+// 座椅
+ctx.fillStyle='#5D4037';ctx.beginPath();ctx.ellipse(0,-16+bounce,14,5,0,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#3E2723';ctx.lineWidth=1;ctx.stroke();
+// 座椅支架
+ctx.strokeStyle='#607D8B';ctx.lineWidth=3;
+ctx.beginPath();ctx.moveTo(-4,-12+bounce);ctx.lineTo(-4,-16+bounce);ctx.stroke();
+ctx.beginPath();ctx.moveTo(4,-12+bounce);ctx.lineTo(4,-16+bounce);ctx.stroke();
+
+// 车把立管
+ctx.strokeStyle='#607D8B';ctx.lineWidth=4;
+ctx.beginPath();ctx.moveTo(0,-12+bounce);ctx.lineTo(0,-28+bounce);ctx.stroke();
+// 车把
+ctx.lineWidth=3;
+ctx.beginPath();ctx.moveTo(-14,-26+bounce);ctx.lineTo(14,-26+bounce);ctx.stroke();
+// 车把端
+ctx.fillStyle='#37474F';ctx.beginPath();ctx.arc(-14,-26+bounce,3.5,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.arc(14,-26+bounce,3.5,0,Math.PI*2);ctx.fill();
+
+// 前轮
+drawWheel(ctx,30,38+bounce,24,wheelAngle);
+// 后轮
+drawWheel(ctx,-30,38+bounce,24,wheelAngle);
+
+// 脚踏曲柄
+const pedalAngle=wheelAngle;
+ctx.fillStyle='#546E7A';
+ctx.save();ctx.translate(0,12+bounce);ctx.rotate(pedalAngle);
+ctx.fillRect(-18,-2.5,36,5);ctx.restore();
+ctx.save();ctx.translate(0,12+bounce);ctx.rotate(pedalAngle+Math.PI);
+ctx.fillRect(-18,-2.5,36,5);ctx.restore();
+
+// 脚踏板
+ctx.fillStyle='#455A64';
+ctx.fillRect(-22,-4+bounce,10,8);ctx.fillRect(12,-4+bounce,10,8);
+
+// 链条
+ctx.strokeStyle='#546E7A';ctx.lineWidth=2.5;
+ctx.beginPath();ctx.arc(0,12+bounce,16,0.3,Math.PI*1.2);ctx.stroke();
+ctx.beginPath();ctx.arc(0,12+bounce,16,Math.PI*1.5+0.3,Math.PI*2-0.3);ctx.stroke();
+
+// 中轴齿轮
+ctx.fillStyle='#546E7A';ctx.beginPath();ctx.arc(0,12+bounce,5,0,Math.PI*2);ctx.fill();
+// 后轮齿轮
+ctx.beginPath();ctx.arc(-30,38+bounce,4,0,Math.PI*2);ctx.fill();
+
+// 车铃
+ctx.fillStyle='#FF6B35';ctx.beginPath();ctx.arc(14,-28+bounce,4,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#CC5522';ctx.lineWidth=1;ctx.stroke();
+ctx.fillStyle='#FFB74D';ctx.beginPath();ctx.arc(14,-28+bounce,2,0,Math.PI*2);ctx.fill();
+
+// 缰绳（连接车把到鹈鹕颈部）
+ctx.strokeStyle='#8D6E63';ctx.lineWidth=2.5;ctx.setLineDash([5,3]);
+ctx.beginPath();ctx.moveTo(0,-28+bounce);ctx.quadraticCurveTo(25,-55+bounce,48,-28+bounce);ctx.stroke();
+ctx.setLineDash([]);
+
+// 车篮（前轮上方）
+ctx.strokeStyle='#607D8B';ctx.lineWidth=2;
+ctx.beginPath();ctx.moveTo(20,-10+bounce);ctx.lineTo(20,-22+bounce);ctx.lineTo(35,-22+bounce);ctx.lineTo(35,-10+bounce);ctx.stroke();
+ctx.fillStyle='rgba(255,255,255,0.1)';ctx.fillRect(20,-22+bounce,15,12);
+
+// 反光片
+ctx.fillStyle='rgba(255,255,200,0.6)';
+ctx.beginPath();ctx.arc(-30,38+bounce,3,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.arc(30,38+bounce,3,0,Math.PI*2);ctx.fill();
+
+ctx.restore();
+}
+
+function drawWheel(cx,cy,r,angle){
+// 轮胎
+ctx.strokeStyle='#2C3E50';ctx.lineWidth=4;
+ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+// 内胎
+ctx.strokeStyle='#34495E';ctx.lineWidth=2;
+ctx.beginPath();ctx.arc(cx,cy,r-3,0,Math.PI*2);ctx.stroke();
+// 辐条
+ctx.strokeStyle='#B0BEC5';ctx.lineWidth=0.8;
+for(let i=0;i<16;i++){
+const a=angle+(i/16)*Math.PI*2;
+ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*r*0.92,cy+Math.sin(a)*r*0.92);ctx.stroke();
+}
+// 轮毂
+ctx.fillStyle='#78909C';ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#90A4AE';ctx.beginPath();ctx.arc(cx,cy,2,0,Math.PI*2);ctx.fill();
+// 轮圈反光
+ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(cx,cy,r-1,0,Math.PI*2);ctx.stroke();
+}
+
+// 组合
+function drawCharacter(t){
+const baseX=W/2,baseY=H*0.68;
+const runBob=Math.sin(t*12*speed)*3;
+const totalBob=runBob;
+
+// 鹈鹕
+drawPelican(baseX,baseY+10,t,pelicanState);
+
+// 自行车（在鹈鹕背上）
+drawBicycle(baseX,baseY-55+totalBob*0.5,t,pelicanState);
+
+// 颠簸效果 - 鹈鹕身体微颤
+if(pelicanState==='startled'){
+const shake=Math.sin(t*20)*2;
+ctx.save();ctx.translate(baseX+shake,baseY+10);
+ctx.fillStyle='rgba(255,100,100,0.1)';ctx.beginPath();ctx.arc(0,0,60,0,Math.PI*2);ctx.fill();
+ctx.restore();
+}
+}
+
+// 里程
+function drawDistance(){
+ctx.save();
+ctx.fillStyle='rgba(255,255,255,0.7)';ctx.font='12px "Segoe UI",sans-serif';ctx.textAlign='left';
+ctx.fillText(`距离: ${Math.floor(distance)}m`,20,H-30);
+ctx.fillText(`天气: ${weather==='sunset'?'日落':weather==='night'?'夜晚':'晴天'}`,20,H-15);
+ctx.restore();
+}
+
+// 主循环
+function animate(ts){
+time=ts/1000;
+
+// 更新
+const currentSpeed=isSprinting?speed*1.8:speed;
+distance+=currentSpeed*2;
+if(bellCooldown>0)bellCooldown-=0.016;
+if(pelicanStartleTimer>0){pelicanStartleTimer-=0.016;if(pelicanStartleTimer<=0)pelicanState='normal';}
+
+// 体力恢复/消耗
+if(isSprinting){pelicanEnergy=Math.max(0,pelicanEnergy-0.15);if(pelicanEnergy<=0){isSprinting=false;document.getElementById('sprintBtn').textContent='⚡ 冲刺';document.getElementById('sprintBtn').style.background='';playSprintSound();}}
+else{pelicanEnergy=Math.min(100,pelicanEnergy+0.05);}
+
+// 天气切换
+weatherTimer+=0.016;
+
+// 清空
+ctx.clearRect(0,0,W,H);
+
+// 背景
+drawSky();drawStars();drawSun();drawClouds();drawOcean();drawPier();
+
+// 角色
+drawCharacter(time);
+
+// 粒子
+if(Math.random()<0.03*currentSpeed)spawnFeather();
+if(Math.random()<0.04)spawnSweat();
+updateParticles();drawParticles();
+
+// UI更新
+document.getElementById('speedBar').style.width=(speed*100)+'%';
+document.getElementById('speedVal').textContent=Math.round(speed*100);
+document.getElementById('energyBar').style.width=pelicanEnergy+'%';
+document.getElementById('energyVal').textContent=Math.round(pelicanEnergy);
+
+drawDistance();
+requestAnimationFrame(animate);
+}
+
+// 交互
+document.getElementById('bellBtn').addEventListener('click',()=>{
+playBellSound();pelicanStartleTimer=2.5;pelicanState='startled';
+speed=Math.min(speed+0.2,1);document.getElementById('speedSlider').value=speed*100;
+spawnRipple(W/2,H*0.5);
+});
+document.getElementById('speedSlider').addEventListener('input',e=>{
+speed=e.target.value/100;document.getElementById('speedLabel').textContent=Math.round(speed*100);
+});
+document.getElementById('sprintBtn').addEventListener('click',()=>{
+if(pelicanEnergy<10){return;}
+isSprinting=!isSprinting();
+const btn=document.getElementById('sprintBtn');
+if(isSprinting){btn.textContent='🛑 停止';btn.style.background='linear-gradient(135deg,#E74C3C,#FF6B6B)';playSprintSound();}
+else{btn.textContent='⚡ 冲刺';btn.style.background='';}
+});
+document.getElementById('feedBtn').addEventListener('click',()=>{
+pelicanState='feeding';pelicanEnergy=Math.min(100,pelicanEnergy+25);
+playFeedSound();spawnRipple(W/2,H*0.55);
+for(let i=0;i<8;i++)spawnFeedParticle();
+setTimeout(()=>{pelicanState='normal';},2500);
+});
+document.getElementById('themeBtn').addEventListener('click',()=>{
+const themes=['sunset','night','sunset'];
+const idx=themes.indexOf(weather);
+weather=themes[(idx+1)%themes.length];
+weatherTimer=0;
+const btn=document.getElementById('themeBtn');
+btn.textContent=weather==='sunset'?'🌅 切换天气':weather==='night'?'☀️ 切换天气':'🌙 切换天气';
+});
+
+// 启动
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

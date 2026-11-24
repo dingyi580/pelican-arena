@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自行车骑鹈鹕 | A Bicycle Riding a Pelican</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Zcool+KuaiLe&family=Inter:wght@400;600;800&display=swap');
+
+    :root {
+      --sky-top: #38bdf8;
+      --sky-bottom: #bfdbfe;
+      --ocean-top: #0ea5e9;
+      --ocean-bottom: #1e3a8a;
+      --sand: #fde047;
+      --wood: #78350f;
+      --pelican-body: #ffffff;
+      --pelican-beak: #f59e0b;
+      --pelican-pouch: #fcd34d;
+      --bike-frame: #ef4444;
+      --bike-dark: #1f2937;
+      --bike-metal: #9ca3af;
+      --sun: #fcd34d;
+      --ui-bg: rgba(0, 0, 0, 0.5);
+      --ui-text: rgba(255, 255, 255, 0.9);
+      --ui-border: rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="night"] {
+      --sky-top: #0f172a;
+      --sky-bottom: #312e81;
+      --ocean-top: #1e3a8a;
+      --ocean-bottom: #172554;
+      --sand: #334155;
+      --wood: #451a03;
+      --pelican-body: #cbd5e1;
+      --pelican-beak: #d97706;
+      --pelican-pouch: #fcd34d;
+      --bike-frame: #b91c1c;
+      --bike-dark: #111827;
+      --bike-metal: #6b7280;
+      --sun: #94a3b8; 
+      --ui-bg: rgba(0, 0, 0, 0.7);
+      --ui-text: #fff;
+      --ui-border: rgba(255, 255, 255, 0.05);
+    }
+
+    [data-theme="dusk"] {
+      --sky-top: #9d174d;
+      --sky-bottom: #fbbf24;
+      --ocean-top: #c2410c;
+      --ocean-bottom: #7c2d12;
+      --sand: #b45309;
+      --wood: #78350f;
+      --pelican-body: #ffe4e6;
+      --pelican-beak: #ea580c;
+      --pelican-pouch: #fb923c;
+      --bike-frame: #9d174d;
+      --bike-dark: #1c1917;
+      --bike-metal: #9ca3af;
+      --sun: #f97316;
+      --ui-bg: rgba(69, 26, 3, 0.6);
+      --ui-text: #fffbeb;
+      --ui-border: rgba(255, 255, 255, 0.05);
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--sky-top);
+      font-family: 'Inter', sans-serif;
+    }
+
+    #canvas-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+      transition: background 1s ease;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .title-overlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Zcool KuaiLe', cursive;
+      font-size: 2.5rem;
+      color: rgba(255,255,255, 0.8);
+      text-shadow: 0 8px 16px rgba(0,0,0,0.3);
+      z-index: 50;
+      pointer-events: none;
+      opacity: 0.8;
+      mix-blend-mode: overlay;
+      user-select: none;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--ui-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--ui-border);
+      padding: 12px 24px;
+      border-radius: 9999px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      transition: background 1s, border-color 1s;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: center;
+      min-width: 80px;
+    }
+
+    .control-label {
+      font-size: 0.75rem;
+      color: var(--ui-text);
+      opacity: 0.7;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .fancy-icon-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.1);
+    }
+
+    .fancy-icon-btn:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.15);
+    }
+
+    .fancy-icon-btn:active {
+      transform: scale(0.95) translateY(0);
+    }
+
+    .fancy-icon-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    
+    .fancy-icon-btn:active svg {
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(12deg); }
+      75% { transform: rotate(-12deg); }
+    }
+
+    .speed-slider {
+      appearance: none;
+      width: 120px;
+      height: 6px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .speed-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .speed-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .speed-display {
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      color: white;
+      font-size: 1.1rem;
+    }
+    
+    input[type="range"] {
+      overflow: hidden;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      margin-top: -6px;
+    }
+
+    .spacer {
+      width: 1px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+    }
+
+    .tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .control-group:hover .tooltip {
+      opacity: 1;
+    }
+    
+    .feather {
+      position: absolute;
+      font-size: 24px;
+      color: rgba(255,255,255,0.8);
+      pointer-events: none;
+      animation: float-up 4s linear forwards;
+      text-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      z-index: 40;
+    }
+    
+    @keyframes float-up {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(-200px) rotate(360deg) translateX(50px); opacity: 0; }
+    }
+    
+    .combo-display {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Zcool KuaiLe', 'Inter', sans-serif;
+      color: #FFF;
+      text-shadow: 0 0 10px #FFF, 0 0 20px #FFFFFF;
+      font-size: 1.5rem;
+      z-index: 35;
+      pointer-events: none;
+      user-select: none;
+    }
+    
+    #night-toggle svg {
+      fill: currentColor;
+      stroke: none;
+    }
+
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container">
+    <div class="title-overlay">Pelecanus in Extremis</div>
+    <div id="combo-text" class="combo-display" style="opacity:0">x0</div>
+    <canvas id="main-canvas"></canvas>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">冲 刺</span>
+        <button id="sprint-btn" class="fancy-icon-btn" aria-label="Sprint">
+          <svg viewBox="0 0 24 24"><path d="M12 2L12 6M12 18L12 22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12L6 12M18 12L22 12M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93"/></svg>
+        </button>
+        <div class="tooltip">按下加速冲刺 (S)</div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="control-group">
+        <span class="control-label">车 铃</span>
+        <button id="bell-btn" class="fancy-icon-btn" aria-label="Ring Bell">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <div class="tooltip">惊吓鹈鹕加速 (B)</div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="control-group">
+        <span class="control-label">速 度</span>
+        <input type="range" id="speed-slider" min="1" max="10" value="3" step="0.1" class="speed-slider">
+        <span id="speed-val" class="speed-display">3</span>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="control-group">
+        <span class="control-label">模 式</span>
+        <button id="night-toggle" class="fancy-icon-btn" aria-label="Toggle Night">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+          </svg>
+        </button>
+        <div class="tooltip">切换日/夜/黄昏</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/**
+ * 主程序：全局作用域 (闭包)
+ */
+(() => {
+  'use strict';
+
+  // --------------------------------------------------------------------------
+  // 1. 全局变量与工具函数
+  // --------------------------------------------------------------------------
+  const canvas = document.getElementById('main-canvas');
+  const ctx = canvas.getContext('2d');
+
+  let W, H, CX, CY;
+  let themeIndex = 0; // 0: day, 1: dusk, 2: night
+  const themes = ['day', 'dusk', 'night'];
+  
+  const state = {
+    speed: 3,
+    targetSpeed: 3,
+    sprinting: false,
+    sprintCooldown: 0,
+    sprintCombo: 0,
+    comboTimer: 0,
+    frame: 0,
+    shake: 0,
+    bellRinging: false,
+    bellAnim: 0,
+    pelicanScared: 0,
+    timeOfDay: 0, // current time for parallax
+    stars: [],
+    clouds: [],
+    feathers: [],
+    droplets: [],
+    puffRing: 0, // for dust/exhaust effects
+    bgOffset: 0,
+    groundOffset: 0,
+    totalDistance: 0,
+    roadType: 0, // 0: smooth, 1: bumpy
+    bumpTime: 0
+  };
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    CX = W / 2;
+    CY = H / 2;
+    initStars(); 
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function randomRange(min, max) { return Math.random() * (max - min) + min; }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  // --------------------------------------------------------------------------
+  // 2. 音频系统 (无外部依赖)
+  // --------------------------------------------------------------------------
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new AudioCtx();
+      } catch(e) { console.warn('Audio init failed'); }
+    }
+    return audioCtx;
+  }
+
+  function playBellSound() {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(800 * 4, t + 0.05);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+    
+    // reverb trigger (simulated via second decaying harmonic)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1200, t);
+    gain2.gain.setValueAtTime(0.05, t);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(t);
+    osc2.stop(t + 0.6);
+  }
+
+  function playSprintSound() {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    for(let i=0; i<3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(50, t + i*0.1);
+      osc.frequency.linearRampToValueAtTime(300, t + i*0.1 + 0.1);
+      gain.gain.setValueAtTime(0.05, t + i*0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i*0.1 + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i*0.1);
+      osc.stop(t + i*0.1 + 0.2);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. 场景生成器 (Stars, Clouds, Particles)
+  // --------------------------------------------------------------------------
+  function initStars() {
+    state.stars = [];
+    for(let i=0; i<80; i++) {
+      state.stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H * 0.6,
+        size: Math.random() * 2 + 1,
+        alpha: Math.random(),
+        twinkle: Math.random() * Math.PI
+      });
+    }
+    initClouds();
+  }
+
+  function initClouds() {
+    state.clouds = [];
+    for(let i=0; i<6; i++) {
+      state.clouds.push({
+        x: Math.random() * W,
+        y: randomRange(H*0.05, H*0.3),
+        scale: randomRange(0.8, 1.5),
+        speed: randomRange(0.2, 0.6)
+      });
+    }
+  }
+
+  function spawnFeather(x, y) {
+    for(let i=0; i<5; i++) {
+      state.feathers.push({
+        x: x + randomRange(-20, 20),
+        y: y + randomRange(-20, 20),
+        size: randomRange(6, 14),
+        vx: -state.speed * 0.5 + randomRange(-2, 2),
+        vy: randomRange(-3, -8),
+        rot: Math.random() * Math.PI,
+        vr: randomRange(-0.2, 0.2),
+        life: 1,
+        decay: randomRange(0.01, 0.02)
+      });
+    }
+  }
+
+  function spawnDroplet(x, y, type = 'sweat') {
+    state.droplets.push({
+      x, y,
+      vx: randomRange(-2, -5),
+      vy: randomRange(2, 6),
+      size: randomRange(2, 5),
+      type: type, // 'sweat' or 'spit'
+      life: 1,
+      decay: randomRange(0.02, 0.04)
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // 4. 绘图引擎 - 最小化的绘制原语
+  // --------------------------------------------------------------------------
+  
+  // --- HELPER: 圆角矩形 ---
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+    if (ctx.lineWidth > 0) ctx.stroke();
+  }
+
+  // --- SCENE: SUN ---
+  function drawSun() {
+    const cx = CX + 200;
+    const cy = H * 0.15;
+    const sunColor = getComputedStyle(document.body).getPropertyValue('--sun').trim();
+    
+    // Only draw sun during day/dusk, for night draw moon
+    if (themeIndex === 2) {
+      // Moon
+      ctx.fillStyle = '#f1f5f9';
+      ctx.shadowColor = '#94a3b8';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Craters
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.arc(cx - 10, cy - 5, 8, 0, Math.PI * 2);
+      ctx.arc(cx + 8, cy + 10, 6, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Sun
+      ctx.fillStyle = sunColor;
+      ctx.shadowColor = sunColor;
+      ctx.shadowBlur = 60;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // --- SCENE: OCEAN ---
+  function drawOcean() {
+    const horizon = H * 0.6;
+    const oceanTop = getComputedStyle(document.body).getPropertyValue('--ocean-top').trim();
+    const oceanBot = getComputedStyle(document.body).getPropertyValue('--ocean-bottom').trim();
+    
+    // Horizon line gradient
+    const grad = ctx.createLinearGradient(0, horizon, 0, H);
+    grad.addColorStop(0, oceanTop);
+    grad.addColorStop(1, oceanBot);
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, horizon, W, H - horizon);
+
+    // Waves
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    for(let i=0; i<5; i++) {
+      ctx.beginPath();
+      const y = horizon + 40 + i * 30;
+      const offset = (state.frame * (0.5 + i * 0.2)) + (i * 123);
+      for(let x=0; x <= W; x+=20) {
+        const amp = (5 + i * 5) * Math.sin((x + offset) * 0.01);
+        if(x===0) ctx.moveTo(x, y + amp);
+        else ctx.lineTo(x, y + amp);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // --- SCENE: BOARDWALK & GROUND ---
+  function drawGround() {
+    const horizon = H * 0.65;
+    const groundColor = getComputedStyle(document.body).getPropertyValue('--sand').trim();
+    const woodColor = getComputedStyle(document.body).getPropertyValue('--wood').trim();
+    
+    // Sand/Ground
+    ctx.fillStyle = groundColor;
+    ctx.fillRect(0, horizon, W, H - horizon);
+    
+    // Walking path texture - subtle horizontal lines to simulate sand
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    ctx.lineWidth = 2;
+    for (let i=0; i < (H - horizon); i+= 15) {
+      ctx.beginPath();
+      ctx.moveTo(0, horizon + i);
+      ctx.lineTo(W, horizon + i);
+      ctx.stroke();
+    }
+
+    // Boardwalk planks moving right to left
+    const plankSpeed = state.speed * 3;
+    const plankW = 100;
+    const plankOffset = (state.groundOffset * plankSpeed) % plankW;
+    
+    ctx.fillStyle = woodColor;
+    // Perspective make planks wider at bottom? Keep flat 2D style consistent.
+    // Draw planks
+    const plankY = H - 60;
+    const plankH = 20;
+    
+    for(let i = -1; i < W / plankW + 2; i++) {
+      let x = i * plankW - plankOffset;
+      // Add slight 3D bevel if possible, but keep simple for performance
+      ctx.fillRect(x, plankY, plankW - 5, plankH);
+      // Wood grain
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, plankY);
+      ctx.lineTo(x, plankY + plankH);
+      ctx.stroke();
+    }
+    
+    // Shadow under pelican
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    const shadowX = CX;
+    const shadowY = H - 40 + (state.bumpTime > 0 ? Math.sin(state.bumpTime * 10)*5 : 0);
+    ctx.ellipse(shadowX, shadowY, 120, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- SCENE: BACKGROUND (Clouds & Stars) ---
+  function drawBackground() {
+    drawSun();
+    
+    // Stars if night
+    if (themeIndex === 2) {
+      state.stars.forEach(star => {
+        star.twinkle += 0.05;
+        const opacity = 0.5 + Math.sin(star.twinkle) * 0.5;
+        ctx.fillStyle = `rgba(255,255,255,${opacity * star.alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Clouds (Parallax)
+    state.clouds.forEach(cloud => {
+      cloud.x -= cloud.speed * (state.speed * 0.2);
+      if (cloud.x < -200) cloud.x = W + 100;
+      
+      ctx.save();
+      ctx.translate(cloud.x, cloud.y);
+      ctx.scale(cloud.scale, cloud.scale);
+      ctx.fillStyle = themeIndex === 2 ? 'rgba(255,255,255,0.1)' : `rgba(255,255,255,${0.7 + Math.sin(state.frame*0.01)*0.1})`;
+      
+      // Cloud shape (3 circles)
+      ctx.beginPath();
+      ctx.arc(0, 0, 30, 0, Math.PI * 2);
+      ctx.arc(40, -10, 40, 0, Math.PI * 2);
+      ctx.arc(80, 5, 30, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+    
+    drawOcean();
+    drawGround();
+  }
+
+  // --------------------------------------------------------------------------
+  // 5. 主角色绘制: 鹈鹕 + 自行车
+  // --------------------------------------------------------------------------
+
+  function drawPelican(x, y, scale, phase) {
+    // Pelican Color Palette
+    const bodyColor = getComputedStyle(document.body).getPropertyValue('--pelican-body').trim();
+    const beakColor = getComputedStyle(document.body).getPropertyValue('--pelican-beak').trim();
+    const pouchColor = getComputedStyle(document.body).getPropertyValue('--pelican-pouch').trim();
+    const black = '#1a1a1a';
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    // Breathing / Running bounce
+    const bounce = Math.sin(state.frame * (state.speed * 0.1)) * 15;
+    ctx.translate(0, bounce);
+
+    // Anger/Scared Tilt (if bell pressed)
+    const angryTilt = state.pelicanScared > 0 ? -0.2 : 0;
+    ctx.rotate(angryTilt);
+
+    // --- 1. BACK LEG (Right) ---
+    // Simple stick leg running animation
+    ctx.save();
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    const legPhase = state.frame * 0.15; // independent run cycle
+    const backLegAngle = Math.sin(legPhase + Math.PI) * 0.5;
+    ctx.translate(10, 50); // hip joint
+    ctx.rotate(backLegAngle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(10, 40);
+    ctx.stroke();
+    // Foot
+    ctx.fillStyle = '#eab308'; // webbed foot
+    ctx.beginPath();
+    ctx.moveTo(0, 40);
+    ctx.lineTo(25, 42);
+    ctx.lineTo(22, 48);
+    ctx.lineTo(-5, 45);
+    ctx.fill();
+    ctx.restore();
+
+    // --- 2. FAR WING ---
+    // Flapping wing
+    ctx.save();
+    const flap = Math.sin(state.frame * 0.1) * 0.3;
+    ctx.translate(-30, -20); // shoulder
+    ctx.rotate(flap - 0.2);
+    
+    ctx.fillStyle = '#f3f4f6'; // slightly darker than body
+    ctx.beginPath();
+    ctx.moveTo(0, 0); // shoulder
+    ctx.quadraticCurveTo(-60, -20, -90, 10);
+    ctx.quadraticCurveTo(-50, 30, 10, 10);
+    ctx.closePath();
+    ctx.fill();
+    // Wing tip details
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 2;
+    for(let i=0; i<3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-20 - i*20, 5 + i*5);
+      ctx.lineTo(-30 - i*20, 15 + i*5);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // --- 3. BODY ---
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    // Big pear shape
+    ctx.moveTo(60, 0);
+    ctx.bezierCurveTo(80, -40, -40, -55, -70, -20);
+    ctx.bezierCurveTo(-90, 10, -60, 60, 20, 55);
+    ctx.bezierCurveTo(50, 55, 60, 30, 60, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Shading on body
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(20, -40);
+    ctx.bezierCurveTo(50, -40, 60, 0, 20, 50);
+    ctx.lineTo(0, 50);
+    ctx.bezierCurveTo(-20, 20, 0, -20, 20, -40);
+    ctx.fill();
+
+    // --- 4. THIGH (Right, visible) ---
+    ctx.fillStyle = '#e5e7eb';
+    ctx.beginPath();
+    ctx.ellipse(20, 45, 25, 15, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- 5. NECK & HEAD ---
+    // Sinuous neck
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(60, -10);
+    // Neck goes right then up
+    ctx.bezierCurveTo(90, -50, 70, -90, 80, -110);
+    ctx.lineTo(65, -110); // top of head
+    ctx.bezierCurveTo(50, -90, 60, -40, 55, -5);
+    ctx.closePath();
+    ctx.fill();
+
+    // --- 6. BEAK & POUCH ---
+    // Lower mandible (pouch)
+    ctx.fillStyle = pouchColor;
+    ctx.beginPath();
+    ctx.moveTo(70, -95); // junction near eye
+    ctx.quadraticCurveTo(90, -80, 110, -85);
+    ctx.quadraticCurveTo(140, -90, 160, -70); // tip of beak
+    ctx.lineTo(160, -70); // blunt tip
+    ctx.quadraticCurveTo(140, -50, 90, -60);
+    ctx.quadraticCurveTo(60, -55, 70, -95);
+    ctx.fill();
+
+    // Upper beak
+    ctx.fillStyle = beakColor;
+    ctx.beginPath();
+    ctx.moveTo(70, -108); // nose bridge
+    ctx.quadraticCurveTo(120, -120, 160, -95);
+    ctx.lineTo(100, -85);
+    ctx.quadraticCurveTo(80, -80, 70, -108);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Beak detail shadow
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(70, -108);
+    ctx.quadraticCurveTo(120, -120, 140, -100);
+    ctx.stroke();
+
+    // --- 7. EYE & EXPRESSION ---
+    // White sclera
+    const eyeAy = state.pelicanScared > 0 ? -12 : 0; // Eye pop when scared
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(78 + (state.pelicanScared ? 5 : 0), -100 + eyeAy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pupil
+    ctx.fillStyle = black;
+    ctx.beginPath();
+    ctx.arc(81 + (state.pelicanScared ? 5 : 0), -100 + eyeAy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Highlight
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(82 + (state.pelicanScared ? 5 : 0), -102 + eyeAy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- 8. CROWN & FEATHERS ---
+    // Little crest on head
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(70, -110);
+    ctx.lineTo(75, -120);
+    ctx.lineTo(80, -110);
+    ctx.fill();
+
+    // --- 9. FAR LEG (Front, Left) ---
+    // This leg should move asynchronously to the right leg (out of sync)
+    ctx.save();
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    const frontLegAngle = Math.sin(legPhase) * 0.5;
+    ctx.translate(30, 50); // hip joint
+    ctx.rotate(frontLegAngle + 0.2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(10, 40);
+    ctx.stroke();
+    // Foot
+    ctx.fillStyle = '#eab308'; 
+    ctx.beginPath();
+    ctx.moveTo(0, 40);
+    ctx.lineTo(25, 42);
+    ctx.lineTo(22, 48);
+    ctx.lineTo(-5, 45);
+    ctx.fill();
+    ctx.restore();
+
+    // --- 10. NEAR WING (Foreground) ---
+    ctx.save();
+    // Wing flaps vigorously if speed is high
+    const fastFlap = state.speed > 6 ? Math.sin(state.frame * 0.2)*0.5 : Math.sin(state.frame * 0.1)*0.3;
+    ctx.translate(-20, -30); // shoulder
+    ctx.rotate(fastFlap);
+    
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(0, 0); // shoulder
+    ctx.quadraticCurveTo(-80, -30, -120, 20);
+    ctx.quadraticCurveTo(-70, 50, 0, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#e5e7eb'; // outline
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Feather layers
+    ctx.strokeStyle = '#e5e7eb'; // Darker line for depth
+    for(let i=0; i<4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-20 - i*20, 10 + i*5);
+      ctx.lineTo(-30 - i*20, 30 + i*5);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Scared particles (Sweat drops / flying feathers)
+    if (state.pelicanScared > 0) {
+      if (Math.random() > 0.5) spawnFeather(x, y - 150);
+    }
+
+    ctx.restore();
+  }
+
+  function drawBicycle(x, y, scale, phase) {
+    // Bike Color Palette
+    const frameColor = getComputedStyle(document.body).getPropertyValue('--bike-frame').trim();
+    const darkColor = getComputedStyle(document.body).getPropertyValue('--bike-dark').trim();
+    const metalColor = getComputedStyle(document.body).getPropertyValue('--bike-metal').trim();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    // Add a "Rider" feel - a subtle rider context? No, just assert control.
+    // Ropes / Reins to Head (Connecting to Pelican neck/head)
+    // Draw these first so they are behind the bike
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 3;
+    // From Handlebars (approx 40, -70 relative to bike) to Pelican Eye (approx 200, -150 in world space? No)
+    // In local space. Pelican eye local: approx (240, -160) relative to bike origin, assuming x,y is pelican center.
+    // Let's say Bike is at (CX, CY). Pelican eye is approx (X+100, Y-100).
+    // So from bike handlebar (40, -80) to ... let's say relative anchor is (100, -120).
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.lineDashOffset = -state.frame;
+    ctx.beginPath();
+    ctx.moveTo(-30, -80); // Left Handlebar end
+    ctx.quadraticCurveTo(-80, -120, 80, -180); // Pulling tight down to neck/mouth
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(30, -80); // Right Handlebar end
+    ctx.quadraticCurveTo(40, -130, 110, -180); 
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // BOBBING Effect on the Bike (Spring/Suspension)
+    // Also handle sprint jitter
+    const bob = Math.sin(state.frame * 0.2) * 3;
+    const sprintJitter = state.sprinting ? Math.sin(state.frame * 0.8) * 4 : 0;
+    ctx.translate(0, bob + sprintJitter);
+    
+    // Entire Bike Tilt
+    const gasTilt = state.sprinting ? -0.1 : 0;
+    const balanceTilt = Math.sin(state.frame * 0.03) * 0.05;
+    ctx.rotate(gasTilt + balanceTilt);
+
+    // --- GEOMETRY ---
+    // Wheels radius = 40. Centers: Rear(-60, 0), Front(60, 0)
+    const wheelR = 40;
+    const rearCx = -60, rearCy = 0;
+    const frontCx = 60, frontCy = 0;
+
+    // --- 1. CHAINGUARD / SPROCKET ---
+    ctx.fillStyle = metalColor;
+    ctx.beginPath();
+    ctx.arc(-20, 0, 10, 0, Math.PI*2);
+    ctx.fill();
+    // Chain (moving)
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = state.frame * state.speed * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-60, 0); // rear axle
+    ctx.lineTo(-20, 0); // sprocket
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // --- 2. REAR WHEEL ---
+    // Rim
+    ctx.strokeStyle = metalColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(rearCx, rearCy, wheelR, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Tire
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(rearCx, rearCy, wheelR - 3, 0, Math.PI * 2);
+    ctx.stroke();
+    // Spokes (Spinning)
+    const spokeRot = state.frame * state.speed * 0.5;
+    ctx.save();
+    ctx.translate(rearCx, rearCy);
+    ctx.rotate(spokeRot);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    for (let i=0; i<8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, -wheelR+3);
+      ctx.lineTo(0, wheelR-3);
+      ctx.stroke();
+      ctx.rotate(Math.PI / 4);
+    }
+    ctx.restore();
+
+    // --- 3. FRONT WHEEL (with Fork) ---
+    // Fork
+    ctx.save();
+    ctx.strokeStyle = metalColor;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(20, -50); // Head tube approximate
+    ctx.lineTo(frontCx, frontCy);
+    ctx.stroke();
+    ctx.restore();
+
+    // Front Wheel
+    ctx.strokeStyle = metalColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(frontCx, frontCy, wheelR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(frontCx, frontCy, wheelR - 3, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Front Spokes
+    ctx.save();
+    ctx.translate(frontCx, frontCy);
+    ctx.rotate(spokeRot);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    for (let i=0; i<8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, -wheelR+3);
+      ctx.lineTo(0, wheelR-3);
+      ctx.stroke();
+      ctx.rotate(Math.PI / 4);
+    }
+    ctx.restore();
+
+    // --- 4. FRAME ---
+    ctx.strokeStyle = frameColor;
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 5;
+
+    ctx.beginPath();
+    // Rear Axle (-60, 0) -> Chainstay to Sprocket (-20, 0)
+    ctx.moveTo(rearCx, rearCy);
+    ctx.lineTo(-20, 0);
+    // Sprocket to Seat Tube Top (-25, -60)
+    ctx.lineTo(-25, -70);
+    // Seat Tube Top to Rear Axle
+    ctx.lineTo(rearCx, rearCy);
+    // Seat Tube Top (-25, -70) -> Head Tube (20, -50)
+    ctx.lineTo(20, -50);
+    // Head Tube to Front Axle
+    ctx.lineTo(frontCx, frontCy); // Actually fork goes there, but frame usually ends earlier on modern bikes
+    // Let's draw a standard diamond frame
+    ctx.moveTo(-25, -70); // Top of seat tube
+    ctx.lineTo(20, -80); // Top tube end
+    ctx.lineTo(20, -50); // Head tube bottom
+    ctx.stroke();
+    
+    ctx.restore(); // Restore shadow/blur settings for next stroke if needed
+    ctx.save();
+    ctx.translate(x, y); // re-apply trans
+    ctx.scale(scale, scale);
+    ctx.translate(0, bob + sprintJitter);
+    ctx.rotate(gasTilt + balanceTilt);
+
+    // Down Tube (20,-80 -> -20,0)
+    ctx.beginPath();
+    ctx.moveTo(20, -80);
+    ctx.lineTo(-20, 0);
+    ctx.stroke();
+
+    // Seat Stay (Rear axle to Seat Tube Top)
+    ctx.beginPath();
+    ctx.moveTo(rearCx, rearCy);
+    ctx.lineTo(-25, -70);
+    ctx.stroke();
+
+    // --- 5. SADDLE & PEDALS ---
+    // Saddle (Seat)
+    ctx.fillStyle = darkColor; // Leather seat
+    ctx.beginPath();
+    ctx.ellipse(-25, -75, 18, 6, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crank & Pedals
+    const crankRot = state.frame * state.speed * 0.5;
+    const leftPedalX = -20 + Math.cos(crankRot) * 20;
+    const leftPedalY = Math.sin(crankRot) * 20;
+    const rightPedalX = -20 - Math.cos(crankRot) * 20;
+    const rightPedalY = -Math.sin(crankRot) * 20;
+
+    ctx.strokeStyle = metalColor; // Crank arm
+    ctx.lineWidth = 4;
+    // Left Pedal (Near side / visual "left" based on perspective)
+    ctx.beginPath();
+    ctx.moveTo(-20, 0);
+    ctx.lineTo(leftPedalX, leftPedalY);
+    ctx.stroke();
+    // Pedal block
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(leftPedalX - 8, leftPedalY - 4, 16, 8);
+
+    // --- 6. HANDLEBARS & STEM ---
+    // Stem
+    ctx.strokeStyle = metalColor;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(20, -70);
+    ctx.lineTo(20, -85);
+    ctx.stroke();
+    
+    // Handlebars
+    ctx.strokeStyle = metalColor;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(10, -85);
+    ctx.lineTo(40, -85);
+    ctx.stroke();
+    // Grips
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = darkColor;
+    ctx.beginPath();
+    ctx.moveTo(10, -85);
+    ctx.lineTo(-5, -85);
+    ctx.stroke();
+    
+    // Headlight
+    ctx.fillStyle = themeIndex === 2 ? '#fef3c7' : '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(20, -80, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // Beam (Only at night?)
+    if (themeIndex === 2) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = 'rgba(253, 224, 71, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(20, -80);
+      ctx.lineTo(300, -150);
+      ctx.lineTo(300, -10);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // --- 7. BELL ---
+    // A decorative shiny bell that rings
+    const bx = -5, by = -90;
+    ctx.fillStyle = '#fbbf24'; // Gold
+    ctx.beginPath();
+    ctx.arc(bx, by, 8, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f59e0b'; // Darker gold
+    ctx.fillRect(bx - 8, by, 6, 12);
+    // Bell hammer
+    ctx.fillStyle = darkColor;
+    const hammerAngle = state.bellRinging ? Math.sin(state.bellAnim * 0.5) * 0.5 : 0;
+    ctx.save();
+    ctx.translate(bx - 8, by + 6);
+    ctx.rotate(hammerAngle);
+    ctx.fillRect(-2, -2, 8, 4);
+    ctx.restore();
+
+    ctx.restore(); // End Bike Drawing
+  }
+
+  // --- PARTICLES ---
+  function drawParticles() {
+    // Background feathers (already passed behind?)
+    // Let's just draw them in drawForeground() or as overlay.
+    
+    state.droplets.forEach((d, i) => {
+      if (d.life <= 0) { state.droplets.splice(i, 1); return; }
+      d.x += d.vx;
+      d.y += d.vy;
+      d.life -= d.decay;
+    });
+    
+    // Actually render them
+    state.droplets.forEach(d => {
+      ctx.globalAlpha = d.life;
+      ctx.fillStyle = d.type === 'sweat' ? '#38bdf8' : '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    
+    state.feathers.forEach(f => {
+      if (f.life <= 0) return; // logic handled above usually
+      f.x += f.vx * (0.5 + f.life);
+      f.y += f.vy;
+      f.rot += f.vr;
+      f.life -= f.decay;
+      
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rot);
+      ctx.globalAlpha = f.life;
+      
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, -f.size);
+      ctx.quadraticCurveTo(f.size/2, 0, 0, f.size);
+      ctx.quadraticCurveTo(-f.size/2, 0, 0, -f.size);
+      ctx.fill();
+      ctx.restore();
+    });
+    ctx.globalAlpha = 1;
+    
+    // Cheering / Sprint effects
+    if (state.sprinting > 0) {
+      // Speed lines
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 2;
+      for(let i=0; i<5; i++) {
+        let sx = (state.frame * 15 + i * 50) % (W + 200) - 200;
+        let sy = CY + Math.random()*200 - 100;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx - 100, sy);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 6. 动画循环 & 逻辑
+  // --------------------------------------------------------------------------
+  
+  function update() {
+    // Speed Physics
+    if (state.sprinting) {
+      state.targetSpeed = 10;
+      state.sprintCooldown--;
+      if (state.sprintCooldown <= 0) {
+        state.sprinting = false;
+        state.sprintCombo = 0; // Reset combo on fail
+        state.targetSpeed = parseFloat(document.getElementById('speed-slider').value);
+      }
+    } else {
+      state.targetSpeed = parseFloat(document.getElementById('speed-slider').value);
+    }
+    
+    // Smooth speed transition
+    state.speed = lerp(state.speed, state.targetSpeed, 0.05);
+
+    // Background offsets
+    state.bgOffset += state.speed * 0.2;
+    state.groundOffset += state.speed * 0.8;
+    state.frame++;
+    
+    // Shake Decay
+    if (state.shake > 0) state.shake *= 0.9;
+    
+    // Bell Animation Decay
+    if (state.bellRinging) {
+      state.bellAnim++;
+      if (state.bellAnim > 20) { state.bellRinging = false; state.bellAnim = 0; }
+    }
+    
+    // Pelican Fear Decay
+    if (state.pelicanScared > 0) state.pelicanScared--;
+    
+    // Combo Display
+    const comboEl = document.getElementById('combo-text');
+    if (state.comboTimer > 0) {
+      state.comboTimer--;
+      comboEl.textContent = `x${state.sprintCombo}`;
+      comboEl.style.opacity = (state.comboTimer > 50) ? 1 : (state.comboTimer / 50);
+      comboEl.style.transform = `translateX(-50%) scale(${1 + Math.sin(state.comboTimer * 0.5) * 0.2})`;
+    } else {
+      comboEl.style.opacity = 0;
+      state.sprintCombo = 0;
+    }
+    
+    // Auto spawn droplets from pelican when fast
+    if (state.speed > 5 && state.frame % 5 === 0) {
+       spawnDroplet(CX - 100, CY - 80, 'sweat');
+    }
+    
+    // Cleanup particles
+    state.feathers = state.feathers.filter(f => f.life > 0);
+  }
+
+  function render() {
+    // Clear
+    ctx.clearRect(0, 0, W, H);
+
+    // Apply Camera Shake (if sprinting started or bell rung)
+    ctx.save();
+    if (state.shake > 0.5) {
+      const dx = (Math.random() - 0.5) * state.shake * 4;
+      const dy = (Math.random() - 0.5) * state.shake * 4;
+      ctx.translate(dx, dy);
+    }
+
+    // 1. Draw Scene
+    drawBackground();
+
+    // 2. Draw Pelican
+    // Pelican position: mostly stable center, slight bob
+    // But running implies moving up down + forward/back relative to "stationary" stage
+    const pelicanY = CY + 150;
+    drawPelican(CX - 50, pelicanY, 1.2, 0);
+
+    // 3. Draw Bicycle (Sitting on Pelican)
+    // The saddle roughly aligns with the pelican back center
+    // Based on pelican draw offsets: Center x,y => CX-50, CY+150
+    // Pelican back is roughly at relative (0, -60) inside drawPelican
+    // So Bike position should be (CX-50 + 10, CY+150 - 100)
+    // Adjustments for visual alignment: 
+    drawBicycle(CX + 10, pelicanY - 120, 1.1, 0);
+
+    // 4. Draw Foreground/Particles
+    drawParticles();
+
+    // Speed Lines overlay for sprint
+    if (state.sprinting) {
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.restore();
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // --------------------------------------------------------------------------
+  // 7. UI 交互 & 事件绑定
+  // --------------------------------------------------------------------------
+  const bellBtn = document.getElementById('bell-btn');
+  const sprintBtn = document.getElementById('sprint-btn');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedVal = document.getElementById('speed-val');
+  const nightToggle = document.getElementById('night-toggle');
+  
+  // CSS Theme Logic
+  function updateTheme() {
+    const name = themes[themeIndex];
+    document.body.setAttribute('data-theme', name);
+  }
+
+  // 1. Ring Bell
+  function triggerBell() {
+    playBellSound();
+    state.bellRinging = true;
+    state.bellAnim = 0;
+    state.pelicanScared = 30; // Frames of scare
+    state.shake = 5;
+    spawnFeather(CX - 50, CY); // Burst of feathers
+    state.pelicanScared = 10;
+    // Also give small temporary speed boost?
+    state.targetSpeed = clamp(state.speed + 2, 1, 12);
+  }
+  bellBtn.addEventListener('click', triggerBell);
+
+  // 2. Sprint
+  function triggerSprint() {
+    playSprintSound();
+    state.sprinting = true;
+    state.sprintCooldown = 120; // 2 seconds
+    state.shake = 10;
+    state.sprintCombo++;
+    state.comboTimer = 90;
+    
+    // Visual burst
+    for(let i=0; i<10; i++) {
+      spawnDroplet(CX + 150, CY, 'spit');
+    }
+  }
+  sprintBtn.addEventListener('click', triggerSprint);
+
+  // 3. Speed Slider
+  speedSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    speedVal.textContent = val.toFixed(1);
+    if (!state.sprinting) state.targetSpeed = val;
+  });
+
+  // 4. Night/Dusk Toggle
+  nightToggle.addEventListener('click', () => {
+    themeIndex = (themeIndex + 1) % themes.length;
+    updateTheme();
+    
+    // generate stars if night
+    if (themeIndex === 2) {
+      initStars();
+    }
+    
+    // Toggle SVG icon based on theme?
+    // For now, we just let CSS handle background.
+  });
+
+  // Keyboard bindings
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault(); // prevent scroll
+      if (state.sprinting) state.sprintCombo++;
+      triggerSprint();
+    }
+    if (e.code === 'KeyB') triggerBell();
+    if (e.code === 'KeyS') triggerSprint();
+  });
+
+  // Initial Setup
+  updateTheme();
+  loop();
+
+})();
+</script>
+</body>
+</html>

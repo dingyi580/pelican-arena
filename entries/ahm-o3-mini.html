@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>自行车骑鹈鹕</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #87ceeb;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #gameCanvas {
+      display: block;
+      background: #a0d8f1; /* 天空蓝 */
+    }
+    #controls {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.8);
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+    #controls button, #controls input[type="range"] {
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: 14px;
+      border: 1px solid #777;
+      border-radius: 5px;
+      background: #fff;
+    }
+    #controls button:hover {
+      background: #eee;
+    }
+    #speedValue, #themeText {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="controls">
+    <button id="bellButton">按车铃</button>
+    <div>
+      速度: <input type="range" id="speedSlider" min="1" max="10" value="4">
+      <span id="speedValue">4</span>
+    </div>
+    <button id="feedButton">投喂小鱼</button>
+    <button id="themeButton">切换晴/夜</button>
+    <span id="themeText">晴天</span>
+  </div>
+
+  <script>
+    // 获取画布及上下文
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // 全局状态变量
+    let lastTime = 0;
+    let baseSpeed = 4;
+    let boostSpeed = 0;
+    let boostDuration = 0;
+    let pelicanStamina = 100; // 0-100, 小鱼投喂可以恢复
+    let themeIsNight = false;
+
+    // 控件元素
+    const bellButton = document.getElementById('bellButton');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValueEl = document.getElementById('speedValue');
+    const feedButton = document.getElementById('feedButton');
+    const themeButton = document.getElementById('themeButton');
+    const themeText = document.getElementById('themeText');
+
+    speedSlider.addEventListener('input', () => {
+      baseSpeed = parseInt(speedSlider.value);
+      speedValueEl.textContent = baseSpeed;
+    });
+
+    bellButton.addEventListener('click', () => {
+      playBell();
+      // 当按下车铃时，鹈鹕突然加速并展示惊讶表情
+      boostSpeed = 6;
+      boostDuration = 500; // 毫秒
+      pelicanStamina = Math.max(0, pelicanStamina - 10);
+    });
+
+    feedButton.addEventListener('click', () => {
+      // 模拟投喂小鱼，提升体力并使鹈鹕开心
+      pelicanStamina = Math.min(100, pelicanStamina + 20);
+      // 短暂的“满足”效果：加快摆动
+      boostSpeed = 3;
+      boostDuration = 300;
+    });
+
+    themeButton.addEventListener('click', () => {
+      themeIsNight = !themeIsNight;
+      themeText.textContent = themeIsNight ? "夜晚" : "晴天";
+      // 改变背景色
+      if(themeIsNight) {
+        document.body.style.background = "#1a1a2e";
+      } else {
+        document.body.style.background = "#87ceeb";
+      }
+    });
+
+    // Web Audio API 合成铃声
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    function playBell() {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.type = 'triangle';
+      oscillator.frequency.value = 1000; // 1kHz
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      gainNode.gain.value = 0.2;
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.15);
+    }
+
+    // 背景图层数据（简单的几何图形实现视差滚动）
+    const bgLayers = [
+      {
+        // 最远背景：远海
+        speedFactor: 0.2,
+        draw: function(offset) {
+          ctx.fillStyle = themeIsNight ? '#0d1b2a' : '#5390d9';
+          ctx.fillRect(0, canvas.height * 0.6, canvas.width, canvas.height * 0.4);
+        }
+      },
+      {
+        // 中间背景：海滨木栈道
+        speedFactor: 0.5,
+        draw: function(offset) {
+          ctx.fillStyle = themeIsNight ? '#333' : '#c4a484';
+          let y = canvas.height * 0.55;
+          ctx.fillRect(0, y, canvas.width, canvas.height * 0.05);
+        }
+      },
+      {
+        // 前景：漂浮羽毛（趣味粒子）
+        speedFactor: 1.0,
+        particles: [],
+        init: function() {
+          for(let i = 0; i < 20; i++) {
+            this.particles.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              size: Math.random() * 3 + 2,
+              speed: Math.random() * 0.5 + 0.5
+            });
+          }
+        },
+        draw: function(offset) {
+          ctx.fillStyle = themeIsNight ? '#aaa' : '#fff';
+          for(let p of this.particles) {
+            p.x -= p.speed;
+            if(p.x < -10) p.x = canvas.width + 10;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+          }
+        }
+      }
+    ];
+    bgLayers[2].init();
+
+    // 鹈鹕对象
+    const pelican = {
+      x: canvas.width * 0.2,
+      y: canvas.height * 0.7,
+      width: 120,
+      height: 60,
+      wingAngle: 0,
+      wingSpeed: 0.1,
+      bounce: 0,
+      bounceSpeed: 0.05,
+      faceOffset: 0, // 用于表情变化
+      update: function(dt, speed) {
+        // 跑步状态：随着时间变化产生摇晃与跳跃效果
+        this.bounce = Math.sin(Date.now() * 0.005) * 5;
+        this.wingAngle = Math.sin(Date.now() * 0.005 * (pelicanStamina/50 + 0.5)) * 20; // 扇动角度
+        // 轻微面部抖动（表情变化）
+        this.faceOffset = Math.sin(Date.now() * 0.01) * 2;
+        // 移动（横向）
+        this.x += speed * dt * 0.1;
+        if(this.x > canvas.width*0.5) this.x = canvas.width*0.2; // 循环
+      },
+      draw: function() {
+        ctx.save();
+        ctx.translate(this.x, this.y + this.bounce);
+        // 身体（用椭圆表示）
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.width/2, this.height/2, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 喉囊（标志性）——大而宽松的形状
+        ctx.beginPath();
+        ctx.ellipse(-this.width*0.25, 0, this.width*0.2, this.height*0.45, 0, 0, Math.PI*2);
+        ctx.fillStyle = "#eef";
+        ctx.fill();
+        ctx.stroke();
+
+        // 头部与长喙
+        ctx.save();
+        ctx.translate(this.width*0.3, -this.height*0.15);
+        // 头
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, 0, Math.PI*2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.stroke();
+        // 喙
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(35, this.faceOffset);
+        ctx.lineTo(15, 10);
+        ctx.closePath();
+        ctx.fillStyle = "#ffc107";
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // 翅膀（左右各一，采用旋转表现扑腾）
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#000";
+        // 左翅膀
+        ctx.translate(-this.width*0.3, -10);
+        ctx.rotate(-this.wingAngle * Math.PI/180);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#000";
+        // 右翅膀
+        ctx.translate(-this.width*0.3, 10);
+        ctx.rotate(this.wingAngle * Math.PI/180);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // 尾羽
+        ctx.beginPath();
+        ctx.moveTo(-this.width/2, 0);
+        ctx.lineTo(-this.width/2 - 15, -10);
+        ctx.lineTo(-this.width/2 - 10, 10);
+        ctx.closePath();
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    };
+
+    // 自行车对象（骑在鹈鹕背上）
+    const bicycle = {
+      // 相对于鹈鹕的坐标偏移
+      offsetX: 30,
+      offsetY: -40,
+      wheelRotation: 0,
+      update: function(dt, speed) {
+        // 轮子旋转角度与速度挂钩 (轮子转速)
+        this.wheelRotation += speed * dt * 0.005;
+      },
+      draw: function(baseX, baseY) {
+        const x = baseX + this.offsetX;
+        const y = baseY + this.offsetY;
+        ctx.save();
+        ctx.translate(x, y);
+        // 绘制两个车轮
+        const wheelRadius = 15;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#333";
+        // 后轮
+        ctx.save();
+        ctx.translate(-20, 0);
+        ctx.rotate(this.wheelRotation);
+        ctx.beginPath();
+        ctx.arc(0, 0, wheelRadius, 0, Math.PI*2);
+        ctx.stroke();
+        // 辐条
+        for(let i=0; i<8; i++){
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          let angle = i * (Math.PI/4);
+          ctx.lineTo(wheelRadius * Math.cos(angle), wheelRadius * Math.sin(angle));
+          ctx.stroke();
+        }
+        ctx.restore();
+        // 前轮
+        ctx.save();
+        ctx.translate(20, 0);
+        ctx.rotate(this.wheelRotation);
+        ctx.beginPath();
+        ctx.arc(0, 0, wheelRadius, 0, Math.PI*2);
+        ctx.stroke();
+        for(let i=0; i<8; i++){
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          let angle = i * (Math.PI/4);
+          ctx.lineTo(wheelRadius * Math.cos(angle), wheelRadius * Math.sin(angle));
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // 车架
+        ctx.strokeStyle = "#555";
+        ctx.beginPath();
+        ctx.moveTo(-20, 0);
+        ctx.lineTo(0, -15);
+        ctx.lineTo(20, 0);
+        ctx.moveTo(0, -15);
+        ctx.lineTo(0, 5);
+        ctx.stroke();
+
+        // 车座
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(-5, -25);
+        ctx.stroke();
+        // 车把：拟人化细节，用虚拟缰绳搭在鹈鹕侧面
+        ctx.beginPath();
+        ctx.moveTo(20, 0);
+        ctx.lineTo(35, -10);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    };
+
+    // 主动画循环
+    function animate(timestamp) {
+      if(!lastTime) lastTime = timestamp;
+      const dt = timestamp - lastTime;
+      lastTime = timestamp;
+
+      // 清除画布
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 绘制背景层 (视差滚动)
+      // 为了模拟横向运动，我们使用 timestamp 结合各图层速度因子产生偏移
+      bgLayers.forEach(layer => {
+        if(layer.draw) {
+          let offset = (timestamp * 0.02 * layer.speedFactor) % canvas.width;
+          layer.draw(offset);
+        }
+      });
+
+      // 计算前进速度：基础速度 + boost（会随着时间衰减）
+      let currentSpeed = baseSpeed + boostSpeed;
+      if(boostDuration > 0) {
+        boostDuration -= dt;
+        if(boostDuration <= 0){
+          boostSpeed = 0;
+        }
+      }
+
+      // 更新和绘制鹈鹕
+      pelican.update(dt, currentSpeed);
+      pelican.draw();
+
+      // 更新和绘制自行车（位于鹈鹕背上）
+      bicycle.update(dt, currentSpeed);
+      bicycle.draw(pelican.x, pelican.y + pelican.bounce - pelican.height/2);
+
+      // 显示体力状态（在左上角轻描淡写显示，不遮挡主舞台）
+      ctx.save();
+      ctx.font = "16px Arial";
+      ctx.fillStyle = themeIsNight ? "#fff" : "#000";
+      ctx.fillText("体力：" + pelicanStamina, 10, 20);
+      ctx.restore();
+
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    // 响应窗口大小变化
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        .btn {
+            margin: 5px;
+            padding: 10px;
+            border: none;
+            background-color: #FFD700;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button class="btn" id="bellBtn">按车铃</button>
+        <button class="btn" id="speedBtn">加速</button>
+        <button class="btn" id="feedBtn">投喂小鱼</button>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let pelicanY = 300;
+        let pelicanSpeed = 2;
+        let bikeTilt = 0;
+        
+        // 设定画布大小
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // 鹈鹕的状态
+        let pelicanState = "normal";
+        
+        // 动画循环
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawPelican();
+            drawBike();
+            requestAnimationFrame(animate);
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = "#87CEEB";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50); // 地面
+        }
+
+        function drawPelican() {
+            ctx.save();
+            ctx.translate(canvas.width / 2, pelicanY);
+            ctx.rotate(Math.sin(Date.now() / 500) / 5); // 鹈鹕抖动
+            ctx.fillStyle = "white"; // 鹈鹕颜色
+            ctx.beginPath();
+            ctx.arc(0, 0, 60, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "orange"; // 喙
+            ctx.beginPath();
+            ctx.moveTo(30, 0);
+            ctx.lineTo(60, 10);
+            ctx.lineTo(30, 20);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawBike() {
+            ctx.save();
+            ctx.translate(canvas.width / 2, pelicanY);
+            ctx.rotate(bikeTilt * Math.PI / 180); // 自行车倾斜
+            ctx.fillStyle = "blue"; // 自行车颜色
+
+            // 车身
+            ctx.fillRect(-50, 10, 100, 20);
+            // 车轮
+            ctx.fillStyle = "black";
+            ctx.beginPath();
+            ctx.arc(-50, 30, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(50, 30, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 车铃
+        const bellSound = new Audio();
+        bellSound.src = 'data:audio/wav;base64,UklGRjhEAABXQVZFZm10IBAAAAABAAEAABAAZGF0YTIzNjkBAAAAvA0ARLBQcCAQSYB3EB78AEEAAAAAAABAAAAAAAAAwAAAAEAPAAAABANABAAAABAAQAABPUkFAAAAAAAAAAAVmZwZgDwAQ0AUAIAAAEuDwsDGh8BGI4KEgoYHAAwVkFAAAAAAAAAAAVmZwZgDwAQ0AAQAAAATGQAABAAAABgAABwAAAAAAAwAAHQAAAABQAAAAAA=='; // 铃声
+        document.getElementById('bellBtn').onclick = () => {
+            bellSound.play();
+            pelicanSpeed += 1; // 加速
+            pelicanY -= 10; // 鹈鹕受惊抬高
+            setTimeout(() => pelicanY += 10, 500);
+        };
+
+        document.getElementById('speedBtn').onclick = () => {
+            pelicanSpeed += 2; // 提高速度
+        };
+
+        document.getElementById('feedBtn').onclick = () => {
+            pelicanSpeed -= 1; // 恢复体力
+        };
+
+        // 主动控制鹈鹕的速度
+        setInterval(() => {
+            pelicanY += pelicanSpeed; // 鹈鹕向下移动
+            bikeTilt = (Math.sin(Date.now() / 200) * 15); // 自行车晃动
+            if (pelicanY > canvas.height - 150) pelicanY = 300; // 回到顶部
+        }, 100);
+
+        animate();
+    </script>
+</body>
+</html>

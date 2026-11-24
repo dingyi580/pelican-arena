@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕 · Bicycle Riding a Pelican</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            overflow: hidden; 
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 50%, #FFE4B5 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        .ui-layer {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2), 0 2px 10px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+        button:active { transform: translateY(0); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        #bellBtn { background: #FFD93D; color: #333; font-size: 18px; }
+        #feedBtn { background: #6BCF7F; color: white; }
+        #sprintBtn { 
+            background: #FF6B6B; 
+            color: white; 
+            position: relative;
+            overflow: hidden;
+        }
+        #sprintBtn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .slider-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 140px;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4ECDC4;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        
+        .status-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #2C3E50;
+            background: rgba(255,255,255,0.9);
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label { font-weight: 600; color: #666; }
+        .stat-value { font-weight: 700; color: #2C3E50; }
+        
+        .stamina-bar {
+            width: 150px;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .stamina-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF6B6B, #FFE66D, #6BCF7F);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        .stamina-low { animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="world"></canvas>
+
+<div class="status-panel">
+    <div class="stat-row">
+        <span class="stat-label">体力状态</span>
+        <span class="stat-value" id="staminaText">精力充沛</span>
+    </div>
+    <div class="stamina-bar">
+        <div class="stamina-fill" id="staminaBar" style="width: 100%"></div>
+    </div>
+    <div class="stat-row" style="margin-top: 10px;">
+        <span class="stat-label">当前时速</span>
+        <span class="stat-value" id="speedText">0 km/h</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-label">骑行里程</span>
+        <span class="stat-value" id="distanceText">0 m</span>
+    </div>
+</div>
+
+<div class="ui-layer">
+    <div class="control-group">
+        <button id="bellBtn">🔔 车铃</button>
+        <label style="font-size: 10px; color: #999;">惊吓加速</label>
+    </div>
+    
+    <div class="slider-wrap">
+        <label>巡航速度</label>
+        <input type="range" id="speedSlider" min="10" max="100" value="40">
+    </div>
+    
+    <div class="control-group">
+        <button id="feedBtn">🐟 投喂小鱼</button>
+        <label style="font-size: 10px; color: #999;">恢复体力</label>
+    </div>
+    
+    <div class="control-group">
+        <button id="sprintBtn">⚡ 冲刺</button>
+        <label style="font-size: 10px; color: #999;">消耗体力</label>
+    </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/**
+ * 自行车骑鹈鹕 - 交互式动画
+ * 所有图形使用Canvas API绘制，无外部资源
+ */
+
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d');
+
+// 状态管理
+const state = {
+    speed: 40,           // 基础速度
+    currentSpeed: 0,     // 实际速度
+    stamina: 100,        // 体力 0-100
+    distance: 0,         // 总里程
+    time: 0,             // 全局时间
+    isSprinting: false,
+    isScared: false,     // 受惊状态（车铃）
+    scareTimer: 0,
+    feedTimer: 0,        // 进食动画计时
+    bgOffset: { cloud: 0, sea: 0, road: 0 },
+    particles: [],
+    lastTime: 0,
+    roadType: 'normal',  // normal / bumpy
+    weather: 'sunny',    // sunny / sunset / night
+    dayTime: 0
+};
+
+// 配置
+const CONFIG = {
+    gravity: 0.5,
+    staminaDecay: 0.05,
+    staminaRecovery: 15,
+    maxSpeed: 120,
+    sprintCost: 0.3,
+    scareSpeed: 80,
+    scareDuration: 60, // 帧
+    colors: {
+        pelicanBody: '#F8F8FF',
+        pelicanWing: '#FFFFFF',
+        pelicanPouch: '#FFA07A',
+        pelicanLeg: '#FF8C00',
+        bikeFrame: '#FF4444',
+        bikeMetal: '#C0C0C0',
+        bikeTire: '#2C3E50',
+        skyDay: ['#87CEEB', '#E0F6FF'],
+        skySunset: ['#FF6B6B', '#FFE66D'],
+        skyNight: ['#1a1a2e', '#16213e']
+    }
+};
+
+// 初始化画布尺寸
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 音频上下文（延迟初始化）
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+// 合成车铃声（Web Audio API）
+function playBellSound() {
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const t = audioCtx.currentTime;
+    
+    // 创建铃声振荡器
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.1);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.3);
+    
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(t);
+    osc.stop(t + 0.6);
+    
+    // 添加谐音让声音更清脆
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1600, t);
+    osc2.frequency.exponentialRampToValueAtTime(2400, t + 0.1);
+    gain2.gain.setValueAtTime(0, t);
+    gain2.gain.linearRampToValueAtTime(0.15, t + 0.02);
+    gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+    
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
+    osc2.start(t);
+    osc2.stop(t + 0.4);
+}
+
+// 粒子系统
+class Particle {
+    constructor(x, y, type, vx, vy) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'feather', 'fish', 'sweat', 'bubble'
+        this.vx = vx || (Math.random() - 0.5) * 2;
+        this.vy = vy || -Math.random() * 3 - 1;
+        this.life = 1.0;
+        this.decay = 0.01 + Math.random() * 0.02;
+        this.size = Math.random() * 5 + 3;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.2;
+    }
+    
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        this.rotation += this.rotSpeed;
+        
+        if (this.type === 'feather') {
+            this.vy += 0.05; // 羽毛飘落
+            this.vx *= 0.99;
+        } else if (this.type === 'sweat') {
+            this.vy += 0.1; // 汗滴下落
+        } else if (this.type === 'fish') {
+            this.vy *= 0.95; // 鱼有浮力感
+            this.rotation += 0.1;
+        }
+    }
+    
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.globalAlpha = this.life;
+        
+        if (this.type === 'feather') {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.size, this.size/3, 0, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (this.type === 'fish') {
+            ctx.fillStyle = '#4ECDC4';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.size, this.size/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(-this.size/3, -this.size/4, 2, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (this.type === 'sweat') {
+            ctx.fillStyle = '#87CEEB';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size/2, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (this.type === 'bubble') {
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+}
+
+// 绘制辅助函数
+function drawWheel(ctx, x, y, radius, rotation) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    
+    // 轮胎
+    ctx.strokeStyle = CONFIG.colors.bikeTire;
+    ctx.lineWidth = radius / 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // 轮毂
+    ctx.fillStyle = CONFIG.colors.bikeMetal;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius / 4, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 辐条
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(radius * 0.85, 0);
+        ctx.stroke();
+        ctx.rotate(Math.PI / 3);
+    }
+    
+    ctx.restore();
+}
+
+// 绘制鹈鹕
+function drawPelican(ctx, cx, cy, scale, runCycle, isTired, isEating) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    
+    const legOffset = Math.sin(runCycle) * 20;
+    const bodyBounce = Math.abs(Math.cos(runCycle)) * 5;
+    
+    // 腿部（后层）
+    const legPositions = [-15, 15];
+    legPositions.forEach((offset, i) => {
+        const phase = i === 0 ? 0 : Math.PI;
+        const legX = Math.sin(runCycle + phase) * 15;
+        const legY = Math.cos(runCycle + phase) * 10 + 40;
+        
+        ctx.strokeStyle = CONFIG.colors.pelicanLeg;
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(offset, 20 + bodyBounce);
+        ctx.lineTo(legX, 40 + legY);
+        ctx.lineTo(legX + 5, 55 + legY); // 脚蹼
+        ctx.stroke();
+        
+        // 蹼
+        ctx.fillStyle = '#FF8C00';
+        ctx.beginPath();
+        ctx.moveTo(legX + 5, 55 + legY);
+        ctx.lineTo(legX - 5, 60 + legY);
+        ctx.lineTo(legX + 15, 60 + legY);
+        ctx.fill();
+    });
+    
+    // 身体（椭圆）
+    ctx.fillStyle = CONFIG.colors.pelicanBody;
+    ctx.beginPath();
+    ctx.ellipse(0, bodyBounce, 40, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 翅膀（扑腾动画）
+    const wingFlap = Math.sin(runCycle * 2) * 0.3;
+    ctx.save();
+    ctx.translate(-20, -10 + bodyBounce);
+    ctx.rotate(wingFlap - 0.2);
+    ctx.fillStyle = CONFIG.colors.pelicanWing;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-30, -20, -50, 10);
+    ctx.quadraticCurveTo(-30, 30, 0, 20);
+    ctx.fill();
+    // 翅膀尖端黑色
+    ctx.fillStyle = '#2C3E50';
+    ctx.beginPath();
+    ctx.moveTo(-45, 5);
+    ctx.lineTo(-55, 12);
+    ctx.lineTo(-48, 15);
+    ctx.fill();
+    ctx.restore();
+    
+    // 头部和颈部
+    ctx.save();
+    ctx.translate(25, -20 + bodyBounce);
+    
+    // 脖子
+    ctx.strokeStyle = CONFIG.colors.pelicanBody;
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(10, -20, 15, -35);
+    ctx.stroke();
+    
+    // 头部
+    ctx.translate(15, -35);
+    
+    // 头部转动（受惊或进食时）
+    if (isEating) {
+        ctx.rotate(0.3);
+    } else if (state.isScared) {
+        ctx.rotate(-0.2);
+    }
+    
+    ctx.fillStyle = CONFIG.colors.pelicanBody;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 长喙
+    ctx.fillStyle = '#FFA500';
+    ctx.beginPath();
+    ctx.moveTo(5, -5);
+    ctx.lineTo(25, 0);
+    ctx.lineTo(25, 6);
+    ctx.lineTo(5, 5);
+    ctx.fill();
+    
+    // 喉囊（晃动动画）
+    const pouchWobble = Math.sin(state.time * 0.1) * 3;
+    ctx.fillStyle = CONFIG.colors.pelicanPouch;
+    ctx.beginPath();
+    ctx.moveTo(5, 5);
+    ctx.quadraticCurveTo(15 + pouchWobble, 20, 5, 18);
+    ctx.lineTo(5, 5);
+    ctx.fill();
+    
+    // 眼睛
+    ctx.fillStyle = state.isScared ? '#FF0000' : '#2C3E50';
+    ctx.beginPath();
+    const eyeOpen = isTired ? 0.6 : 1;
+    ctx.arc(2, -3, 3 * eyeOpen, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath();
+    ctx.arc(3, -4, 1, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 鼻孔
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.arc(18, -2, 1, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+    
+    // 尾部羽毛
+    ctx.fillStyle = '#F0F8FF';
+    ctx.beginPath();
+    ctx.moveTo(-40, bodyBounce);
+    ctx.lineTo(-55, -10 + bodyBounce);
+    ctx.lineTo(-55, 10 + bodyBounce);
+    ctx.fill();
+    
+    // 喘气效果（体力低时）
+    if (isTired && Math.floor(state.time / 20) % 2 === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '16px Arial';
+        ctx.fillText('哈...', 20, -50 + bodyBounce);
+    }
+    
+    ctx.restore();
+}
+
+// 绘制自行车（骑手）
+function drawBicycle(ctx, cx, cy, scale, rotation, wheelRot) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.rotate(rotation);
+    
+    // 车身颠簸（与鹈鹕同步但稍有延迟）
+    const bikeBounce = Math.sin(state.time * 0.15) * 2;
+    ctx.translate(0, bikeBounce);
+    
+    // 后轮
+    drawWheel(ctx, -25, 15, 12, wheelRot);
+    // 前轮（稍微抬起，表现"骑"的姿态）
+    ctx.save();
+    ctx.translate(25, 10);
+    ctx.rotate(-0.1); // 前轮微抬
+    drawWheel(ctx, 0, 0, 12, wheelRot);
+    ctx.restore();
+    
+    // 车架（三角形）
+    ctx.strokeStyle = CONFIG.colors.bikeFrame;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    ctx.beginPath();
+    ctx.moveTo(-25, 15); // 后轮轴
+    ctx.lineTo(0, -5);   // 座垫下方
+    ctx.lineTo(25, 10);  // 前轮轴
+    ctx.lineTo(-10, 5);  // 脚踏
+    ctx.lineTo(-25, 15);
+    ctx.stroke();
+    
+    // 车把立管
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(5, -25);
+    ctx.stroke();
+    
+    // 车把（横把）
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-8, -25);
+    ctx.lineTo(15, -28);
+    ctx.stroke();
+    
+    // 车把套
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(15, -28, 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 缰绳（连接到鹈鹕头部）
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(15, -28);
+    ctx.quadraticCurveTo(20, -35, 35, -45); // 连接到前方鹈鹕颈部
+    ctx.stroke();
+    
+    // 座椅
+    ctx.fillStyle = '#2C3E50';
+    ctx.beginPath();
+    ctx.ellipse(-3, -8, 8, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 脚踏和链条
+    const pedalAngle = wheelRot;
+    const pedalX = Math.cos(pedalAngle) * 8;
+    const pedalY = Math.sin(pedalAngle) * 8 + 5;
+    
+    // 牙盘
+    ctx.fillStyle = '#777';
+    ctx.beginPath();
+    ctx.arc(-10, 5, 5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 脚踏臂
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-10, 5);
+    ctx.lineTo(-10 + pedalX, 5 + pedalY);
+    ctx.stroke();
+    
+    // 脚踏板
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-10 + pedalX - 3, 5 + pedalY - 2, 6, 4);
+    
+    // 车铃（金色小圆）
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(12, -30, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// 绘制背景（视差滚动）
+function drawBackground(ctx) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const groundY = h * 0.75;
+    
+    // 天空渐变（根据时间/天气）
+    let grad;
+    if (state.weather === 'sunset') {
+        grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, CONFIG.colors.skySunset[0]);
+        grad.addColorStop(0.5, CONFIG.colors.skySunset[1]);
+        grad.addColorStop(1, '#FFE4B5');
+    } else if (state.weather === 'night') {
+        grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, CONFIG.colors.skyNight[0]);
+        grad.addColorStop(1, CONFIG.colors.skyNight[1]);
+    } else {
+        grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, CONFIG.colors.skyDay[0]);
+        grad.addColorStop(0.5, CONFIG.colors.skyDay[1]);
+        grad.addColorStop(1, '#FFE4B5');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    
+    // 太阳/月亮
+    if (state.weather === 'night') {
+        ctx.fillStyle = '#FEFCD7';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#FEFCD7';
+        ctx.beginPath();
+        ctx.arc(w * 0.8, h * 0.15, 30, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    } else {
+        ctx.fillStyle = '#FFD700';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#FFA500';
+        const sunY = state.weather === 'sunset' ? h * 0.6 : h * 0.15;
+        ctx.beginPath();
+        ctx.arc(w * 0.8, sunY, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    
+    // 云朵（视差层1 - 最慢）
+    ctx.fillStyle = state.weather === 'night' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.8)';
+    const cloudOffset = (state.bgOffset.cloud % (w + 200)) - 100;
+    for (let i = 0; i < 3; i++) {
+        const cx = ((i * 300) - cloudOffset * 0.2) % (w + 200);
+        const x = cx < -100 ? cx + w + 300 : cx;
+        const cy = 50 + i * 30;
+        drawCloud(ctx, x, cy, 0.8 - i * 0.1);
+    }
+    
+    // 海洋（视差层2）
+    const seaOffset = (state.bgOffset.sea % 100);
+    ctx.fillStyle = state.weather === 'sunset' ? '#FF7F50' : (state.weather === 'night' ? '#1e3a5f' : '#4A90E2');
+    ctx.fillRect(0, groundY - 50, w, h);
+    
+    // 波浪线
+    ctx.strokeStyle = state.weather === 'sunset' ? '#FFB347' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        for (let x = 0; x < w; x += 10) {
+            const y = Math.sin((x + state.bgOffset.sea * (1 + i * 0.2)) * 0.02) * 5;
+            ctx.lineTo(x, groundY - 30 + i * 15 + y);
+        }
+        ctx.stroke();
+    }
+    
+    // 木栈道（视差层3 - 最快，前景）
+    const plankWidth = 60;
+    const plankOffset = (state.bgOffset.road % plankWidth);
+    
+    // 路面
+    ctx.fillStyle = '#DEB887';
+    ctx.fillRect(0, groundY, w, h - groundY);
+    
+    // 木板纹理
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    for (let x = -plankOffset; x < w; x += plankWidth) {
+        ctx.beginPath();
+        ctx.moveTo(x, groundY);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+        
+        // 钉子细节
+        ctx.fillStyle = '#654321';
+        ctx.fillRect(x + 5, groundY + 10, 3, 3);
+        ctx.fillRect(x + 5, h - 20, 3, 3);
+    }
+    
+    // 颠簸路面效果
+    if (state.roadType === 'bumpy') {
+        ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
+        for (let i = 0; i < 5; i++) {
+            const bx = ((i * 150) - state.bgOffset.road * 1.5) % w;
+            const x = bx < 0 ? bx + w : bx;
+            ctx.beginPath();
+            ctx.arc(x, groundY + 20, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    return groundY;
+}
+
+function drawCloud(ctx, x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.arc(40, -10, 35, 0, Math.PI * 2);
+    ctx.arc(80, 0, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+// 主动画循环
+function animate(timestamp) {
+    if (!state.lastTime) state.lastTime = timestamp;
+    const delta = timestamp - state.lastTime;
+    state.lastTime = timestamp;
+    state.time++;
+    
+    // 清空画布
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 计算实际速度
+    let targetSpeed = state.speed;
+    if (state.isSprinting && state.stamina > 0) {
+        targetSpeed *= 1.8;
+        state.stamina -= CONFIG.sprintCost;
+    } else if (state.isScared) {
+        targetSpeed = CONFIG.scareSpeed;
+        state.scareTimer--;
+        if (state.scareTimer <= 0) state.isScared = false;
+    }
+    
+    // 体力影响速度
+    if (state.stamina < 20) {
+        targetSpeed *= 0.5;
+    }
+    
+    // 平滑速度变化
+    state.currentSpeed += (targetSpeed - state.currentSpeed) * 0.1;
+    
+    // 更新距离和背景偏移（视差）
+    state.distance += state.currentSpeed * 0.05;
+    state.bgOffset.cloud += state.currentSpeed * 0.1;
+    state.bgOffset.sea += state.currentSpeed * 0.3;
+    state.bgOffset.road += state.currentSpeed;
+    
+    // 自然体力恢复（很慢）
+    if (!state.isSprinting && state.stamina < 100) {
+        state.stamina += 0.02;
+    }
+    
+    // 绘制背景
+    const groundY = drawBackground(ctx);
+    
+    // 计算主体位置
+    const centerX = canvas.width / 2;
+    const centerY = groundY - 80;
+    
+    // 奔跑周期
+    const runCycle = state.time * state.currentSpeed * 0.005;
+    
+    // 颠簸效果（石子路更颠）
+    let bumpiness = state.roadType === 'bumpy' ? 3 : 1;
+    const pelicanYOffset = Math.abs(Math.sin(runCycle)) * 5 * bumpiness;
+    const pelicanTilt = Math.cos(runCycle) * 0.05;
+    
+    // 绘制鹈鹕
+    const isTired = state.stamina < 30;
+    drawPelican(ctx, centerX, centerY + pelicanYOffset, 1.5, runCycle, isTired, state.feedTimer > 0);
+    
+    // 绘制自行车（在鹈鹕背上）
+    const bikeY = centerY + pelicanYOffset - 35; // 位于鹈鹕背部上方
+    const bikeRotation = pelicanTilt + (state.isScared ? -0.1 : 0);
+    drawBicycle(ctx, centerX, bikeY, 1.2, bikeRotation, runCycle);
+    
+    // 更新和绘制粒子
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+    
+    // 随机生成羽毛（速度快时更多）
+    if (Math.random() < state.currentSpeed * 0.0005) {
+        state.particles.push(new Particle(
+            centerX - 30 + Math.random() * 20,
+            centerY + pelicanYOffset - 20,
+            'feather',
+            -state.currentSpeed * 0.1,
+            -2
+        ));
+    }
+    
+    // 受惊时的汗滴
+    if (state.isScared && state.time % 5 === 0) {
+        state.particles.push(new Particle(centerX + 20, centerY - 60, 'sweat'));
+    }
+    
+    // 更新进食动画
+    if (state.feedTimer > 0) state.feedTimer--;
+    
+    // 更新UI
+    updateUI();
+    
+    requestAnimationFrame(animate);
+}
+
+function updateUI() {
+    // 体力条
+    const staminaBar = document.getElementById('staminaBar');
+    const staminaText = document.getElementById('staminaText');
+    staminaBar.style.width = state.stamina + '%';
+    
+    if (state.stamina < 30) {
+        staminaBar.parentElement.classList.add('stamina-low');
+        staminaText.textContent = '气喘吁吁';
+        staminaText.style.color = '#FF6B6B';
+    } else if (state.stamina < 70) {
+        staminaBar.parentElement.classList.remove('stamina-low');
+        staminaText.textContent = '略显疲惫';
+        staminaText.style.color = '#FFA07A';
+    } else {
+        staminaBar.parentElement.classList.remove('stamina-low');
+        staminaText.textContent = '精力充沛';
+        staminaText.style.color = '#6BCF7F';
+    }
+    
+    // 速度
+    document.getElementById('speedText').textContent = Math.floor(state.currentSpeed) + ' km/h';
+    
+    // 距离
+    document.getElementById('distanceText').textContent = Math.floor(state.distance / 10) + ' m';
+    
+    // 冲刺按钮状态
+    const sprintBtn = document.getElementById('sprintBtn');
+    if (state.stamina < 5) {
+        sprintBtn.disabled = true;
+        sprintBtn.style.opacity = '0.5';
+    } else {
+        sprintBtn.disabled = false;
+        sprintBtn.style.opacity = '1';
+    }
+}
+
+// 交互事件
+document.getElementById('bellBtn').addEventListener('click', () => {
+    playBellSound();
+    state.isScared = true;
+    state.scareTimer = CONFIG.scareDuration;
+    
+    // 产生惊吓粒子效果
+    for (let i = 0; i < 3; i++) {
+        state.particles.push(new Particle(
+            canvas.width / 2 + 30,
+            canvas.height / 2 - 80,
+            'sweat'
+        ));
+    }
+});
+
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+    state.speed = parseInt(e.target.value);
+});
+
+document.getElementById('feedBtn').addEventListener('click', () => {
+    if (state.stamina >= 100) return;
+    
+    // 创建飞向鹈鹕的鱼
+    for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+            const fish = new Particle(
+                canvas.width / 2 + 200 + Math.random() * 50,
+                canvas.height / 2 - 100 - Math.random() * 50,
+                'fish',
+                -8 - Math.random() * 2,
+                2 + Math.random() * 2
+            );
+            state.particles.push(fish);
+            
+            // 检测鱼到达（简化版，直接定时恢复体力）
+            setTimeout(() => {
+                if (state.stamina < 100) {
+                    state.stamina = Math.min(100, state.stamina + CONFIG.staminaRecovery / 5);
+                }
+            }, 300);
+        }, i * 100);
+    }
+    
+    state.feedTimer = 60; // 触发进食动画
+});
+
+const sprintBtn = document.getElementById('sprintBtn');
+sprintBtn.addEventListener('mousedown', () => { if (state.stamina > 5) state.isSprinting = true; });
+sprintBtn.addEventListener('mouseup', () => { state.isSprinting = false; });
+sprintBtn.addEventListener('mouseleave', () => { state.isSprinting = false; });
+sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (state.stamina > 5) state.isSprinting = true; });
+sprintBtn.addEventListener('touchend', (e) => { e.preventDefault(); state.isSprinting = false; });
+
+// 键盘控制
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        e.preventDefault();
+        document.getElementById('bellBtn').click();
+    }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        if (state.stamina > 5) state.isSprinting = true;
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        state.isSprinting = false;
+    }
+});
+
+// 启动动画
+requestAnimationFrame(animate);
+
+// 防止空格键滚动页面
+window.addEventListener('keydown', function(e) {
+    if(e.keyCode == 32 && e.target == document.body) {
+        e.preventDefault();
+    }
+});
+</script>
+</body>
+</html>

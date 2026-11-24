@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>一辆自行车正在骑着一只鹈鹕 · 跨代模型前端擂台赛</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #99c4e3;
+      font-family: 'Segoe UI', 'PingFang SC', '微软雅黑', Arial, sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    #container {
+      position: relative;
+      margin-top: 24px;
+      user-select: none;
+    }
+    #mainCanvas {
+      display: block;
+      border-radius: 24px;
+      background: linear-gradient(to top, #e1efff 60%, #b3dbe8 100%);
+      box-shadow: 0 8px 24px rgba(70,110,170,0.11), 0 1.5px 0 #c3e7f3;
+    }
+    .controls {
+      position: absolute;
+      top: 26px;
+      right: 38px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .controls * {
+      pointer-events: auto;
+    }
+    .control-btn, .toggle-btn {
+      min-width: 48px;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, #fafafa 90%, #e7ecf2 100%);
+      box-shadow: 0 2px 7px rgba(80,103,140,0.07);
+      font-size: 25px;
+      transition: background .15s, box-shadow .16s;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-weight: bold;
+      outline: none;
+      color: #34595e;
+    }
+    .control-btn:active, .toggle-btn:active {
+      background: #e0edff;
+      box-shadow: 0 0 0 2px #85b8e7;
+    }
+    .slider-group {
+      background: linear-gradient(101deg, #fcfcfb 85%, #eef3f8 100%);
+      border-radius: 18px;
+      padding: 8px 16px;
+      box-shadow: 0 2px 7px rgba(60, 125, 180, 0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 17px;
+      color: #476a7a;
+      gap: 5px;
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+    .slider-label {
+      font-weight: bold;
+      margin-bottom: 2px;
+      font-size: 15px;
+      color: #4980c0;
+    }
+    input[type=range] {
+      width: 120px;
+      accent-color: #4267b7;
+      margin-top: 6px;
+    }
+    @media (max-width: 900px) {
+      #mainCanvas { width: 97vw !important; height: 65vw !important;}
+      #container { width: 100vw; }
+      .controls { right: 8px; top: 18px;}
+    }
+    .tooltip {
+      position: absolute;
+      left: 18px;
+      top: 26px;
+      background: rgba(255,255,255,0.96);
+      border-radius: 15px;
+      padding: 18px 28px;
+      font-size: 15.3px;
+      color: #3f5f77;
+      box-shadow: 0 4px 16px rgba(100,130,170,0.17);
+      max-width: 340px;
+      z-index: 120;
+      pointer-events: none;
+      animation: fadein .8s;
+    }
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(-15px);}
+      to   { opacity: 1; transform: none;}
+    }
+    .badge {
+      background: #4e90e9;
+      color: #fff;
+      font-size: 13px;
+      border-radius: 8px;
+      padding: 3px 10px;
+      margin-right: 7px;
+      letter-spacing: .02em;
+      box-shadow: 0 1px 6px #96ceda5b;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="mainCanvas" width="900" height="600" tabindex="0" aria-label="A Bicycle riding a Pelican, Interactive Art"></canvas>
+    <div class="controls" id="controls">
+      <button class="control-btn" id="bellBtn" title="按车铃 (Bell)">
+        <span role="img" aria-label="铃声">🔔</span>
+      </button>
+      <div class="slider-group" >
+        <div class="slider-label">速度</div>
+        <input type="range" id="speedSlider" min="1" max="7" step="1" value="3">
+      </div>
+      <button class="control-btn" id="feedBtn" title="喂鱼恢复体力">
+        <span role="img" aria-label="投喂小鱼">🐟</span>
+        喂鱼
+      </button>
+      <button class="toggle-btn" id="dayBtn" title="切换场景">
+        <span role="img" aria-label="切换时间" id="timeIcon">🌞</span>
+      </button>
+    </div>
+    <div class="tooltip" id="tooltip">
+      <span class="badge">反常识挑战</span><br>
+      <b>“一辆自行车骑着一只鹈鹕”！</b><br>
+      上方是 <b>自行车</b> 拟人化地驾驭鹈鹕，<br>
+      下方是 <b>鹈鹕</b> 努力奔跑。（<em>不是鹈鹕骑自行车！</em>)
+      <hr>
+      <div>🛎️ <b>按车铃</b>：鹈鹕受惊加速，听铃声。</div>
+      <div>🚤 <b>速度</b>：手动调节。</div>
+      <div>🐟 <b>喂鱼</b>：鹈鹕恢复体力，表情变化。</div>
+      <div>🌞 <b>切换时间</b>：晴天/黄昏/夜晚。</div>
+    </div>
+  </div>
+  <script>
+    // ----------- 画布设置/适应屏幕 -----------------
+    function fitCanvas() {
+      // 基准 900x600，移动端自适应
+      const canvas = document.getElementById('mainCanvas');
+      let ww = Math.min(window.innerWidth * 0.98, 900);
+      let wh = Math.max(Math.min(window.innerHeight * 0.84, 600), 350);
+      if(window.innerWidth <= 900){
+        ww = window.innerWidth * 0.98;
+        wh = window.innerWidth * 0.65;
+      }
+      canvas.width = ww;
+      canvas.height = wh;
+    }
+    fitCanvas();
+    window.addEventListener('resize', fitCanvas);
+
+    // ----------- 场景状态 --------------------------
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let scene = {
+      time: 'day', // day, dusk, night
+      speed: 3,
+      bellShake: 0,
+      bellTime: 0,
+      bellPlaying: false,
+      pelican: {
+        y: 0,
+        runCycle: 0,
+        wingFlap: 0,
+        energy: 85,   // 0-100
+        maxEnergy: 100,
+        energyFlash: 0,
+        express: 'normal', // happy, tired, surprised
+      },
+      bike: {
+        bounce: 0,
+        tilt: 0,
+        wheelRoll: 0,
+        pedalSwing: 0,
+        showBellShake: false,
+      },
+      bg: {
+        scroll: 0,
+        clouds: [],
+        feathers: [],
+        seaWave: [],
+      },
+      lastTime: performance.now(),
+      feedFishAnim: 0,
+      feedFishShow: false,
+      feedFishX: 0,
+      feedFishY: 0,
+      tooltipFade: 1
+    };
+
+    // ------- 背景粒子初始化 ---------
+    function genClouds() {
+      scene.bg.clouds = [];
+      for(let i=0;i<6;i++){
+        scene.bg.clouds.push({
+          x: Math.random()*canvas.width,
+          y: 40+Math.random()*160,
+          r: 50+Math.random()*48,
+          speed: 0.16+Math.random()*0.18,
+          shade: Math.random()>0.6?'gray':null
+        });
+      }
+    }
+    function genFeathers() {
+      scene.bg.feathers = [];
+      for(let i=0;i<5;i++){
+        scene.bg.feathers.push({
+          x: Math.random()*canvas.width,
+          y: 380+Math.random()*140,
+          angle: Math.random()*2*Math.PI,
+          speedY: 0.14+Math.random()*0.16,
+          speedX: 0.1+Math.random()*0.13,
+          life: 200+Math.random()*180,
+        });
+      }
+    }
+    genClouds();
+    genFeathers();
+
+    // ----------- 控件事件 --------------------------
+    // 车铃
+    document.getElementById('bellBtn').onclick = function(){
+      ringBell();
+    };
+    // 速度条
+    document.getElementById('speedSlider').oninput = function(e){
+      scene.speed = parseInt(e.target.value);
+    };
+    // 喂鱼
+    document.getElementById('feedBtn').onclick = function(){
+      feedFish();
+    };
+    // 日夜切换
+    document.getElementById('dayBtn').onclick = function(){
+      if(scene.time === 'day') scene.time='dusk';
+      else if(scene.time==='dusk') scene.time='night';
+      else scene.time='day';
+      updateTimeIcon();
+      genClouds();
+    };
+
+    // ----- 时间图标更换 -----
+    function updateTimeIcon(){
+      let icon = document.getElementById('timeIcon');
+      if(scene.time==='day') icon.innerText='🌞';
+      else if(scene.time==='dusk') icon.innerText='🌆';
+      else icon.innerText='🌙';
+    }
+    updateTimeIcon();
+
+    // ---------- 车铃功能 + 音频 ----------
+    function ringBell() {
+      if(scene.bellPlaying) return;
+      scene.bellShake = 1;
+      scene.bellTime = 0;
+      scene.bellPlaying = true;
+      scene.bike.showBellShake = true;
+      scene.pelican.express = 'surprised';
+      // 鹈鹕受惊加速
+      scene.speed = Math.min(scene.speed+2,7);
+      document.getElementById('speedSlider').value = scene.speed;
+      // Web Audio合成铃声
+      playBellSound();
+      setTimeout(()=>{scene.bellPlaying=false; scene.bike.showBellShake=false;}, 700);
+      // 鹈鹕短暂冲刺
+      setTimeout(()=>{scene.pelican.express='normal';}, 1230);
+    }
+    function playBellSound(){
+      try{
+        let ctx = new(window.AudioContext||window.webkitAudioContext)();
+        let now = ctx.currentTime;
+        let osc1 = ctx.createOscillator();
+        osc1.type='triangle';
+        osc1.frequency.setValueAtTime(2100, now); // 2.1kHz
+        let osc2 = ctx.createOscillator();
+        osc2.type='triangle';
+        osc2.frequency.setValueAtTime(850, now);
+        let osc3 = ctx.createOscillator();
+        osc3.type='triangle';
+        osc3.frequency.setValueAtTime(2360, now);
+
+        let gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.27, now);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        osc3.connect(gain);
+
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc3.start(now);
+
+        // Decay
+        gain.gain.linearRampToValueAtTime(0.06, now+0.07);
+        gain.gain.linearRampToValueAtTime(0.15, now+0.19);
+        gain.gain.linearRampToValueAtTime(0.03, now+0.28);
+        gain.gain.linearRampToValueAtTime(0.0, now+0.43);
+
+        osc1.frequency.linearRampToValueAtTime(1150, now+0.2);
+        osc2.frequency.linearRampToValueAtTime(450, now+0.18);
+        osc3.frequency.linearRampToValueAtTime(1700, now+0.18);
+
+        osc1.stop(now+0.46);
+        osc2.stop(now+0.46);
+        osc3.stop(now+0.46);
+
+        // 解放context资源
+        setTimeout(()=>{ctx.close();},600);
+      }catch(e){}
+    }
+
+    // --------- 喂鱼动画/恢复能量 ---------
+    function feedFish(){
+      scene.feedFishAnim = 1.1;
+      scene.feedFishShow = true;
+      scene.feedFishX = 450 + (Math.random()*36-18);
+      scene.feedFishY = 370 + (Math.random()*31-15);
+      scene.pelican.energy = Math.min(scene.pelican.energy+19, scene.pelican.maxEnergy);
+      scene.pelican.energyFlash = 1;
+      scene.pelican.express = 'happy';
+      setTimeout(()=>{scene.pelican.express='normal';}, 950);
+    }
+
+    // ---------- 画布主循环 --------------
+    function animate() {
+      const now = performance.now();
+      const dt = Math.min(now - scene.lastTime, 40)/1000; // 高帧低波动
+      scene.lastTime = now;
+
+      // 背景滚动速度
+      let baseSpeed = Math.max(1.5, scene.speed*1.1);
+      let pelicanEnergyDrop = 0.15+scene.speed*0.05;
+      let fatigue = scene.pelican.energy<25 ? 0.25:0;
+
+      // 鹈鹕体力消耗
+      scene.pelican.energy -= (pelicanEnergyDrop+fatigue)*dt;
+      scene.pelican.energy = Math.max(0, Math.min(scene.pelican.energy, scene.pelican.maxEnergy));
+
+      // 鹈鹕表情反馈
+      if(scene.pelican.energy<18 && scene.pelican.express!=='tired'){
+        scene.pelican.express='tired';
+      }else if(scene.pelican.energy>30 && scene.pelican.express==='tired'){
+        scene.pelican.express='normal';
+      }
+
+      // 跑步&背景滚动
+      scene.bg.scroll += baseSpeed * dt * 110;
+      scene.pelican.runCycle += dt * scene.speed * 2.5 + Math.random()*0.09;
+      scene.pelican.wingFlap += dt * (scene.speed) * (scene.pelican.energy<20?1.5:1);
+
+      // 翅膀扑、喉囊震
+      scene.bike.bounce = Math.sin(scene.pelican.runCycle)*Math.max(22, scene.speed * 5.5) * (scene.pelican.energy>7?1:0.46);
+      scene.bike.tilt = -Math.cos(scene.pelican.runCycle)*7 * (scene.speed/7) + (scene.pelican.energy<13?-8:0);
+
+      // 车轮旋转
+      scene.bike.wheelRoll += dt * scene.speed * 4.4;
+      scene.bike.pedalSwing += dt * scene.speed * 5.4;
+
+      // 喉囊晃动
+      if(scene.pelican.energyFlash>0)
+        scene.pelican.energyFlash -= dt*1.6;
+
+      // 车铃抖动
+      if(scene.bellShake>0){
+        scene.bellTime += dt;
+        if(scene.bellTime<0.7){
+          scene.bellShake = Math.sin(scene.bellTime*25)*Math.max(0.18, 0.33-0.14*scene.bellTime);
+        }else{
+          scene.bellShake = 0;
+        }
+      }else{
+        scene.bellShake=0;
+      }
+
+      // 喂鱼动画
+      if(scene.feedFishShow){
+        scene.feedFishAnim -= dt*1.6;
+        scene.feedFishY += dt*65;
+        scene.feedFishX += Math.sin(scene.feedFishAnim*3.5)*2.3;
+        if(scene.feedFishAnim<=0) scene.feedFishShow=false;
+      }
+
+      // 云朵飘动
+      scene.bg.clouds.forEach(c=>{
+        c.x += c.speed*(scene.speed*0.4+1.2)*dt * 62;
+        if(c.x > canvas.width+90) c.x = -80;
+      });
+      // 羽毛粒子
+      scene.bg.feathers.forEach(f=>{
+        f.x += f.speedX*scene.speed*dt*41;
+        f.y += f.speedY*dt*53;
+        f.angle += 0.6*dt;
+        f.life -= dt*63;
+        if(f.y > canvas.height-65 || f.life<20){
+          f.x = Math.random()*canvas.width;
+          f.y = 380+Math.random()*140;
+          f.life = 210+Math.random()*180;
+          f.angle = Math.random()*2*Math.PI;
+        }
+      });
+
+      // ------ 渲染主体 ------
+      renderScene();
+
+      // ------ 提示淡出 ------
+      if(scene.tooltipFade>0){
+        scene.tooltipFade -= dt*0.17;
+        if(scene.tooltipFade<0){
+          document.getElementById('tooltip').style.display='none';
+        }else{
+          document.getElementById('tooltip').style.opacity=scene.tooltipFade.toFixed(2);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // ------ 主要绘制函数 ------
+    function renderScene(){
+      // 基本配色参数
+      let daylight={
+        sky:'#c1e5fc', sea:'#63cbe0', sand:'#ffe7b9', board:'#d4b480', boardEdge:'#8c6c41', shadow:'#9dd0e6'
+      };
+      let dusk={
+        sky:'#eebc94', sea:'#3386b9', sand:'#f6d593', board:'#b6af9a', boardEdge:'#8c6c41', shadow:'#b19d87'
+      };
+      let night={
+        sky:'#425f82', sea:'#23326E', sand:'#2c384c', board:'#727375', boardEdge:'#475781', shadow:'#384e60'
+      };
+      let colorSchemes={'day':daylight, 'dusk':dusk, 'night':night};
+      let colors = colorSchemes[scene.time];
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      // ------ 渲染分层 -------
+      // 0.天空背景
+      drawBackgroundLayer(colors);
+
+      // 1. 云朵
+      scene.bg.clouds.forEach(cloud=>drawCloud(cloud.x, cloud.y, cloud.r, cloud.shade, colors));
+
+      // 2. 远海
+      drawSeaLayer(colors);
+
+      // 3.沙滩/栈道
+      drawBoardwalk(scene.bg.scroll, colors);
+
+      // 4. 羽毛粒子
+      scene.bg.feathers.forEach(f=>drawFeather(f.x, f.y, f.angle, f.life));
+
+      // 5. 鹈鹕 & 自行车主体
+      drawMain(scene);
+
+      // 6. 小鱼投喂动画
+      if(scene.feedFishShow)
+        drawFeedFish(scene.feedFishX, scene.feedFishY, scene.feedFishAnim);
+
+      // 7. 状态指示（体力）
+      drawStatusBar();
+
+      // 8. Logo
+      drawLogo();
+    }
+
+    function drawBackgroundLayer(colors){
+      // 渐变天空
+      let g = ctx.createLinearGradient(0,0,0,canvas.height*0.88);
+      if(scene.time=='day'){
+        g.addColorStop(0,'#e3f3ff');
+        g.addColorStop(0.65,colors.sky);
+        g.addColorStop(1,colors.sea);
+      }else if(scene.time=='dusk'){
+        g.addColorStop(0,'#ffeee3');
+        g.addColorStop(0.47,colors.sky);
+        g.addColorStop(1,colors.sea);
+      }else{
+        g.addColorStop(0,'#6bb3d5');
+        g.addColorStop(0.22,colors.sky);
+        g.addColorStop(0.7,colors.sea);
+        g.addColorStop(1,'#23325d');
+      }
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // 日夜时段光效
+      if(scene.time==='night'){
+        ctx.save();
+        ctx.globalAlpha=0.39;
+        let rad = ctx.createRadialGradient(canvas.width*0.25,90,100, canvas.width*0.65,220,450);
+        rad.addColorStop(0,'#eee8d5');
+        rad.addColorStop(0.41,'#4571bb');
+        rad.addColorStop(0.8,'#1b2b48');
+        ctx.fillStyle=rad;
+        ctx.fillRect(0,0,canvas.width,canvas.height*0.48);
+        ctx.restore();
+        // 月亮
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(canvas.width*0.13,70,32,0,2*Math.PI);
+        ctx.fillStyle='#ffec97';
+        ctx.globalAlpha=0.48;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawCloud(x,y,r,shade,colors){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x,y,r*1.05,Math.PI*0.6,Math.PI*1.3,false);
+      ctx.arc(x+r*0.27,y-r*0.28,r*0.66,0,2*Math.PI);
+      ctx.arc(x+r*0.43,y+r*0.21,r*0.56,0,2*Math.PI);
+      ctx.arc(x-r*0.26,y+r*0.32,r*0.39,0,2*Math.PI);
+      ctx.closePath();
+      if(shade=='gray') ctx.fillStyle='rgba(210,220,238,0.84)';
+      else ctx.fillStyle='rgba(255,255,255,0.94)';
+      ctx.shadowColor='rgba(220,233,255,0.18)';
+      ctx.shadowBlur=13;
+      ctx.globalAlpha=0.74;
+      ctx.fill();
+      ctx.globalAlpha=1.0;
+      ctx.restore();
+    }
+
+    function drawSeaLayer(colors){
+      // 远海/微波
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height*0.51);
+      for(let i=0;i<=22;i++){
+        let px = i*canvas.width/22;
+        let py = canvas.height*0.51+Math.sin(scene.bg.scroll/70 + i)*8;
+        ctx.lineTo(px, py);
+      }
+      ctx.lineTo(canvas.width, canvas.height*0.6);
+      ctx.lineTo(0, canvas.height*0.6);
+      ctx.closePath();
+      ctx.fillStyle=colors.sea;
+      ctx.globalAlpha=0.81;
+      ctx.fill();
+      ctx.restore();
+      // 远海反光
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height*0.54);
+      for(let i=0;i<=11;i++){
+        let px = i*canvas.width/11;
+        let py = canvas.height*0.54+Math.sin(scene.bg.scroll/70 + i)*3;
+        ctx.lineTo(px, py);
+      }
+      ctx.lineTo(canvas.width, canvas.height*0.58);
+      ctx.lineTo(0, canvas.height*0.58);
+      ctx.closePath();
+      ctx.globalAlpha=0.22;
+      ctx.fillStyle='#e8f4ff';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBoardwalk(scroll, colors){
+      // 木栈道，近处
+      const yBoard = canvas.height*0.64;
+      ctx.save();
+      // 沙滩底色
+      ctx.beginPath();
+      ctx.moveTo(0, yBoard+7);
+      ctx.lineTo(canvas.width, yBoard+7);
+      ctx.lineTo(canvas.width, yBoard+70);
+      ctx.lineTo(0, yBoard+70);
+      ctx.closePath();
+      ctx.fillStyle=colors.sand;
+      ctx.fill();
+      // 木板
+      for(let i=0;i<16;i++){
+        let bx = (i*canvas.width/8 + scroll)%canvas.width - canvas.width/8;
+        ctx.beginPath();
+        ctx.moveTo(bx, yBoard+5);
+        ctx.lineTo(bx+canvas.width/8, yBoard);
+        ctx.lineTo(bx+canvas.width/8, yBoard+28);
+        ctx.lineTo(bx, yBoard+28);
+        ctx.closePath();
+        ctx.fillStyle=colors.board;
+        ctx.shadowColor=colors.shadow;
+        ctx.shadowBlur=6;
+        ctx.globalAlpha=0.83;
+        ctx.fill();
+        ctx.globalAlpha=1;
+        ctx.shadowBlur=0;
+        ctx.strokeStyle=colors.boardEdge;
+        ctx.lineWidth=2.1;
+        ctx.stroke();
+      }
+      // 木板线条
+      ctx.beginPath();
+      ctx.moveTo(0,yBoard); ctx.lineTo(canvas.width,yBoard);
+      ctx.moveTo(0,yBoard+28); ctx.lineTo(canvas.width,yBoard+28);
+      ctx.strokeStyle=colors.boardEdge;
+      ctx.lineWidth=2.35;
+      ctx.globalAlpha=0.36;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawFeather(x,y,angle,life){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(angle+Math.sin(life*0.08)*0.16);
+      let c=['#fff','#efe','rgba(146,206,218,0.65)','rgba(200,244,250,0.45)'];
+      ctx.beginPath();
+      ctx.moveTo(0,-6);
+      ctx.quadraticCurveTo(13,-8, 11,13);
+      ctx.quadraticCurveTo(6,17,-7,8);
+      ctx.quadraticCurveTo(-13,4,-4,-6);
+      ctx.closePath();
+      ctx.fillStyle=c[Math.floor(Math.random()*c.length)];
+      ctx.globalAlpha=0.7+Math.sin(life*0.13)*0.09;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawLogo(){
+      ctx.save();
+      ctx.globalAlpha=0.25;
+      ctx.font='bold 28px Segoe UI, Arial';
+      ctx.textAlign='left';
+      ctx.fillText('自行车骑鹈鹕  ·  Bicycle Riding a Pelican', 25, 38);
+      ctx.globalAlpha=1;
+      ctx.restore();
+    }
+
+    // ---------- 状态栏 ----------
+    function drawStatusBar(){
+      const barX = 44, barY = canvas.height-54, barW = 150, barH = 23;
+      // 背景
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 13);
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.shadowColor='#b2d4ef';
+      ctx.shadowBlur=7;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      // 体力区
+      let v = scene.pelican.energy/scene.pelican.maxEnergy;
+      let g = ctx.createLinearGradient(barX,barY,barX+barW,barY);
+      g.addColorStop(0,'#6cddbf');
+      g.addColorStop(0.4,'#4cb0fd');
+      g.addColorStop(1,'#d6e7f4');
+      ctx.beginPath();
+      ctx.roundRect(barX+2, barY+2, Math.max(3,barW*v-4), barH-4, 9);
+      ctx.globalAlpha=0.82+(scene.pelican.energyFlash*0.34);
+      ctx.fillStyle=g;
+      ctx.fill();
+
+      // 字体
+      ctx.globalAlpha=1;
+      ctx.font='bold 14px Arial';
+      ctx.fillStyle='#439db5';
+      ctx.fillText('鹈鹕体力', barX+6, barY+17);
+      ctx.font='13px Segoe UI';
+      ctx.fillStyle='#347';
+      ctx.fillText(Math.floor(scene.pelican.energy), barX+barW-36, barY+17);
+      ctx.restore();
+    }
+
+    // ---------- 主体 鹈鹕+自行车 -----------
+    function drawMain(scene){
+      // 主体居中并适应canvas
+      ctx.save();
+      let cx = canvas.width/2, cy = canvas.height*0.56;
+      /*
+      鹈鹕尺寸：宽 220，高 99+65
+      自行车尺寸：宽 204，高 87
+      */
+      ctx.translate(cx, cy);
+      // 鹈鹕动态偏移
+      let pelicanY = 7 + Math.sin(scene.pelican.runCycle)*12 + Math.cos(scene.pelican.runCycle*0.2)*3.8;
+      ctx.translate(0, pelicanY);
+
+      // 鹈鹕颠簸/奔跑
+      let runPhase = scene.pelican.runCycle;
+      let wingFlap = Math.sin(scene.pelican.wingFlap)*0.42;
+      let tiredSwing = scene.pelican.energy<20 ? 0.32 : 0;
+
+      // 鹈鹕 body group
+      drawPelican(ctx, {
+        runPhase: runPhase,
+        wingFlap: wingFlap,
+        tiredSwing: tiredSwing,
+        energy: scene.pelican.energy,
+        express: scene.pelican.express,
+        bellScare: scene.bellShake,
+      });
+
+      // 自行车 bounce/tilt
+      ctx.save();
+      ctx.translate(0, -79+ scene.bike.bounce*0.43);
+      ctx.rotate(scene.bike.tilt*Math.PI/180);
+
+      // 拟人化骑乘 - 车把“拉缰绳”，车轮“卡住”鹈鹕背，铃震动
+      drawBike(ctx, {
+        wheelRoll: scene.bike.wheelRoll,
+        pedalSwing: scene.bike.pedalSwing,
+        showBellShake: scene.bike.showBellShake,
+        bellShake: scene.bellShake,
+      });
+
+      // “缰绳”：车把往鹈鹕脖子一绑
+      ctx.save();
+      // 缰绳从车把
+      ctx.strokeStyle='#876937';
+      ctx.lineWidth=3.2;
+      ctx.setLineDash([9,5]);
+      ctx.beginPath();
+      ctx.moveTo(66,-17); // 车把右端点
+      let ropeSwing = Math.sin(runPhase*1.23)*9;
+      ctx.bezierCurveTo(102,-7+ropeSwing, 110,38-ropeSwing, 65,53+ropeSwing); // 鹈鹕脖子
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    // ------ 鹈鹕绘制 --------
+    function drawPelican(ctx, params){
+      /*
+      鹈鹕特征：
+        - 大喉囊
+        - 长嘴
+        - 翅膀
+        - 蹼足
+        - 表情：眼睛嘴角/喘气/汗珠
+      */
+      let runPhase = params.runPhase;
+      let wingFlap = params.wingFlap;
+      let tiredSwing = params.tiredSwing;
+      // 主体结构
+      ctx.save();
+
+      // 腿部动态
+      for(let i=0;i<2;i++){
+        let legX = -70 + i*140;
+        let legY = 37;
+        let swing = Math.cos(runPhase*1.7 + i*Math.PI)*25 + Math.sin(runPhase*0.4+i*1.2)*7;
+        ctx.save();
+        ctx.translate(legX, legY);
+        ctx.rotate(swing*0.028);
+
+        // 蹼足
+        ctx.beginPath();
+        ctx.moveTo(0,25);
+        ctx.lineTo(19,43);
+        ctx.lineTo(-7,55);
+        ctx.lineTo(-21,42);
+        ctx.closePath();
+        ctx.fillStyle='#fed947';
+        ctx.globalAlpha=0.97;
+        ctx.fill();
+        ctx.save();
+        ctx.lineWidth=2;
+        ctx.strokeStyle='#d0b268';
+        ctx.globalAlpha=0.26;
+        ctx.stroke();
+        ctx.restore();
+
+        // 腿
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(0,26);
+        ctx.lineWidth=7+2.5*i;
+        ctx.strokeStyle='#fdddb3';
+        ctx.globalAlpha=0.89;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 阴影
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0,72,69,18,0,0,2*Math.PI);
+      ctx.fillStyle='rgba(50,60,62,0.17)';
+      ctx.globalAlpha=0.19+Math.abs(Math.sin(runPhase*1.4)*0.12);
+      ctx.blur=5;
+      ctx.fill();
+      ctx.restore();
+
+      // 肩膀
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(-42, -38, 42, Math.PI*0.74, Math.PI*1.47, false);
+      ctx.arc(56,-33,28,Math.PI*1.4, Math.PI*1.6, true);
+      ctx.closePath();
+      ctx.fillStyle='#eceaff';
+      ctx.globalAlpha=0.82;
+      ctx.fill();
+      ctx.restore();
+
+      // 身体
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0,0,104,52,Math.PI*0.027,0,2*Math.PI);
+      ctx.fillStyle='#f9f6ee';
+      ctx.shadowColor='#b7dfdf';
+      ctx.shadowBlur=18;
+      ctx.globalAlpha=0.96;
+      ctx.fill();
+      ctx.shadowBlur=0;
+
+      ctx.restore();
+
+      // 喉囊
+      let throatSwing = Math.sin(runPhase*1.2)*7 + tiredSwing*16;
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(61,29,49+throatSwing,28+Math.sin(runPhase*0.92)*7,Math.PI*0.02,0,2*Math.PI);
+      ctx.fillStyle='rgba(255,239,133,0.82)';
+      ctx.globalAlpha=0.85+(scene.pelican.energyFlash*0.22);
+      ctx.fill();
+      ctx.restore();
+
+      // 背羽（自行车座椅卡住位置）
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-25,-35);
+      ctx.quadraticCurveTo(-42,-64,-79,-34);
+      ctx.quadraticCurveTo(-50,-16,-25,-35);
+      ctx.closePath();
+      ctx.fillStyle='#e9e7f9';
+      ctx.globalAlpha=0.82;
+      ctx.fill();
+      ctx.restore();
+
+      // 尾羽
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-88,22);
+      ctx.quadraticCurveTo(-109,17, -116,-19);
+      ctx.quadraticCurveTo(-98,-11,-88,22);
+      ctx.closePath();
+      ctx.fillStyle='#f1eef8';
+      ctx.globalAlpha=0.78;
+      ctx.shadowColor='#c3c3d2';
+      ctx.shadowBlur=9;
+      ctx.fill();
+      ctx.restore();
+
+      // 两侧翅膀
+      for(let i=0;i<2;i++){
+        ctx.save();
+        ctx.translate(i?-12:61, i?-13:9);
+        ctx.rotate((i?-0.7:0.9)+wingFlap*(i?1:-1));
+        ctx.scale(i?1:-1,1);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.quadraticCurveTo(48,10,44,46);
+        ctx.quadraticCurveTo(33,44,6,20);
+        ctx.quadraticCurveTo(-7,9,0,0);
+        ctx.closePath();
+        ctx.fillStyle='#e4e9ff';
+        ctx.globalAlpha=0.89-Math.abs(i*0.15);
+        ctx.shadowColor='#bcd7f3';
+        ctx.shadowBlur=11;
+        ctx.fill();
+        ctx.shadowBlur=0;
+        ctx.restore();
+      }
+
+      // 头部
+      ctx.save();
+      ctx.translate(70,-29);
+      ctx.rotate(Math.sin(runPhase*1.7)*0.13+throatSwing*0.03);
+      // 头部底
+      ctx.beginPath();
+      ctx.ellipse(0,0,38,22,Math.PI*0.13,0,2*Math.PI);
+      ctx.fillStyle='#fcfcfc';
+      ctx.globalAlpha=0.99;
+      ctx.fill();
+      // 头顶羽
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-8,-19);
+      ctx.bezierCurveTo(-11,-34, 23,-34, 14,-13);
+      ctx.closePath();
+      ctx.fillStyle='#eafafe';
+      ctx.globalAlpha=0.5;
+      ctx.fill();
+      ctx.restore();
+
+      // 嘴，分上下嘴/喙
+      // 上喙
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(9,7);
+      ctx.quadraticCurveTo(87,16,99,9);
+      ctx.quadraticCurveTo(80,-6,11,-8);
+      ctx.quadraticCurveTo(11,6,9,7);
+      ctx.closePath();
+      ctx.fillStyle='#e9d57a';
+      ctx.globalAlpha=0.97;
+      ctx.fill();
+      ctx.restore();
+      // 下喙（与喉囊连接）
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(11,-7);
+      ctx.quadraticCurveTo(89,-13,95,-8);
+      ctx.quadraticCurveTo(81,17,10,13);
+      ctx.quadraticCurveTo(11,-7,11,-7);
+      ctx.closePath();
+      ctx.fillStyle='rgba(255,239,170,0.89)';
+      ctx.fill();
+      ctx.restore();
+
+      // 嘴尖
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(103,4,7.4,3.9,Math.PI*0.11,0,2*Math.PI);
+      ctx.fillStyle='#f6db42';
+      ctx.globalAlpha=0.94;
+      ctx.shadowColor='#e5c050';
+      ctx.shadowBlur=6;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.restore();
+
+      // 嘴弯口线条
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(13,12);
+      ctx.quadraticCurveTo(54,-13, 98,5);
+      ctx.lineWidth=2.3;
+      ctx.globalAlpha=0.44;
+      ctx.strokeStyle='#d1b77e';
+      ctx.stroke();
+      ctx.restore();
+
+      // 担心/喜悦/喘气表情设置
+      let eyeX = 17, eyeY = -7;
+      let eyeR = 7.5;
+      ctx.save();
+
+      // 鹈鹕受惊/表情反馈
+      if(params.express=='happy'){
+        // 喜悦眉
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(eyeX-1,eyeY-3,4,Math.PI*0.86,Math.PI*1.67,false);
+        ctx.arc(eyeX-1,eyeY-3,2.1,Math.PI*0.82,Math.PI*1.68,false);
+        ctx.strokeStyle='#659bdb';
+        ctx.lineWidth=1.8;
+        ctx.globalAlpha=0.68;
+        ctx.stroke();
+        ctx.restore();
+      }
+      if(params.express=='tired'){
+        // 疲惫眼袋
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(eyeX,eyeY+4,5,2.9,0,0,2*Math.PI);
+        ctx.strokeStyle='#8876a0';
+        ctx.globalAlpha=0.19;
+        ctx.lineWidth=1.15;
+        ctx.stroke();
+        ctx.restore();
+      }
+      if(params.express=='surprised'){
+        // 大眼
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeR*1.16, 0, 2*Math.PI);
+        ctx.fillStyle='#fff';
+        ctx.globalAlpha=0.98;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeX-2, eyeY+3, eyeR*0.35, 0, 2*Math.PI);
+        ctx.fillStyle='#000';
+        ctx.globalAlpha=0.89;
+        ctx.fill();
+      }else{
+        // 正常/喜悦
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeR, 0, 2*Math.PI);
+        ctx.fillStyle='#fff';
+        ctx.globalAlpha=0.97;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeX-1.7, eyeY+1.8, eyeR*0.41, 0, 2*Math.PI);
+        ctx.fillStyle='#326';
+        ctx.globalAlpha=0.78;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeX+2.0, eyeY-2.1, eyeR*0.29, 0, 2*Math.PI);
+        ctx.fillStyle='#fff';
+        ctx.globalAlpha=0.7;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 嘴角表情
+      ctx.save();
+      ctx.beginPath();
+      let mouthBaseX = 78, mouthBaseY = 10;
+      if(params.express=='happy'){
+        ctx.arc(mouthBaseX+8, mouthBaseY, 6, Math.PI*0.94, Math.PI*1.17);
+      }else if(params.express=='tired'){
+        ctx.arc(mouthBaseX+8, mouthBaseY+2, 6, Math.PI*0.85, Math.PI*1.12);
+      }else{
+        ctx.arc(mouthBaseX+8, mouthBaseY, 6, Math.PI*0.92, Math.PI*1.11);
+      }
+      ctx.strokeStyle='#dfa465';
+      ctx.lineWidth=1.5;
+      ctx.globalAlpha=0.43;
+      ctx.stroke();
+      ctx.restore();
+
+      // 汗珠
+      if(params.express=='tired'){
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(eyeX+10,eyeY-4,4,7,Math.PI*0.11,0,2*Math.PI);
+        ctx.fillStyle='#b1e7fa';
+        ctx.globalAlpha=0.38;
+        ctx.shadowColor='#dedced';
+        ctx.shadowBlur=5;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 喘气气泡
+      if(params.express=='tired'){
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(109,14,5+Math.cos(runPhase*2.1)*1.3,0,2*Math.PI);
+        ctx.fillStyle='#daeefd';
+        ctx.globalAlpha=0.29+0.32*Math.abs(Math.sin(runPhase*1.4));
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.restore();
+      ctx.restore();
+    }
+
+    // ------- 自行车绘制 ---------
+    function drawBike(ctx, params){
+      /*
+      自行车结构：
+        - 前后轮辐条（动态旋转）
+        - 车架（经典三角，下管/上管/立管/前叉）
+        - 车把/铃
+        - 车座/脚踏/链条
+        - 拟人化骑鹈鹕（例如车把牵缰绳/铃受惊/轮卡背羽） 
+      */
+      let wheelRoll = params.wheelRoll || 0;
+      let pedalSwing = params.pedalSwing || 0;
+      let showBellShake = params.showBellShake || false;
+      let bellShake = params.bellShake || 0;
+      ctx.save();
+
+      // 车架主色
+      let frameColor = '#4486ef';
+      let darkFrame = '#15395a';
+
+      // 轮胎/辐条
+      let wheels = [
+        {x:-62, y:40}, // 后轮
+        {x:68, y:44}   // 前轮
+      ];
+      wheels.forEach((w,i)=>{
+        ctx.save();
+        ctx.translate(w.x,w.y);
+        ctx.rotate(wheelRoll+(i?0.13:-0.11));
+        // 轮胎
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0,0,32,0,2*Math.PI);
+        ctx.strokeStyle='#333947';
+        ctx.lineWidth=8;
+        ctx.shadowColor='#a3c8ef';
+        ctx.shadowBlur=6;
+        ctx.globalAlpha=0.85;
+        ctx.stroke();
+        ctx.shadowBlur=0;
+        ctx.restore();
+        // 轮圈
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0,0,24,0,2*Math.PI);
+        ctx.strokeStyle='#ddeaf9';
+        ctx.lineWidth=4.8;
+        ctx.globalAlpha=0.85;
+        ctx.stroke();
+        ctx.restore();
+        // 辐条
+        for(let j=0;j<8;j++){
+          ctx.save();
+          ctx.rotate(j*Math.PI/4);
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          ctx.lineTo(0,24);
+          ctx.strokeStyle='#e6f6f2';
+          ctx.lineWidth=2.1;
+          ctx.globalAlpha=0.83;
+          ctx.stroke();
+          ctx.restore();
+        }
+        // 轮毂
+        ctx.beginPath();
+        ctx.arc(0,0,7.3,0,2*Math.PI);
+        ctx.fillStyle='#bec9ee';
+        ctx.globalAlpha=0.94;
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      // 车架三角
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-62,40); // 后轮
+      ctx.lineTo(-11,-15); // 座管轴
+      ctx.lineTo(68,44);   // 前轮
+      ctx.closePath();
+      ctx.strokeStyle=frameColor;
+      ctx.lineWidth=10.7;
+      ctx.shadowColor='#5ca7fb';
+      ctx.shadowBlur=14;
+      ctx.globalAlpha=0.85;
+      ctx.stroke();
+      ctx.shadowBlur=0;
+
+      // 下管、立管
+      ctx.beginPath();
+      ctx.moveTo(68,44);
+      ctx.lineTo(44,-22);
+      ctx.strokeStyle=frameColor;
+      ctx.lineWidth=8.7;
+      ctx.globalAlpha=0.95;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(-11,-15);
+      ctx.lineTo(44,-22);
+      ctx.strokeStyle=darkFrame;
+      ctx.lineWidth=7.7;
+      ctx.globalAlpha=0.83;
+      ctx.stroke();
+
+      // 前叉弯管
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(44,-22);
+      ctx.bezierCurveTo(74,-32,90,11,68,44);
+      ctx.strokeStyle=frameColor;
+      ctx.lineWidth=7.7;
+      ctx.globalAlpha=0.87;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+
+      // 车把
+      ctx.save();
+      ctx.translate(66,-17);
+      ctx.rotate(0.11);
+      // 主车把弯管
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.bezierCurveTo(18,-22,60,-13,34,12);
+      ctx.strokeStyle='#333947';
+      ctx.lineWidth=5.4;
+      ctx.globalAlpha=0.93;
+      ctx.stroke();
+      // 左把套
+      ctx.beginPath();
+      ctx.arc(35,11,7,0,2*Math.PI);
+      ctx.fillStyle='#dce2e6';
+      ctx.globalAlpha=0.9;
+      ctx.fill();
+
+      // 铃
+      ctx.save();
+      ctx.translate(22,-7.3);
+      if(showBellShake)
+        ctx.rotate(bellShake*0.63);
+      ctx.beginPath();
+      ctx.arc(0,0,8.3,0,2*Math.PI);
+      ctx.fillStyle='#f8f6e7';
+      ctx.globalAlpha=0.97;
+      ctx.shadowColor='#f2efbd';
+      ctx.shadowBlur=6;
+      ctx.fill();
+      ctx.shadowBlur=0;
+
+      ctx.beginPath();
+      ctx.arc(-1.5,3,3.7,0,2*Math.PI);
+      ctx.fillStyle='#dcbe63';
+      ctx.globalAlpha=0.85;
+      ctx.fill();
+
+      // 铃小柄
+      ctx.beginPath();
+      ctx.arc(8,-2.1,2.6,0,2*Math.PI);
+      ctx.fillStyle='#7e6a5b';
+      ctx.globalAlpha=0.82;
+      ctx.fill();
+
+      ctx.restore();
+      ctx.restore();
+
+      // 座椅
+      ctx.save();
+      ctx.translate(-10,-21.7);
+      ctx.rotate(-0.13);
+      ctx.beginPath();
+      ctx.ellipse(0,0,28.8,10.2,Math.PI*0.03,0,2*Math.PI);
+      ctx.fillStyle='#484547';
+      ctx.globalAlpha=0.95;
+      ctx.shadowColor='#a1c3e6';
+      ctx.shadowBlur=8;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.restore();
+
+      // 脚踏+曲柄
+      for(let i=0;i<2;i++){
+        ctx.save();
+        ctx.translate(-11,-15);
+        ctx.rotate(pedalSwing + Math.PI*i);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(22,9);
+        ctx.strokeStyle='#aab4c9';
+        ctx.lineWidth=5.9;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(22,9,6.9,0,2*Math.PI);
+        ctx.fillStyle='#ffd13e';
+        ctx.globalAlpha=0.81;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 链轮/链条
+      ctx.save();
+      ctx.translate(-6,3.1);
+      ctx.beginPath();
+      ctx.arc(0,0,15.7,0,2*Math.PI);
+      ctx.fillStyle='#aab4c9';
+      ctx.globalAlpha=0.92;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      // 弧链条
+      ctx.save();
+      ctx.rotate(pedalSwing);
+      ctx.beginPath();
+      ctx.arc(0,0,21,Math.PI*0.55,Math.PI*1.68,false);
+      ctx.strokeStyle='#375db1';
+      ctx.lineWidth=4.7;
+      ctx.globalAlpha=0.9;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    // --- 投喂小鱼动画函数 ---
+    function drawFeedFish(x,y,anim){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(Math.sin(anim*14)*0.43);
+      ctx.scale(1.04+0.15*Math.abs(Math.sin(anim*9)),0.97+0.12*Math.abs(Math.sin(anim*9)));
+      // 鱼身
+      ctx.beginPath();
+      ctx.ellipse(0,0,14,7,Math.PI*0.02,0,2*Math.PI);
+      ctx.fillStyle='#5cc7fb';
+      ctx.globalAlpha=0.95;
+      ctx.shadowColor='#b9e6f6';
+      ctx.shadowBlur=10;
+      ctx.fill();
+      // 鱼尾
+      ctx.save();
+      ctx.translate(-14,0);
+      ctx.rotate(Math.sin(anim*8)*0.22);
+      ctx.beginPath();
+      ctx.moveTo(0,-3);
+      ctx.lineTo(-7,-8);
+      ctx.lineTo(-2,0);
+      ctx.lineTo(-7,8);
+      ctx.lineTo(0,3);
+      ctx.closePath();
+      ctx.fillStyle='#9fdfff';
+      ctx.fill();
+      ctx.restore();
+      // 鱼鳞
+      ctx.save();
+      ctx.globalAlpha=0.37;
+      ctx.beginPath();
+      ctx.arc(8,0,3.3,0,Math.PI*1.6,false);
+      ctx.strokeStyle='#fbf9e7';
+      ctx.lineWidth=1.2;
+      ctx.stroke();
+      ctx.restore();
+
+      // 眼睛
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(9,-2,1.3,0,2*Math.PI);
+      ctx.fillStyle='#222';
+      ctx.globalAlpha=0.69;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(9,-2,2.4,0,2*Math.PI);
+      ctx.strokeStyle='#fff';
+      ctx.globalAlpha=0.11;
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    // ---------- 启动动画 ----------
+    requestAnimationFrame(animate);
+
+    // ----- 键盘支持 -----
+    document.getElementById('mainCanvas').addEventListener('keydown', function(e){
+      if(e.key===' '||e.key==='Enter') ringBell();
+      else if(e.key==='ArrowRight'||e.key==='ArrowUp'){
+        scene.speed = Math.min(scene.speed+1,7);
+        document.getElementById('speedSlider').value = scene.speed;
+      }
+      else if(e.key==='ArrowLeft'||e.key==='ArrowDown'){
+        scene.speed = Math.max(scene.speed-1,1);
+        document.getElementById('speedSlider').value = scene.speed;
+      }
+      else if(e.key==='f'||e.key==='F') feedFish();
+      else if(e.key==='t'||e.key==='T') {
+        document.getElementById('dayBtn').click();
+      }
+    });
+
+    // ----- 提示淡出 -----
+    setTimeout(()=>{scene.tooltipFade=0.01;}, 6800);
+
+    // ------- 禁止默认画布拖拽 ---------
+    document.getElementById('mainCanvas').addEventListener('touchstart', e=>e.preventDefault());
+    document.getElementById('mainCanvas').addEventListener('mousedown', e=>e.preventDefault());
+
+  </script>
+</body>
+</html>

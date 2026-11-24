@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>A Bicycle Riding a Pelican</title>
+<style>
+  html, body {
+    margin: 0; 
+    padding: 0; 
+    overflow: hidden; 
+    background: #87CEEB; /* default sky color: lightblue */
+    font-family: sans-serif;
+  }
+  #scene {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    background: #87CEEB;
+  }
+  #controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  #controls button, #controls input[type="range"] {
+    cursor: pointer;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body onload="init()">
+
+<canvas id="scene"></canvas>
+
+<div id="controls">
+  <button onclick="ringBell()">按车铃</button>
+  <label>速度: 
+    <input id="speedControl" type="range" min="0" max="10" step="0.1" value="2" oninput="updateSpeed(this.value)" />
+  </label>
+  <button onclick="feedPelican()">投喂小鱼</button>
+</div>
+
+<script>
+let canvas, ctx, w, h;
+let lastTime = 0;
+
+// Parallax offsets
+let bgOffset1 = 0;  // for near ground
+let bgOffset2 = 0;  // for far ocean
+let cloudOffset = 0; // for clouds
+
+// Pelican & bicycle states
+let baseSpeed = 2;        // base forward speed
+let speed = 2;            // current speed
+let accumulatedBoost = 0; // track how much time remains in the speed boost
+let energy = 100;         // pelican energy
+let wingFlap = 0;         // wing animation factor
+let pedalAngle = 0;       // bicycle pedal angle
+let wheelAngle = 0;       // bicycle wheels rotation
+let bounce = 0;           // up-down bounce offset
+let bounceSpeed = 0;      // upward velocity for bounce effect
+
+// Fish array for feeding
+let fishes = [];
+
+// Audio context for the bike bell
+let audioCtx;
+
+function init() {
+  canvas = document.getElementById('scene');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  
+  // Pre-create an AudioContext
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  requestAnimationFrame(animate);
+}
+
+// Update canvas size
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  w = canvas.width;
+  h = canvas.height;
+}
+
+// Called when speed slider changes
+function updateSpeed(val) {
+  baseSpeed = parseFloat(val);
+}
+
+// Simulate pressing the bike bell
+function ringBell() {
+  // Short beep
+  let oscillator = audioCtx.createOscillator();
+  let gainNode = audioCtx.createGain();
+  oscillator.type = 'triangle';
+  oscillator.frequency.value = 1200;
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  oscillator.start();
+  gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
+  oscillator.stop(audioCtx.currentTime + 0.3);
+
+  // Temporary speed boost
+  accumulatedBoost = 50; // frames of boost
+}
+
+// Simulate feeding the pelican with a small fish
+function feedPelican() {
+  // Create a fish "falling" from above
+  let fish = {
+    x: w * 0.2 + 50,   // near pelican's head area
+    y: -20,
+    vy: 2 + Math.random() * 2,
+    size: 10
+  };
+  fishes.push(fish);
+}
+
+// Draw the parallax background
+function drawBackground(dt) {
+  // Move parallax layers
+  // speed scaling for parallax effect
+  bgOffset1 -= speed * dt * 50;
+  bgOffset2 -= speed * dt * 20;
+  cloudOffset -= speed * dt * 10;
+
+  // Keep them in range
+  bgOffset1 %= w * 2;
+  bgOffset2 %= w * 2;
+  cloudOffset %= w * 3;
+
+  // Sky
+  let grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#87CEEB'); // top (lighter)
+  grad.addColorStop(1, '#ffffff'); // bottom
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Clouds
+  ctx.save();
+  ctx.translate(-cloudOffset, h*0.1);
+  ctx.fillStyle = '#ffffff';
+  for (let i=0; i<5; i++){
+    let cx = (i*200) % (w*3);
+    let cy = Math.sin((Date.now()+i*300)/1000)*10;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 50, 20, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Distant ocean
+  ctx.save();
+  ctx.translate(bgOffset2, 0);
+  ctx.fillStyle = '#4a90e2';
+  for (let i = -1; i <= 2; i++) {
+    ctx.fillRect(i * w, h*0.6, w, h*0.4);
+  }
+  ctx.restore();
+  
+  // Slight wave patterns on the ocean
+  ctx.save();
+  ctx.translate(bgOffset2 * 1.2, 0);
+  ctx.strokeStyle = '#add8e6';
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    for (let x = -w; x <= 2*w; x += 20) {
+      let y = h*0.7 + Math.sin((x + Date.now()*0.2 + i*100)/50)*5 + (i*10);
+      if (x === -w) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+  
+  // Foreground: boardwalk or path
+  ctx.save();
+  ctx.translate(bgOffset1, 0);
+  ctx.fillStyle = '#C19A6B';
+  for (let i = -1; i <= 2; i++) {
+    ctx.fillRect(i * w, h*0.9, w, h*0.1);
+  }
+  ctx.restore();
+}
+
+// Draw the pelican
+function drawPelican(x, y, t) {
+  ctx.save();
+  ctx.translate(x, y + bounce);
+
+  // Body
+  ctx.save();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); // main body
+  ctx.ellipse(0, 0, 60, 30, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wing (simple flapping)
+  let wingFlapOffset = 15 * Math.sin(t * 8);
+  ctx.save();
+  ctx.rotate(wingFlapOffset * Math.PI / 180);
+  ctx.fillStyle = '#d3d3d3';
+  ctx.beginPath();
+  ctx.ellipse(-30, -10, 30, 15, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Head & beak
+  ctx.save();
+  ctx.translate(60, -10);
+  // Neck
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-60, 0);
+  ctx.lineTo(0, 0);
+  ctx.stroke();
+  // Head
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, -15, 15, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = 'orange';
+  ctx.beginPath(); // beak
+  ctx.moveTo(0, -5);
+  ctx.lineTo(30, 0);
+  ctx.lineTo(0, 5);
+  ctx.fill();
+  // Eye
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(-5, -17, 2.5, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Feet (quick simple motion)
+  let footOffset = 5 * Math.sin(t * 10);
+  ctx.fillStyle = 'orange';
+  // left foot
+  ctx.beginPath();
+  ctx.ellipse(-20, 30 + footOffset, 8, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // right foot
+  ctx.beginPath();
+  ctx.ellipse(20, 30 - footOffset, 8, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// Draw the bicycle (which is "on top" of the pelican)
+function drawBicycle(x, y, wheelAngle, pedalAngle) {
+  ctx.save();
+  ctx.translate(x, y + bounce);
+  // Tilt the bike slightly as if balancing
+  let tilt = 0.1 * Math.sin(Date.now() / 200); 
+  ctx.rotate(tilt);
+
+  // Draw seat / frame
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  // Frame (simple polygon)
+  ctx.moveTo(-30, 0);  // seat
+  ctx.lineTo(0, -20);  // top tube to handle
+  ctx.lineTo(30, 0);   // handle to front wheel
+  ctx.lineTo(20, 30);  // down tube to pedal center
+  ctx.lineTo(-20, 30); // chain stay to pedal center
+  ctx.lineTo(-30, 0);  // seat stay
+  ctx.stroke();
+
+  // Handlebar
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(10, -25);
+  ctx.moveTo(0, -20);
+  ctx.lineTo(-10, -25);
+  ctx.stroke();
+
+  // Seat
+  ctx.beginPath();
+  ctx.moveTo(-35, -5);
+  ctx.lineTo(-25, -5);
+  ctx.stroke();
+
+  // Wheels
+  ctx.save();
+    ctx.translate(-30, 0);
+    ctx.rotate(wheelAngle);
+    drawWheel();
+  ctx.restore();
+  ctx.save();
+    ctx.translate(30, 0);
+    ctx.rotate(wheelAngle);
+    drawWheel();
+  ctx.restore();
+
+  // Pedals and chainring
+  ctx.save();
+    ctx.translate(0, 30);
+    ctx.rotate(pedalAngle);
+    // chainring
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    // crank arms
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(10, 0);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-10, 0);
+    ctx.stroke();
+    // Pedals
+    ctx.beginPath();
+    ctx.moveTo(12, 0);
+    ctx.rect(12, -4, 8, 8);
+    ctx.rect(-20, -4, 8, 8);
+    ctx.fillStyle = '#333';
+    ctx.fill();
+  ctx.restore();
+
+  // "Reins"/Handle cords from bike to pelican
+  ctx.beginPath();
+  ctx.strokeStyle = '#663300';
+  ctx.lineWidth = 2;
+  // Front handle to pelican's neck area
+  ctx.moveTo(0, -20);
+  ctx.lineTo(60 + (10*Math.sin(Date.now()*0.01)), -10 + (5*Math.sin(Date.now()*0.01))); 
+  ctx.stroke();
+
+  // "Body" to some imaginary harness around pelican
+  ctx.beginPath();
+  ctx.moveTo(-30, 0);
+  ctx.lineTo(10 + (5*Math.cos(Date.now()*0.015)), 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// A helper function to draw a simple bicycle wheel with spokes
+function drawWheel() {
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 15, 0, Math.PI * 2);
+  ctx.stroke();
+  // Spokes
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    let angle = (Math.PI * 2 / 8) * i;
+    ctx.moveTo(0, 0);
+    ctx.lineTo(15 * Math.cos(angle), 15 * Math.sin(angle));
+  }
+  ctx.stroke();
+}
+
+// Main animation loop
+function animate(timestamp) {
+  let dt = (timestamp - lastTime) / 1000; // in seconds
+  lastTime = timestamp;
+  
+  // Calculate speed with possible short 'boost'
+  if (accumulatedBoost > 0) {
+    speed = baseSpeed + 3;  // extra speed while boosted
+    accumulatedBoost -= 1;  // decrement frames
+  } else {
+    speed = baseSpeed;
+  }
+
+  // If energy is too low, reduce speed
+  if (energy <= 0) {
+    speed = 0.3;
+    if (energy < 0) energy = 0;
+  } else {
+    // Slowly decrease energy if speed is high
+    energy -= 0.3 * speed * dt; 
+    if (energy < 0) energy = 0;
+  }
+
+  // Keep track of wing and pedal angles
+  // We can incorporate speed and time to create movement
+  wingFlap += dt;
+  pedalAngle += speed * dt * 2;
+  wheelAngle += speed * dt * 2;
+
+  // Bounce effect (pelican running on the ground, bike bouncing on top)
+  bounceSpeed += 30 * dt; // gravity-like pull
+  bounce += bounceSpeed;
+  // Simulate a ground collision bounce
+  if (bounce > 0) {
+    bounce = 0;
+    bounceSpeed = -speed * 4; 
+  }
+
+  // Move fishes
+  for (let i = 0; i < fishes.length; i++) {
+    let f = fishes[i];
+    f.y += f.vy;
+    // Check if fish is "caught" by pelican mouth area:
+    // Pelican's mouth around: (w*0.2 + 60, h*0.7 - 10 + bounce)
+    let px = w*0.2 + 60, py = h*0.7 - 10 + bounce;
+    let dx = f.x - px;
+    let dy = f.y - py;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 30) {
+      // Pelican eats the fish
+      energy = Math.min(100, energy + 20);
+      fishes.splice(i, 1);
+      i--;
+    }
+    // If fish is out of screen, remove it
+    else if (f.y > h + 20) {
+      fishes.splice(i, 1);
+      i--;
+    }
+  }
+
+  // Drawing
+  ctx.clearRect(0, 0, w, h);
+  drawBackground(dt);
+
+  // Draw fish
+  ctx.save();
+  ctx.fillStyle = 'gold';
+  fishes.forEach(f => {
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y, f.size, f.size/2, 0, 0, Math.PI*2);
+    ctx.fill();
+    // A small tail
+    ctx.beginPath();
+    ctx.moveTo(f.x - f.size, f.y);
+    ctx.lineTo(f.x - f.size*1.5, f.y - f.size/2);
+    ctx.lineTo(f.x - f.size*1.5, f.y + f.size/2);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.restore();
+
+  // Draw pelican at bottom left portion
+  drawPelican(w*0.2, h*0.7, wingFlap);
+  // Bicycle on top of pelican
+  drawBicycle(w*0.2+10, h*0.56, wheelAngle, pedalAngle);
+
+  // Display energy
+  ctx.save();
+  ctx.fillStyle = 'black';
+  ctx.font = "16px sans-serif";
+  ctx.fillText("体力: " + Math.round(energy) + "/100", 10, 70);
+  ctx.restore();
+
+  requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>

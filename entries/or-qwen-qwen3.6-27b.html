@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚲 自行车骑鹈鹕 🐦</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    overflow: hidden;
+    background: #1a1a2e;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    user-select: none;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    z-index: 10;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 12px 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 14px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  .btn:active { transform: translateY(0); }
+  .btn-bell {
+    background: linear-gradient(135deg, #f6d365, #fda085);
+    color: #5a3e1b;
+  }
+  .btn-fish {
+    background: linear-gradient(135deg, #89f7fe, #66a6ff);
+    color: #1a3a5c;
+  }
+  .btn-theme {
+    background: linear-gradient(135deg, #a18cd1, #fbc2eb);
+    color: #3a2050;
+  }
+  .speed-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .speed-wrap input[type=range] {
+    width: 100px;
+    accent-color: #fda085;
+    cursor: pointer;
+  }
+  #stamina-bar {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  #stamina-label {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+  #stamina-track {
+    width: 160px;
+    height: 14px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 7px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  #stamina-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
+    border-radius: 7px;
+    transition: width 0.3s, background 0.3s;
+  }
+  #stamina-fill.low { background: linear-gradient(90deg, #ff416c, #ff4b2b); }
+  #title-bar {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    letter-spacing: 2px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  #bell-flash {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at 50% 40%, rgba(255,220,100,0.3), transparent 60%);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 5;
+    transition: opacity 0.1s;
+  }
+  @keyframes bellPulse {
+    0% { opacity: 0.8; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="title-bar">🚲 自行车骑鹈鹕 🐦</div>
+
+<div id="stamina-bar">
+  <div id="stamina-label">鹈鹕体力 ⚡</div>
+  <div id="stamina-track"><div id="stamina-fill"></div></div>
+</div>
+
+<div id="bell-flash"></div>
+
+<div id="ui">
+  <button class="btn btn-bell" id="btn-bell" title="按车铃">🔔 按车铃</button>
+  <div class="speed-wrap">
+    <span>🏃</span>
+    <input type="range" id="speed-slider" min="0" max="100" value="30">
+    <span id="speed-val">30%</span>
+  </div>
+  <button class="btn btn-fish" id="btn-fish" title="投喂小鱼">🐟 投喂小鱼</button>
+  <button class="btn btn-theme" id="btn-theme" title="切换场景">🌅 黄昏</button>
+</div>
+
+<script>
+// ============ SETUP ============
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ============ AUDIO ============
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBell() {
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+  const freqs = [830, 1247, 1660, 2076, 2500];
+  const gains = [0.3, 0.15, 0.1, 0.06, 0.03];
+  freqs.forEach((f, i) => {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    gain.gain.setValueAtTime(gains[i], now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 1.3);
+  });
+}
+
+function playFishSound() {
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(600, now);
+  osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
+  osc.frequency.exponentialRampToValueAtTime(500, now + 0.25);
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.4);
+}
+
+function playScream() {
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+  osc.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+  gain.gain.setValueAtTime(0.12, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.55);
+}
+
+// ============ STATE ============
+let speed = 30;
+let stamina = 100;
+let theme = 0; // 0=day, 1=sunset, 2=night
+const themes = ['☀️ 晴天', '🌅 黄昏', '🌙 夜晚'];
+let bellRing = 0;
+let startled = 0;
+let fishParticles = [];
+let featherParticles = [];
+let sweatParticles = [];
+let sparkParticles = [];
+let frameCount = 0;
+let bgOffset = 0;
+let groundOffset = 0;
+
+// ============ THEME COLORS ============
+const themeColors = [
+  { // day
+    sky1: '#4a90d9', sky2: '#87ceeb', sky3: '#b8e4f0',
+    sea1: '#1e6fa0', sea2: '#3a9fd4',
+    ground: '#c4956a', groundDark: '#8b6914',
+    cloud: 'rgba(255,255,255,0.9)',
+    sun: { x: 0.85, y: 0.12, r: 50, color: '#ffe066', glow: 'rgba(255,224,102,0.3)' },
+    starAlpha: 0
+  },
+  { // sunset
+    sky1: '#2c1654', sky2: '#d4556b', sky3: '#f7a541',
+    sea1: '#5c3d6e', sea2: '#a0557d',
+    ground: '#9e7040', groundDark: '#6b4420',
+    cloud: 'rgba(255,180,120,0.5)',
+    sun: { x: 0.5, y: 0.35, r: 65, color: '#ff6b35', glow: 'rgba(255,107,53,0.4)' },
+    starAlpha: 0.3
+  },
+  { // night
+    sky1: '#0a0a23', sky2: '#1a1a3e', sky3: '#2a2a5e',
+    sea1: '#0a1628', sea2: '#152a4a',
+    ground: '#3a2a1a', groundDark: '#2a1a0a',
+    cloud: 'rgba(100,100,140,0.3)',
+    sun: { x: 0.15, y: 0.15, r: 35, color: '#e8e8ff', glow: 'rgba(200,200,255,0.15)' },
+    starAlpha: 1
+  }
+];
+
+// ============ PARTICLES ============
+function addFeather() {
+  featherParticles.push({
+    x: W + 20,
+    y: Math.random() * H * 0.5,
+    vx: -(2 + Math.random() * 3),
+    vy: Math.sin(Math.random() * Math.PI * 2) * 0.5,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.05,
+    size: 6 + Math.random() * 10,
+    alpha: 0.6 + Math.random() * 0.4,
+    color: ['#fff', '#f0e6d3', '#e8d8c4'][Math.floor(Math.random() * 3)]
+  });
+}
+
+function addSweat() {
+  const px = W * 0.55 + Math.random() * 40 - 20;
+  const py = H * 0.35 + Math.random() * 20;
+  sweatParticles.push({
+    x: px, y: py,
+    vx: (Math.random() - 0.5) * 2,
+    vy: -2 - Math.random() * 2,
+    life: 1,
+    size: 3 + Math.random() * 3
+  });
+}
+
+function addFishParticle() {
+  fishParticles.push({
+    x: W * 0.5,
+    y: H * 0.3,
+    tx: W * 0.52,
+    ty: H * 0.55,
+    progress: 0,
+    speed: 0.03 + Math.random() * 0.02,
+    rot: 0
+  });
+}
+
+function addSpark() {
+  for (let i = 0; i < 8; i++) {
+    sparkParticles.push({
+      x: W * 0.52,
+      y: H * 0.52,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      life: 1,
+      size: 2 + Math.random() * 3,
+      color: ['#ffd700', '#ff6b6b', '#87ceeb', '#98fb98'][Math.floor(Math.random() * 4)]
+    });
+  }
+}
+
+// ============ DRAW FUNCTIONS ============
+
+function drawSky(tc) {
+  const grad = ctx.createLinearGradient(0, 0, 0, H * 0.65);
+  grad.addColorStop(0, tc.sky1);
+  grad.addColorStop(0.5, tc.sky2);
+  grad.addColorStop(1, tc.sky3);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H * 0.65);
+}
+
+function drawStars(tc) {
+  if (tc.starAlpha <= 0) return;
+  ctx.fillStyle = `rgba(255,255,255,${tc.starAlpha})`;
+  const seed = 42;
+  for (let i = 0; i < 80; i++) {
+    const sx = ((i * 7919 + seed) % W);
+    const sy = ((i * 6271 + seed) % (H * 0.5));
+    const ss = 1 + ((i * 3571) % 3);
+    const twinkle = Math.sin(frameCount * 0.02 + i) * 0.5 + 0.5;
+    ctx.globalAlpha = tc.starAlpha * twinkle * 0.8;
+    ctx.beginPath();
+    ctx.arc(sx, sy, ss, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawSun(tc) {
+  const sx = W * tc.sun.x;
+  const sy = H * tc.sun.y;
+  // glow
+  const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, tc.sun.r * 3);
+  glow.addColorStop(0, tc.sun.glow);
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sx - tc.sun.r * 3, sy - tc.sun.r * 3, tc.sun.r * 6, tc.sun.r * 6);
+  // sun body
+  ctx.beginPath();
+  ctx.arc(sx, sy, tc.sun.r, 0, Math.PI * 2);
+  ctx.fillStyle = tc.sun.color;
+  ctx.fill();
+}
+
+function drawClouds(tc, offset) {
+  ctx.fillStyle = tc.cloud;
+  const clouds = [
+    { x: 100, y: 60, w: 120, h: 40 },
+    { x: 400, y: 90, w: 160, h: 50 },
+    { x: 700, y: 40, w: 100, h: 35 },
+    { x: 1000, y: 80, w: 140, h: 45 },
+    { x: 1300, y: 55, w: 110, h: 38 },
+  ];
+  clouds.forEach(c => {
+    let cx = ((c.x - offset * 0.1) % (W + 300)) - 150;
+    drawCloud(cx, c.y, c.w, c.h);
+  });
+}
+
+function drawCloud(x, y, w, h) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, w * 0.5, h * 0.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - w * 0.25, y + h * 0.1, w * 0.35, h * 0.4, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.25, y + h * 0.05, w * 0.3, h * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSea(tc, offset) {
+  const seaY = H * 0.55;
+  const grad = ctx.createLinearGradient(0, seaY, 0, H);
+  grad.addColorStop(0, tc.sea2);
+  grad.addColorStop(1, tc.sea1);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, seaY, W, H - seaY);
+
+  // waves
+  ctx.strokeStyle = theme === 2 ? 'rgba(100,150,200,0.15)' : 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 2;
+  for (let row = 0; row < 5; row++) {
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 5) {
+      const waveY = seaY + 15 + row * 25 + Math.sin((x + offset * 0.5 + row * 50) * 0.02) * 8;
+      if (x === 0) ctx.moveTo(x, waveY);
+      else ctx.lineTo(x, waveY);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawGround(tc, offset) {
+  const groundY = H * 0.68;
+  // boardwalk
+  ctx.fillStyle = tc.ground;
+  ctx.fillRect(0, groundY, W, H - groundY);
+
+  // planks
+  ctx.strokeStyle = tc.groundDark;
+  ctx.lineWidth = 2;
+  const plankW = 80;
+  const startX = -(offset % plankW);
+  for (let x = startX; x < W + plankW; x += plankW) {
+    ctx.beginPath();
+    ctx.moveTo(x, groundY);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  // plank lines horizontal
+  ctx.lineWidth = 1;
+  for (let y = groundY + 20; y < H; y += 25) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  // edge highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(0, groundY, W, 3);
+}
+
+function drawPelican(px, py, frame, spd, stam, startle) {
+  const bob = Math.sin(frame * 0.15 * (1 + spd / 30)) * 5;
+  const wingAngle = Math.sin(frame * 0.12 * (1 + spd / 25)) * 0.4;
+  const legPhase = frame * 0.15 * (1 + spd / 30);
+  const bodyTilt = Math.sin(frame * 0.08) * 2;
+  const pouchBob = Math.sin(frame * 0.1 + 1) * 3;
+
+  ctx.save();
+  ctx.translate(px, py + bob);
+  ctx.rotate(bodyTilt * Math.PI / 180);
+
+  if (startle > 0) {
+    ctx.translate(Math.sin(frame * 0.5) * startle * 3, 0);
+  }
+
+  // === LEGS ===
+  const legSpread = Math.sin(legPhase) * 15;
+  const legSpread2 = Math.sin(legPhase + Math.PI) * 15;
+
+  // Left leg
+  ctx.strokeStyle = '#d4883a';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(10, 30);
+  ctx.lineTo(10 + legSpread, 55);
+  ctx.lineTo(10 + legSpread + 12, 70);
+  ctx.stroke();
+  // webbed foot
+  ctx.beginPath();
+  ctx.moveTo(2 + legSpread, 70);
+  ctx.lineTo(18 + legSpread, 74);
+  ctx.lineTo(10 + legSpread + 12, 70);
+  ctx.fillStyle = '#d4883a';
+  ctx.fill();
+
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(-5, 30);
+  ctx.lineTo(-5 + legSpread2, 55);
+  ctx.lineTo(-5 + legSpread2 + 12, 70);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-13 + legSpread2, 70);
+  ctx.lineTo(1 + legSpread2, 74);
+  ctx.lineTo(-5 + legSpread2 + 12, 70);
+  ctx.fill();
+
+  // === BODY ===
+  // Main body
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 55, 32, 0, 0, Math.PI * 2);
+  const bodyGrad = ctx.createRadialGradient(-5, -5, 5, 0, 0, 55);
+  bodyGrad.addColorStop(0, '#ffffff');
+  bodyGrad.addColorStop(0.7, '#f0ece4');
+  bodyGrad.addColorStop(1, '#ddd5c8');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#bbb0a0';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Belly highlight
+  ctx.beginPath();
+  ctx.ellipse(5, 10, 35, 18, 0.1, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fill();
+
+  // === TAIL FEATHERS ===
+  ctx.fillStyle = '#ddd5c8';
+  ctx.strokeStyle = '#bbb0a0';
+  ctx.lineWidth = 1;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-45, -5 + i * 8);
+    ctx.quadraticCurveTo(-65, -10 + i * 12, -75, -5 + i * 15);
+    ctx.quadraticCurveTo(-65, 5 + i * 6, -45, 5 + i * 8);
+    ctx.fillStyle = i % 2 === 0 ? '#e8e0d5' : '#d5cdc0';
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // === WINGS ===
+  // Left wing (back)
+  ctx.save();
+  ctx.translate(5, -5);
+  ctx.rotate(wingAngle - 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(30, -30, 60, -15);
+  ctx.quadraticCurveTo(50, -5, 35, 5);
+  ctx.quadraticCurveTo(20, 10, 0, 10);
+  ctx.fillStyle = '#e8e0d5';
+  ctx.fill();
+  ctx.strokeStyle = '#c8bfb0';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Wing feathers detail
+  ctx.strokeStyle = '#c0b8a8';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(10 + i * 8, -5 + i * 3);
+    ctx.lineTo(25 + i * 10, -15 + i * 5);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Right wing (front)
+  ctx.save();
+  ctx.translate(5, -5);
+  ctx.rotate(-wingAngle + 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(25, 25, 50, 20);
+  ctx.quadraticCurveTo(40, 10, 30, 5);
+  ctx.quadraticCurveTo(15, 8, 0, 10);
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fill();
+  ctx.strokeStyle = '#c8bfb0';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = '#c0b8a8';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(10 + i * 8, 5 + i * 2);
+    ctx.lineTo(25 + i * 10, 15 + i * 4);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // === NECK & HEAD ===
+  ctx.beginPath();
+  ctx.moveTo(35, -15);
+  ctx.quadraticCurveTo(50, -30, 55, -45);
+  ctx.quadraticCurveTo(60, -55, 50, -60);
+  ctx.lineTo(30, -55);
+  ctx.quadraticCurveTo(35, -45, 30, -30);
+  ctx.lineTo(20, -10);
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fill();
+  ctx.strokeStyle = '#c8bfb0';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === HEAD ===
+  ctx.beginPath();
+  ctx.ellipse(45, -58, 20, 16, -0.1, 0, Math.PI * 2);
+  ctx.fillStyle = '#f8f5f0';
+  ctx.fill();
+  ctx.strokeStyle = '#c8bfb0';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // === EYE ===
+  const eyeX = 52, eyeY = -62;
+  // Eye white
+  ctx.beginPath();
+  ctx.ellipse(eyeX, eyeY, 7, 6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Pupil
+  const pupilOffX = startle > 0 ? 2 : 0;
+  const pupilSize = startle > 0 ? 4 : 3;
+  ctx.beginPath();
+  ctx.arc(eyeX + pupilOffX, eyeY, pupilSize, 0, Math.PI * 2);
+  ctx.fillStyle = '#222';
+  ctx.fill();
+  // Eye highlight
+  ctx.beginPath();
+  ctx.arc(eyeX + pupilOffX - 1.5, eyeY - 1.5, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Eyebrow (expression)
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (stam < 30) {
+    // tired eyebrow
+    ctx.moveTo(eyeX - 6, eyeY - 9);
+    ctx.lineTo(eyeX + 6, eyeY - 7);
+  } else if (startle > 0) {
+    // startled
+    ctx.moveTo(eyeX - 7, eyeY - 8);
+    ctx.lineTo(eyeX + 7, eyeY - 10);
+  } else {
+    ctx.moveTo(eyeX - 7, eyeY - 8);
+    ctx.lineTo(eyeX + 7, eyeY - 8);
+  }
+  ctx.stroke();
+
+  // === BEAK ===
+  // Upper beak
+  ctx.beginPath();
+  ctx.moveTo(60, -62);
+  ctx.lineTo(105, -55);
+  ctx.lineTo(105, -48);
+  ctx.lineTo(62, -50);
+  ctx.fillStyle = '#f0a030';
+  ctx.fill();
+  ctx.strokeStyle = '#c88020';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Lower beak / pouch
+  ctx.beginPath();
+  ctx.moveTo(62, -48);
+  ctx.quadraticCurveTo(90, -42, 100, -45);
+  ctx.lineTo(98, -38);
+  ctx.lineTo(60, -42);
+  ctx.fillStyle = '#f5b050';
+  ctx.fill();
+
+  // Pouch (the big pouch!)
+  ctx.beginPath();
+  ctx.moveTo(60, -42);
+  ctx.quadraticCurveTo(75, -15 + pouchBob, 90, -25 + pouchBob);
+  ctx.quadraticCurveTo(80, -35 + pouchBob, 60, -42);
+  const pouchGrad = ctx.createLinearGradient(60, -42, 85, -20);
+  pouchGrad.addColorStop(0, '#f0a050');
+  pouchGrad.addColorStop(1, '#e89040');
+  ctx.fillStyle = pouchGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#c88030';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Pouch inner shadow
+  ctx.beginPath();
+  ctx.moveTo(62, -42);
+  ctx.quadraticCurveTo(75, -25 + pouchBob, 88, -32 + pouchBob);
+  ctx.strokeStyle = 'rgba(160,80,20,0.3)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // === HARNESS ===
+  ctx.strokeStyle = '#8B4513';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(30, -5);
+  ctx.quadraticCurveTo(20, 10, 15, 20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(40, -5);
+  ctx.quadraticCurveTo(50, 10, 45, 25);
+  ctx.stroke();
+  // harness ring
+  ctx.beginPath();
+  ctx.arc(15, 22, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8a050';
+  ctx.fill();
+  ctx.strokeStyle = '#8B6914';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // === SWEAT DROPS ===
+  if (spd > 60 && stam < 60) {
+    ctx.fillStyle = '#87ceeb';
+    const sweatCount = spd > 80 ? 3 : 1;
+    for (let i = 0; i < sweatCount; i++) {
+      const sx = 30 + Math.sin(frame * 0.05 + i * 2) * 15;
+      const sy = -70 + i * 12;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 3, 4, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // === FACE FLUSH when tired ===
+  if (stam < 25) {
+    ctx.beginPath();
+    ctx.ellipse(42, -52, 6, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,150,150,0.3)';
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawBicycle(px, py, frame, spd, tilt, startle) {
+  const bounce = Math.abs(Math.sin(frame * 0.12 * (1 + spd / 25))) * 4;
+  const wheelRot = frame * 0.08 * (1 + spd / 20);
+  const pedalRot = frame * 0.08 * (1 + spd / 20);
+
+  ctx.save();
+  ctx.translate(px, py - bounce);
+  ctx.rotate((tilt + startle * Math.sin(frame * 0.3) * 2) * Math.PI / 180);
+
+  const scale = 1.1;
+  ctx.scale(scale, scale);
+
+  // === REINS ===
+  ctx.strokeStyle = '#8B4513';
+  ctx.lineWidth = 2.5;
+  // Left rein
+  ctx.beginPath();
+  ctx.moveTo(-25, -55);
+  ctx.quadraticCurveTo(-30, -30, -20, 0);
+  ctx.stroke();
+  // Right rein
+  ctx.beginPath();
+  ctx.moveTo(25, -55);
+  ctx.quadraticCurveTo(30, -30, 20, 0);
+  ctx.stroke();
+
+  // Reins attachment rings
+  ctx.beginPath();
+  ctx.arc(-20, 0, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8a050';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(20, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === WHEELS ===
+  function drawWheel(wx, wy) {
+    // Tire
+    ctx.beginPath();
+    ctx.arc(wx, wy, 28, 0, Math.PI * 2);
+    ctx.fillStyle = '#333';
+    ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Rim
+    ctx.beginPath();
+    ctx.arc(wx, wy, 24, 0, Math.PI * 2);
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Hub
+    ctx.beginPath();
+    ctx.arc(wx, wy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#999';
+    ctx.fill();
+    ctx.strokeStyle = '#777';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Spokes
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      const a = wheelRot + i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(wx + Math.cos(a) * 5, wy + Math.sin(a) * 5);
+      ctx.lineTo(wx + Math.cos(a) * 23, wy + Math.sin(a) * 23);
+      ctx.stroke();
+    }
+  }
+
+  const frontWheelX = 40;
+  const rearWheelX = -40;
+  const wheelY = 35;
+
+  drawWheel(rearWheelX, wheelY);
+  drawWheel(frontWheelX, wheelY);
+
+  // === FRAME ===
+  ctx.strokeStyle = '#e03030';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Main triangle
+  ctx.beginPath();
+  ctx.moveTo(rearWheelX, wheelY); // rear axle
+  ctx.lineTo(-5, -5); // bottom bracket
+  ctx.lineTo(frontWheelX - 5, -5); // front fork base
+  ctx.closePath();
+  ctx.stroke();
+
+  // Top tube
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(15, -25); // seat tube top
+  ctx.lineTo(frontWheelX - 10, -25); // head tube top
+  ctx.stroke();
+
+  // Seat tube
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(15, -25);
+  ctx.stroke();
+
+  // Head tube
+  ctx.beginPath();
+  ctx.moveTo(frontWheelX - 10, -25);
+  ctx.lineTo(frontWheelX - 5, -5);
+  ctx.stroke();
+
+  // Fork
+  ctx.beginPath();
+  ctx.moveTo(frontWheelX - 5, -5);
+  ctx.lineTo(frontWheelX, wheelY);
+  ctx.stroke();
+
+  // Chain stay
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(rearWheelX, wheelY);
+  ctx.stroke();
+
+  // Seat stay
+  ctx.beginPath();
+  ctx.moveTo(15, -25);
+  ctx.lineTo(rearWheelX, wheelY);
+  ctx.stroke();
+
+  // === CHAIN ===
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 2;
+  // Chain around front and rear
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(rearWheelX, wheelY);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(frontWheelX - 5, -5);
+  ctx.stroke();
+
+  // Chainring
+  ctx.beginPath();
+  ctx.arc(-5, -5, 8, 0, Math.PI * 2);
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // === PEDALS ===
+  const pedalAngle = pedalRot;
+  const pedalLen = 14;
+
+  // Crank arms
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 3;
+  // Left crank
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(-5 + Math.cos(pedalAngle) * pedalLen, -5 + Math.sin(pedalAngle) * pedalLen);
+  ctx.stroke();
+  // Right crank
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.lineTo(-5 + Math.cos(pedalAngle + Math.PI) * pedalLen, -5 + Math.sin(pedalAngle + Math.PI) * pedalLen);
+  ctx.stroke();
+
+  // Pedal platforms
+  const p1x = -5 + Math.cos(pedalAngle) * pedalLen;
+  const p1y = -5 + Math.sin(pedalAngle) * pedalLen;
+  const p2x = -5 + Math.cos(pedalAngle + Math.PI) * pedalLen;
+  const p2y = -5 + Math.sin(pedalAngle + Math.PI) * pedalLen;
+
+  ctx.fillStyle = '#555';
+  ctx.fillRect(p1x - 6, p1y - 2, 12, 4);
+  ctx.fillRect(p2x - 6, p2y - 2, 12, 4);
+
+  // === SEAT ===
+  ctx.fillStyle = '#5a3020';
+  ctx.beginPath();
+  ctx.ellipse(12, -32, 14, 5, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4a2010';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Seat post
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(15, -25);
+  ctx.lineTo(12, -32);
+  ctx.stroke();
+
+  // === HANDLEBARS ===
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(frontWheelX - 10, -25);
+  ctx.lineTo(frontWheelX - 12, -40);
+  ctx.stroke();
+
+  // Handlebar stem
+  ctx.beginPath();
+  ctx.moveTo(frontWheelX - 25, -42);
+  ctx.lineTo(frontWheelX + 5, -42);
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Handlebar grips
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.ellipse(frontWheelX - 25, -42, 4, 6, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(frontWheelX + 5, -42, 4, 6, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === GLOVES (on handlebars - showing bicycle is "riding") ===
+  // Left glove
+  ctx.fillStyle = '#4a90d9';
+  ctx.beginPath();
+  ctx.ellipse(frontWheelX - 25, -42, 7, 6, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#3a70b0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Finger hints
+  ctx.fillStyle = '#5aa0e0';
+  ctx.beginPath();
+  ctx.arc(frontWheelX - 28, -38, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Right glove
+  ctx.fillStyle = '#4a90d9';
+  ctx.beginPath();
+  ctx.ellipse(frontWheelX + 5, -42, 7, 6, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#3a70b0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#5aa0e0';
+  ctx.beginPath();
+  ctx.arc(frontWheelX + 2, -38, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === BELL (on handlebar) ===
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath();
+  ctx.arc(frontWheelX - 10, -44, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#daa520';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Bell button
+  ctx.fillStyle = '#ff8c00';
+  ctx.beginPath();
+  ctx.arc(frontWheelX - 10, -47, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === BELL RING EFFECT ===
+  if (bellRing > 0) {
+    ctx.strokeStyle = `rgba(255,215,0,${bellRing})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const r = 10 + (1 - bellRing) * 25 + i * 8;
+      ctx.beginPath();
+      ctx.arc(frontWheelX - 10, -44, r, -0.5, 0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(frontWheelX - 10, -44, r, Math.PI - 0.5, Math.PI + 0.5);
+      ctx.stroke();
+    }
+  }
+
+  // === FRAME DETAILS ===
+  // Headlight
+  ctx.fillStyle = theme === 2 ? '#ffffaa' : '#ffffcc';
+  ctx.beginPath();
+  ctx.arc(frontWheelX - 2, -48, 4, 0, Math.PI * 2);
+  ctx.fill();
+  if (theme === 2) {
+    ctx.fillStyle = 'rgba(255,255,170,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(frontWheelX - 6, -48);
+    ctx.lineTo(frontWheelX + 20, -60);
+    ctx.lineTo(frontWheelX + 20, -30);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // === "RIDER" DETAILS - bicycle eyes on the frame ===
+  // Cute eyes on the top tube to show personality
+  const eyeBaseX = 5;
+  const eyeBaseY = -22;
+  // Left eye
+  ctx.beginPath();
+  ctx.ellipse(eyeBaseX - 6, eyeBaseY, 4, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(eyeBaseX - 5, eyeBaseY, 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(eyeBaseX - 5.5, eyeBaseY - 1, 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Right eye
+  ctx.beginPath();
+  ctx.ellipse(eyeBaseX + 6, eyeBaseY, 4, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(eyeBaseX + 7, eyeBaseY, 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(eyeBaseX + 6.5, eyeBaseY - 1, 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Smile
+  ctx.beginPath();
+  ctx.arc(eyeBaseX, eyeBaseY + 4, 4, 0.1, Math.PI - 0.1);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Cheek blush
+  ctx.beginPath();
+  ctx.ellipse(eyeBaseX - 10, eyeBaseY + 3, 3, 2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,150,150,0.4)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(eyeBaseX + 10, eyeBaseY + 3, 3, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawFishParticle(fp) {
+  const t = fp.progress;
+  const x = fp.x + (fp.tx - fp.x) * t;
+  const y = fp.y + (fp.ty - fp.y) * t - Math.sin(t * Math.PI) * 60;
+  fp.rot += 0.1;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(fp.rot);
+
+  // Fish body
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#87ceeb';
+  ctx.fill();
+  ctx.strokeStyle = '#4a90d9';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(-16, -5);
+  ctx.lineTo(-16, 5);
+  ctx.closePath();
+  ctx.fillStyle = '#6ab0d9';
+  ctx.fill();
+
+  // Eye
+  ctx.beginPath();
+  ctx.arc(5, -1, 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawFeatherParticle(fp) {
+  ctx.save();
+  ctx.translate(fp.x, fp.y);
+  ctx.rotate(fp.rot);
+  ctx.globalAlpha = fp.alpha;
+
+  // Feather shape
+  ctx.beginPath();
+  ctx.ellipse(0, 0, fp.size, fp.size * 0.3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = fp.color;
+  ctx.fill();
+
+  // Feather lines
+  ctx.strokeStyle = 'rgba(150,140,130,0.5)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-fp.size, 0);
+  ctx.lineTo(fp.size, 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawSweatParticle(sp) {
+  ctx.save();
+  ctx.globalAlpha = sp.life;
+  ctx.fillStyle = '#87ceeb';
+  ctx.beginPath();
+  ctx.ellipse(sp.x, sp.y, sp.size * 0.6, sp.size, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSparkParticle(sp) {
+  ctx.save();
+  ctx.globalAlpha = sp.life;
+  ctx.fillStyle = sp.color;
+  ctx.beginPath();
+  ctx.arc(sp.x, sp.y, sp.size * sp.life, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ============ UPDATE ============
+function updateParticles() {
+  // Feathers
+  featherParticles.forEach(p => {
+    p.x += p.vx - speed * 0.05;
+    p.y += p.vy + Math.sin(frameCount * 0.02 + p.x) * 0.3;
+    p.rot += p.rotV;
+    p.alpha -= 0.002;
+  });
+  featherParticles = featherParticles.filter(p => p.x > -50 && p.alpha > 0);
+
+  // Sweat
+  sweatParticles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05;
+    p.life -= 0.015;
+  });
+  sweatParticles = sweatParticles.filter(p => p.life > 0);
+
+  // Fish
+  fishParticles.forEach(p => {
+    p.progress += p.speed;
+  });
+  fishParticles = fishParticles.filter(p => p.progress < 1);
+
+  // Sparks
+  sparkParticles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05;
+    p.life -= 0.02;
+  });
+  sparkParticles = sparkParticles.filter(p => p.life > 0);
+}
+
+// ============ MAIN LOOP ============
+function animate() {
+  frameCount++;
+  const tc = themeColors[theme];
+
+  // Update background offset
+  const moveSpeed = speed * 0.15;
+  bgOffset += moveSpeed;
+  groundOffset += moveSpeed * 1.5;
+
+  // Update stamina
+  if (speed > 50) {
+    stamina = Math.max(0, stamina - 0.05 * (speed / 50));
+  } else if (speed < 20) {
+    stamina = Math.min(100, stamina + 0.03);
+  }
+
+  // Update bell ring
+  if (bellRing > 0) bellRing -= 0.02;
+  if (startled > 0) startled -= 0.015;
+
+  // Spawn particles
+  if (frameCount % 15 === 0 && speed > 0) {
+    addFeather();
+  }
+  if (frameCount % 10 === 0 && speed > 60) {
+    addSweat();
+  }
+
+  updateParticles();
+
+  // === DRAW ===
+  ctx.clearRect(0, 0, W, H);
+
+  // Sky
+  drawSky(tc);
+  drawStars(tc);
+  drawSun(tc);
+  drawClouds(tc, bgOffset);
+
+  // Sea
+  drawSea(tc, bgOffset);
+
+  // Ground / boardwalk
+  drawGround(tc, groundOffset);
+
+  // === MAIN CHARACTERS ===
+  const pelicanX = W * 0.52;
+  const pelicanY = H * 0.62;
+  const bikeX = W * 0.52;
+  const bikeY = H * 0.38;
+
+  // Pelican
+  drawPelican(pelicanX, pelicanY, frameCount, speed, stamina, startled);
+
+  // Bicycle
+  drawBicycle(bikeX, bikeY, frameCount, speed, Math.sin(frameCount * 0.03) * 2, startled);
+
+  // === PARTICLES ===
+  featherParticles.forEach(drawFeatherParticle);
+  sweatParticles.forEach(drawSweatParticle);
+  fishParticles.forEach(drawFishParticle);
+  sparkParticles.forEach(drawSparkParticle);
+
+  // === SPEED LINES ===
+  if (speed > 70) {
+    ctx.strokeStyle = `rgba(255,255,255,${(speed - 70) / 100})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      const ly = H * 0.4 + i * 30;
+      const lx = (frameCount * 5 + i * 100) % (W + 200) - 100;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(lx - 40 - speed * 0.3, ly);
+      ctx.stroke();
+    }
+  }
+
+  // === UI UPDATES ===
+  const staminaFill = document.getElementById('stamina-fill');
+  staminaFill.style.width = stamina + '%';
+  staminaFill.className = stamina < 25 ? 'low' : '';
+
+  requestAnimationFrame(animate);
+}
+
+// ============ CONTROLS ============
+document.getElementById('btn-bell').addEventListener('click', () => {
+  playBell();
+  bellRing = 1;
+  startled = 1;
+  stamina = Math.max(0, stamina - 3);
+  // Flash
+  const flash = document.getElementById('bell-flash');
+  flash.style.opacity = '0.6';
+  setTimeout(() => flash.style.opacity = '0', 200);
+  // Add sparks
+  addSpark();
+});
+
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = speed + '%';
+});
+
+document.getElementById('btn-fish').addEventListener('click', () => {
+  playFishSound();
+  stamina = Math.min(100, stamina + 20);
+  addFishParticle();
+  addSpark();
+});
+
+document.getElementById('btn-theme').addEventListener('click', () => {
+  theme = (theme + 1) % 3;
+  const btn = document.getElementById('btn-theme');
+  btn.textContent = themes[theme];
+});
+
+// Prevent context menu
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Start
+animate();
+</script>
+</body>
+</html>

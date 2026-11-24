@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>A Bicycle Riding a Pelican</title>
+<style>
+html,body{
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    background:#000;
+}
+canvas{
+    display:block;
+}
+#ui{
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:12px 16px;
+    background:rgba(255,255,255,.25);
+    border-radius:12px;
+    backdrop-filter:blur(8px);
+}
+#ui button,
+#ui label{
+    font:15px/1.4 sans-serif;
+    color:#000;
+    background:rgba(255,255,255,.85);
+    border:none;
+    border-radius:6px;
+    padding:6px 10px;
+    cursor:pointer;
+    user-select:none;
+}
+#ui button:hover{
+    background:#fff7c0;
+}
+#ui input[type=range]{
+    width:140px;
+    vertical-align:middle;
+}
+#barframe{
+    position:fixed;
+    top:20px;
+    left:20px;
+    width:140px;
+    height:14px;
+    border:2px solid #333;
+    border-radius:8px;
+    background:#444;
+}
+#bar{
+    position:absolute;
+    top:0;
+    left:0;
+    height:100%;
+    width:100%;
+    background:#0f0;
+    border-radius:6px 0 0 6px;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!-- 体力条 -->
+<div id="barframe"><div id="bar"></div></div>
+
+<!-- 控件 -->
+<div id="ui">
+    <button id="bell">🔔 Ring Bell</button>
+    <label>Speed&nbsp;<input id="speed" type="range" min="0" max="8" step="0.5" value="2"></label>
+    <button id="feed">🐟 Feed Fish</button>
+    <button id="toggle">🌞 / 🌜</button>
+</div>
+
+<script>
+/* ---------------- 基础设置 ---------------- */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize',resize);
+resize();
+
+/* ---------------- 世界变量 ---------------- */
+let baseSpeed = 2;        // 滑块决定的基础速度
+let dashSpeed = 0;        // 冲刺附加速度
+let worldX = 0;           // 背景位移
+let stamina = 1;          // 0 ~ 1 体力
+let isNight = false;      // 日夜模式
+let last = 0;             // 上一帧时间
+let fishes = [];          // 掉落的小鱼数组
+
+/* ---------------- 音效：车铃 ---------------- */
+function ringBell(){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ac = new AudioCtx();
+    const g = ac.createGain();
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(1800, ac.currentTime);
+    g.gain.setValueAtTime(0.001, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.5, ac.currentTime + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 1.2);
+    o.connect(g).connect(ac.destination);
+    o.start();
+    o.stop(ac.currentTime + 1.25);
+    dashSpeed = 6;        // 受惊加速
+}
+
+/* ---------------- 交互绑定 ---------------- */
+document.getElementById('bell').addEventListener('click',ringBell);
+document.getElementById('speed').addEventListener('input',e=>{
+    baseSpeed = parseFloat(e.target.value);
+});
+document.getElementById('feed').addEventListener('click',()=>{
+    fishes.push({x:canvas.width*0.3, y:canvas.height*0.6-90});
+});
+document.getElementById('toggle').addEventListener('click',()=>{
+    isNight = !isNight;
+});
+
+/* ---------------- 工具函数 ---------------- */
+function clamp(v,min,max){return v<min?min:v>max?max:v;}
+
+/* ---------------- 绘制函数 ---------------- */
+function drawSky(){
+    const h = canvas.height;
+    const grd = ctx.createLinearGradient(0,0,0,h);
+    if(isNight){
+        grd.addColorStop(0,'#000428');
+        grd.addColorStop(1,'#004e92');
+    }else{
+        grd.addColorStop(0,'#87ceeb');
+        grd.addColorStop(1,'#c8eafc');
+    }
+    ctx.fillStyle = grd;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    /* 星星 */
+    if(isNight){
+        ctx.fillStyle='rgba(255,255,255,0.8)';
+        for(let i=0;i<120;i++){
+            const x = (i*79)%canvas.width;
+            const y = (i*53)%canvas.height*0.5;
+            ctx.fillRect(x,y,1,1);
+        }
+    }
+}
+
+function drawCloud(x,y,s){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    ctx.fillStyle='rgba(255,255,255,0.8)';
+    for(let i=0;i<5;i++){
+        ctx.beginPath();
+        ctx.arc(i*30,0,20,0,Math.PI*2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawBackground(){
+    /* 云朵 */
+    for(let i=0;i<6;i++){
+        const cx = ( -worldX*0.2 + i*320) % (canvas.width+320) -160;
+        const cy = 40 + (i%2)*35;
+        drawCloud(cx,cy,1);
+    }
+
+    /* 海平面 */
+    ctx.fillStyle = isNight? '#02334f':'#0a8';
+    ctx.fillRect(0,canvas.height*0.6,canvas.width,canvas.height*0.05);
+
+    /* 木栈道（前景） */
+    drawBoardwalk();
+}
+
+function drawBoardwalk(){
+    const h = canvas.height;
+    const plankH = 32;
+    const y0 = h*0.6+20;
+    ctx.fillStyle='#966F33';
+    /* 横向木板 */
+    for(let i=0;i<h/plankH+2;i++){
+        ctx.fillRect(0, y0 + i*plankH - (worldX%plankH), canvas.width, plankH-2);
+    }
+    /* 纵向缝隙 */
+    ctx.strokeStyle='rgba(0,0,0,0.2)';
+    ctx.lineWidth=1;
+    for(let i=0;i<canvas.width/40+2;i++){
+        const x = i*40 - (worldX*1.5)%40;
+        ctx.beginPath();
+        ctx.moveTo(x, y0 - (worldX%plankH));
+        ctx.lineTo(x, h);
+        ctx.stroke();
+    }
+}
+
+function drawWheel(x,y,r,rot){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rot);
+    ctx.lineWidth=6;
+    ctx.strokeStyle='#000';
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.stroke();
+    ctx.lineWidth=2;
+    ctx.strokeStyle='#888';
+    for(let i=0;i<8;i++){
+        ctx.beginPath();
+        ctx.rotate(Math.PI/4);
+        ctx.moveTo(0,0);
+        ctx.lineTo(r,0);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawBike(x,y,rot){
+    ctx.save();
+    ctx.translate(x,y);
+
+    /* 轮子 */
+    drawWheel(-40,0,30,rot);
+    drawWheel(40,0,30,rot);
+
+    /* 车架 */
+    ctx.lineWidth=4;
+    ctx.strokeStyle='#222';
+    ctx.beginPath();
+    ctx.moveTo(-40,0); ctx.lineTo(0,-30);   // 后叉 到 座管
+    ctx.lineTo(40,0);                       // 座管到下管
+    ctx.lineTo(-10,0);                      // 下管到后叉
+    ctx.moveTo(0,-30); ctx.lineTo(0,-50);   // 座杆
+    ctx.stroke();
+
+    /* 车座 */
+    ctx.lineWidth=6;
+    ctx.beginPath();
+    ctx.moveTo(-10,-50); ctx.lineTo(10,-50);
+    ctx.stroke();
+
+    /* 车把 */
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.moveTo(40,0); ctx.lineTo(50,-30); ctx.lineTo(30,-30);
+    ctx.stroke();
+
+    /* 曲柄&脚踏 */
+    ctx.save();
+    ctx.rotate(rot);
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.moveTo(-10,0); ctx.lineTo(10,0);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(10,0,5,0,Math.PI*2); ctx.arc(-10,0,5,0,Math.PI*2);
+    ctx.fillStyle='#555'; ctx.fill();
+    ctx.restore();
+
+    /* “缰绳” */
+    ctx.strokeStyle='#654321';
+    ctx.beginPath();
+    ctx.moveTo(50,-30); ctx.lineTo(80,-60);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawPelican(x,y,phase){
+    ctx.save();
+    ctx.translate(x,y);
+
+    /* 身体 */
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    ctx.ellipse(0,0,60,30,0,0,Math.PI*2);
+    ctx.fill();
+
+    /* 翅膀（轻微扑腾） */
+    ctx.save();
+    ctx.rotate(Math.sin(phase*0.1)*0.25);
+    ctx.fillStyle='#ddd';
+    ctx.beginPath();
+    ctx.ellipse(-10,-10,40,20,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    /* 头 */
+    ctx.beginPath();
+    ctx.arc(50,-25,15,0,Math.PI*2);
+    ctx.fillStyle='#fff';
+    ctx.fill();
+
+    /* 眼睛 */
+    ctx.fillStyle='#000';
+    ctx.beginPath();
+    ctx.arc(55,-28,3,0,Math.PI*2);
+    ctx.fill();
+
+    /* 喙和喉囊 */
+    ctx.fillStyle='#ffc107';
+    ctx.beginPath();
+    ctx.moveTo(65,-23);
+    ctx.lineTo(110,-15);
+    ctx.lineTo(110,-25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle='#ffb347';
+    ctx.beginPath();
+    ctx.moveTo(65,-15);
+    ctx.lineTo(110,-5);
+    ctx.lineTo(110,-15);
+    ctx.closePath();
+    ctx.fill();
+
+    /* 腿 */
+    const legShift = Math.sin(phase*0.3);
+    ctx.lineWidth=4;
+    ctx.strokeStyle='#f60';
+    ctx.beginPath();
+    ctx.moveTo(-20,20); ctx.lineTo(-20+legShift*5,40);
+    ctx.moveTo(0,20);   ctx.lineTo(0-legShift*5,40);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawFish(fx,fy){
+    ctx.save();
+    ctx.translate(fx,fy);
+    ctx.fillStyle='#0af';
+    ctx.beginPath(); ctx.ellipse(0,0,10,5,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(-16,5); ctx.lineTo(-16,-5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+}
+
+/* ---------------- 主循环 ---------------- */
+function update(dt){
+    /* 速度合成 */
+    const speed = baseSpeed + dashSpeed;
+    worldX += speed*dt;
+    dashSpeed *= 0.94;                    // 冲刺衰减
+    stamina -= speed*0.0002*dt;
+    stamina = clamp(stamina,0,1);
+
+    /* 小鱼下落 & 碰撞 */
+    for(let i=fishes.length-1;i>=0;i--){
+        const f = fishes[i];
+        f.y += 3*dt;
+        /* 与喉囊简单碰撞检测 */
+        const pelX = canvas.width*0.3 + 80;   // 喉囊大概位置
+        const pelY = canvas.height*0.6 - 60;
+        if(Math.hypot(f.x - pelX, f.y - pelY) < 25){
+            stamina = clamp(stamina + 0.3, 0, 1);
+            fishes.splice(i,1);
+        }else if(f.y > canvas.height){
+            fishes.splice(i,1);
+        }
+    }
+}
+
+function render(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawSky();
+    drawBackground();
+
+    /* 弹跳效果 */
+    const bounce = Math.sin(worldX*0.05)*5;
+    const groundY = canvas.height*0.6;
+    const pelX = canvas.width*0.3;
+    const pelY = groundY - 60 + bounce;
+
+    drawPelican(pelX,pelY,worldX);
+    drawBike(pelX,pelY-90,worldX*0.1);
+
+    /* 鱼 */
+    fishes.forEach(f=>drawFish(f.x,f.y));
+
+    /* 体力条更新 */
+    const bar = document.getElementById('bar');
+    bar.style.width = (stamina*100)+'%';
+    bar.style.background = stamina>0.5 ? '#0f0' : stamina>0.2 ? '#ff0' : '#f00';
+}
+
+function loop(t){
+    const dt = (t-last)||16.6;
+    last = t;
+    update(dt/16.6);      // 标准化到“帧”为单位
+    render();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

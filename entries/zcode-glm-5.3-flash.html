@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一辆自行车正在骑着一只鹈鹕</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚲</text></svg>">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden}
+  body{
+    font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:#182647;
+    -webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stage{position:fixed;inset:0;display:block}
+
+  .card{
+    background:rgba(255,252,244,.6);
+    -webkit-backdrop-filter:blur(12px) saturate(1.15);
+    backdrop-filter:blur(12px) saturate(1.15);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 8px 26px rgba(50,38,16,.16);
+    border-radius:16px;
+  }
+
+  .brand{position:fixed;top:14px;left:16px;z-index:6;padding:9px 14px 10px;max-width:72vw}
+  .brand h1{font-size:15px;font-weight:700;color:#3d3324;letter-spacing:.02em;white-space:nowrap}
+  .brand p{font-size:10px;color:#8a7758;letter-spacing:.16em;margin-top:3px;white-space:nowrap}
+
+  .hud{position:fixed;top:14px;right:16px;z-index:6;padding:10px 13px;display:flex;flex-direction:column;gap:7px;min-width:186px}
+  .hud .row{display:flex;align-items:center;gap:7px;font-size:12px;color:#4b4130;font-weight:600}
+  .hud .ic{font-size:13px}
+  .hud .bar{flex:1;height:9px;border-radius:99px;background:rgba(70,55,30,.16);overflow:hidden}
+  .hud .bar i{display:block;height:100%;width:100%;border-radius:99px;background:#5fbf7a;transition:width .18s,background .3s}
+  .hud .spacer{flex:1}
+  .hud b{font-variant-numeric:tabular-nums;font-weight:700}
+
+  .dock{
+    position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;
+    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:13px;
+    padding:10px 16px;border-radius:20px;max-width:min(94vw,900px);
+  }
+  .iconbtn{
+    position:relative;width:48px;height:48px;border:none;border-radius:16px;cursor:pointer;
+    font-size:22px;line-height:1;color:#4b4130;
+    background:rgba(255,255,255,.78);
+    box-shadow:0 3px 10px rgba(60,44,18,.18), inset 0 -2px 0 rgba(90,70,40,.12);
+    transition:transform .14s,filter .2s;
+    touch-action:manipulation;
+  }
+  .iconbtn:hover{transform:translateY(-1px)}
+  .iconbtn:active{transform:scale(.9)}
+  .iconbtn:focus-visible{outline:2px solid #d9a13c;outline-offset:2px}
+  .iconbtn .cd{
+    position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:conic-gradient(rgba(50,36,18,.4) calc(var(--cd,0)*1turn),transparent 0);
+  }
+  .iconbtn.off{filter:saturate(.35) brightness(.92);cursor:default}
+  .iconbtn.off:active{transform:none}
+  .holdbtn{
+    height:48px;padding:0 16px;border:none;border-radius:16px;cursor:pointer;
+    display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#4b4130;
+    background:rgba(255,255,255,.78);
+    box-shadow:0 3px 10px rgba(60,44,18,.18), inset 0 -2px 0 rgba(90,70,40,.12);
+    transition:transform .14s,background .2s,color .2s,box-shadow .2s;
+    touch-action:none;
+  }
+  .holdbtn:active{transform:scale(.95)}
+  .holdbtn.on{
+    background:linear-gradient(160deg,#ffb648,#f2883c);color:#fff;
+    box-shadow:0 4px 16px rgba(240,140,50,.5);
+  }
+  .ctl{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .ctl label{font-size:10.5px;color:#6d5d43;letter-spacing:.1em;font-weight:600}
+  .ctl label b{color:#3d3324;font-variant-numeric:tabular-nums}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:148px;height:6px;border-radius:99px;outline:none;cursor:pointer;
+    background:linear-gradient(90deg,#e2ac44 var(--fill,40%),rgba(70,55,30,.18) var(--fill,40%));
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+    background:#fffdf6;border:2px solid #d9a13c;box-shadow:0 2px 6px rgba(60,44,18,.3);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:15px;height:15px;border-radius:50%;background:#fffdf6;border:2px solid #d9a13c;
+    box-shadow:0 2px 6px rgba(60,44,18,.3);
+  }
+  input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:transparent}
+  .seg{display:flex;gap:3px;background:rgba(70,55,30,.13);border-radius:12px;padding:3px}
+  .seg button{
+    border:none;background:transparent;border-radius:9px;padding:5px 10px;cursor:pointer;
+    font-size:12px;font-weight:600;color:#5f523b;transition:all .18s;font-family:inherit;
+    touch-action:manipulation;
+  }
+  .seg button:hover{color:#3d3324}
+  .seg button.on{background:#fffdf6;color:#3d3324;box-shadow:0 2px 7px rgba(60,44,18,.2)}
+
+  .keys{position:fixed;right:16px;bottom:16px;z-index:5;padding:6px 11px;border-radius:11px;
+    font-size:10.5px;color:#6d5d43;letter-spacing:.03em;max-width:280px;text-align:right}
+
+  @media (max-width:760px){
+    .keys{display:none}
+    .brand{padding:7px 11px}
+    .brand h1{font-size:12.5px}
+    .brand p{display:none}
+    .hud{min-width:0;padding:8px 10px;gap:5px}
+    .hud .row{font-size:10.5px}
+    .dock{gap:9px;padding:8px 10px;bottom:10px}
+    input[type=range]{width:110px}
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<header class="card brand">
+  <h1>🚲 一辆自行车正在骑着一只鹈鹕</h1>
+  <p>A BICYCLE RIDING A PELICAN · 海滨特快专线</p>
+</header>
+
+<div class="card hud">
+  <div class="row"><span class="ic">⚡</span><div class="bar"><i id="stbar"></i></div><b id="stv">100</b></div>
+  <div class="row"><span class="ic">💨</span><b id="spdv">0.0 km/h</b><span class="spacer"></span><span class="ic">📍</span><b id="distv">0 m</b></div>
+</div>
+
+<div class="dock card">
+  <button id="bellBtn" class="iconbtn" title="按车铃 (B)" aria-label="按车铃">🔔</button>
+  <button id="fishBtn" class="iconbtn" title="投喂小鱼恢复体力 (F)" aria-label="投喂小鱼">🐟<span class="cd"></span></button>
+  <button id="sprintBtn" class="holdbtn" title="按住冲刺 (Shift)" aria-label="冲刺">⚡<span>冲刺</span></button>
+  <div class="ctl">
+    <label>速度 <b id="spdLabel">1.2×</b></label>
+    <input id="spd" type="range" min="0.4" max="2.4" step="0.1" value="1.2">
+  </div>
+  <div class="ctl">
+    <label>路况</label>
+    <div class="seg" id="roadSeg">
+      <button data-v="smooth" class="on">🪵 平路</button>
+      <button data-v="stone">🪨 石子路</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>时辰</label>
+    <div class="seg" id="todSeg">
+      <button data-v="day" class="on">☀️</button>
+      <button data-v="dusk">🌇</button>
+      <button data-v="night">🌙</button>
+    </div>
+  </div>
+</div>
+
+<div class="keys card">快捷键 · B 铃铛 / F 小鱼 / Shift 冲刺 / 1·2·3 时辰 / R 路况 · 戳一戳鹈鹕试试 👉</div>
+
+<script>
+'use strict';
+/* ============ 基础工具 ============ */
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const easeOut = t => 1 - (1 - t) * (1 - t);
+const wrap = (v, m) => ((v % m) + m) % m;
+const hash01 = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const hex2rgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const css = (c, a) => 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
+const mixC = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r);
+    this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+    this.closePath();
+    return this;
+  };
+}
+
+/* ============ 画布 ============ */
+const cv = document.getElementById('stage');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, S = 1, RX = 0, GY = 0, HOR = 0, DUNE0 = 0, vigGrad = null;
+
+function resize() {
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  S = clamp(Math.min(W, H) / 760, 0.55, 1.1);
+  RX = clamp(W * 0.44, 190, W - 240);
+  GY = Math.min(H * 0.795, H - 108);
+  HOR = H * 0.52;
+  DUNE0 = GY - clamp(H * 0.085, 56, 74);
+  vigGrad = ctx.createRadialGradient(W / 2, H * 0.44, Math.min(W, H) * 0.42, W / 2, H * 0.55, Math.max(W, H) * 0.78);
+  vigGrad.addColorStop(0, 'rgba(22,16,30,0)');
+  vigGrad.addColorStop(1, 'rgba(22,16,30,.17)');
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ============ 时辰配色（晴天 / 黄昏 / 夜晚） ============ */
+function parsePal(o) {
+  const r = {};
+  for (const k in o) { const v = o[k]; r[k] = (typeof v === 'string') ? hex2rgb(v) : v; }
+  return r;
+}
+const PALS = {
+  day: parsePal({
+    sky0: '#6fc0ef', sky1: '#a9e3f9', sky2: '#ffedcb',
+    sea0: '#2f8bbb', sea1: '#8fd2ea',
+    sun: '#ffd76e', sunGlow: '#ffe9a8', sunX: .70, sunY: .20, sunR: 44, glowR: 155, moon: 0,
+    cloud: '#ffffff', cloudSh: '#d7eaf6', cloudA: .95,
+    starA: 0, sparkA: .55, birdA: .8, fireflyA: 0, lampA: 0,
+    wood: '#c78f5e', woodD: '#a06e42', woodL: '#e3b686', lip: '#eec391',
+    dune: '#ecd9a8', grass: '#7fae62',
+    stone: '#a7adb4', stoneD: '#868d96',
+    rope: '#9a7a55', boat: '#4d7d99',
+    dim: '#ffffff', dimA: 0
+  }),
+  dusk: parsePal({
+    sky0: '#4d539b', sky1: '#e77e9d', sky2: '#ffbd7d',
+    sea0: '#585c9d', sea1: '#f0a077',
+    sun: '#ff9d54', sunGlow: '#ffb37e', sunX: .62, sunY: .40, sunR: 56, glowR: 195, moon: 0,
+    cloud: '#ffd8c9', cloudSh: '#dd93ab', cloudA: .92,
+    starA: .3, sparkA: .45, birdA: .6, fireflyA: .9, lampA: .35,
+    wood: '#a76e49', woodD: '#7e5031', woodL: '#c98f60', lip: '#d9a06b',
+    dune: '#cfa671', grass: '#6e9455',
+    stone: '#97918f', stoneD: '#787170',
+    rope: '#84653f', boat: '#494a7d',
+    dim: '#ff9a5a', dimA: .07
+  }),
+  night: parsePal({
+    sky0: '#141f3d', sky1: '#273a68', sky2: '#42538b',
+    sea0: '#1e3057', sea1: '#3a5184',
+    sun: '#f2e8cf', sunGlow: '#cdd9f7', sunX: .26, sunY: .16, sunR: 30, glowR: 130, moon: 1,
+    cloud: '#33406b', cloudSh: '#28335a', cloudA: .78,
+    starA: 1, sparkA: .3, birdA: 0, fireflyA: 1, lampA: 1,
+    wood: '#5e4a37', woodD: '#463526', woodL: '#75604a', lip: '#7b6248',
+    dune: '#4d5a45', grass: '#39543c',
+    stone: '#59626e', stoneD: '#434b57',
+    rope: '#544634', boat: '#243257',
+    dim: '#1d2c55', dimA: .18
+  })
+};
+let C = PALS.day, palFrom = null, palTo = PALS.day, palT = 1;
+const snapPal = p => { const o = {}; for (const k in p) { const v = p[k]; o[k] = Array.isArray(v) ? v.slice() : v; } return o; };
+function lerpPal(a, b, t) {
+  const o = {};
+  for (const k in b) {
+    const va = a[k], vb = b[k];
+    o[k] = Array.isArray(vb) ? [lerp(va[0], vb[0], t), lerp(va[1], vb[1], t), lerp(va[2], vb[2], t)] : lerp(va, vb, t);
+  }
+  return o;
+}
+function computePal() {
+  if (palT >= 1) { C = palTo; return; }
+  C = lerpPal(palFrom, palTo, easeOut(palT));
+}
+
+/* ============ 音效（Web Audio 纯合成） ============ */
+const sfx = {
+  ctx: null, master: null, noiseBuf: null,
+  ensure() {
+    try {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.42;
+        this.master.connect(this.ctx.destination);
+        const len = this.ctx.sampleRate | 0;
+        const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        this.noiseBuf = buf;
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
+    } catch (e) { return null; }
+  },
+  tone(type, f0, f1, t0, dur, peak, filterF) {
+    const c = this.ctx;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0006, t0 + dur);
+    let node = o;
+    if (filterF) {
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = filterF;
+      o.connect(f); node = f;
+    }
+    node.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  burst(t0, dur, peak, type, freq) {
+    const c = this.ctx;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0006, t0 + dur);
+    s.connect(f); f.connect(g); g.connect(this.master);
+    s.start(t0); s.stop(t0 + dur + 0.05);
+    return f;
+  },
+  bell() {
+    const c = this.ensure(); if (!c) return;
+    const t0 = c.currentTime;
+    const hit = (tt) => {
+      const parts = [[2093, 0.42, 1.0], [2637, 0.22, 0.82], [3520, 0.12, 0.6]];
+      for (let i = 0; i < parts.length; i++) {
+        this.tone('sine', parts[i][0], parts[i][0], tt, 0.85 * parts[i][2], parts[i][1]);
+      }
+    };
+    hit(t0); hit(t0 + 0.13);
+    this.burst(t0, 0.03, 0.05, 'highpass', 5000);
+  },
+  squawk(short) {
+    const c = this.ensure(); if (!c) return;
+    const t0 = c.currentTime;
+    if (short) this.tone('sawtooth', 720, 470, t0, 0.13, 0.12, 1600);
+    else {
+      this.tone('sawtooth', 620, 300, t0, 0.2, 0.13, 1400);
+      this.tone('sawtooth', 632, 316, t0, 0.2, 0.07, 1400);
+    }
+  },
+  whoosh() {
+    const c = this.ensure(); if (!c) return;
+    const t0 = c.currentTime;
+    const f = this.burst(t0, 0.55, 0.2, 'bandpass', 340);
+    f.Q.value = 1.1;
+    f.frequency.setValueAtTime(340, t0);
+    f.frequency.exponentialRampToValueAtTime(1500, t0 + 0.22);
+    f.frequency.exponentialRampToValueAtTime(360, t0 + 0.55);
+  },
+  gulp() {
+    const c = this.ensure(); if (!c) return;
+    const t0 = c.currentTime;
+    this.tone('sine', 330, 100, t0, 0.13, 0.18);
+    this.tone('sine', 300, 90, t0 + 0.16, 0.14, 0.16);
+    this.burst(t0, 0.07, 0.07, 'bandpass', 520);
+  },
+  clack() {
+    const c = this.ensure(); if (!c) return;
+    const t0 = c.currentTime;
+    this.tone('triangle', 190, 150, t0, 0.06, 0.11);
+    this.burst(t0, 0.035, 0.06, 'highpass', 900);
+  }
+};
+document.addEventListener('pointerdown', () => sfx.ensure());
+
+/* ============ 角色配色 ============ */
+const OUT = '#574533';
+const C_BODY = '#f8f3e7', C_SHADE = '#e4dac4', C_BEAK = '#f0a458', C_POUCH = '#f6b76d';
+const C_LEG = '#ec9d4e', C_LEG_D = '#cf8440', C_TIP = '#a3967b', C_TIP_D = '#8d8065';
+const FRAME = '#d9534f', FRAME_D = '#b23e3c', DARK = '#3d414a';
+
+/* ============ 世界状态 ============ */
+const G = {
+  body: { x: 0, y: -86, rx: 64, ry: 46 },
+  RA: { x: -58, y: -108 }, FA: { x: 74, y: -104 }, WR: 27,
+  CRK: { x: 28, y: -92 }
+};
+const ST = {
+  spd: 0.9, slider: 1.2, sprint: false, stamina: 100, exhausted: false,
+  road: 'smooth', tod: 'day',
+  dist: 0, gait: 0, wing: 0, wheel: 0, crank: 0, chain: 0,
+  startleT: 0, bellShake: 0, gulpT: 0, fishApplied: true, fishCd: 0,
+  happyT: 0, sulkT: 0, boostT: 0, pokes: 0, pokeCd: 0,
+  blinkT: 2, blink: 0, joltT: 1, sweatT: 0, idleT: 0, lastJia: 0
+};
+const M = {
+  bob: 0, pitch: 0, act: 1,
+  bikeY: { p: 0, v: 0 }, bikeT: { p: 0, v: 0 },
+  headL: { p: 0, v: 0 }, jig: { p: 0, v: 0 },
+  legPrev: [0, 0]
+};
+const HEAD_L = { hx: 90, hy: -160 };
+const headW = { x: 0, y: 0 };
+let tNow = 0, BUB = null, birdT = 4;
+const PART = [], BIRDS = [];
+
+const CLOUDS = [], BOATS = [];
+for (let i = 0; i < 8; i++) {
+  CLOUDS.push({ seed: i * 13.7 + 3, f: i < 4 ? 0.05 : 0.11, sc: 0.65 + hash01(i * 3.1) * 0.95, drift: 4 + hash01(i * 7.7) * 9 });
+}
+const boatYF = [0.12, 0.5, 0.82];
+for (let i = 0; i < 3; i++) {
+  BOATS.push({ seed: i * 29.3 + 7, f: 0.12 + i * 0.035, yF: boatYF[i], sc: 0.55 + hash01(i * 11) * 0.4 });
+}
+
+/* ============ 小工具 ============ */
+function springTo(s, target, k, c, dt) {
+  s.v += (target - s.p) * k * dt;
+  s.v *= Math.max(0, 1 - c * dt);
+  s.p += s.v * dt;
+}
+function petal(x, y, ang, len, w, fill, lw) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(ang);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(len * 0.45, -w, len, 0);
+  ctx.quadraticCurveTo(len * 0.45, w, 0, 0);
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = 'rgba(87,69,51,.75)'; ctx.lineWidth = lw || 1.6; ctx.stroke();
+  ctx.restore();
+}
+function rrectPath(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function bikeXf(px, py) {
+  const x = px - G.CRK.x, y = py - G.CRK.y;
+  const c = Math.cos(M.bikeT.p), s = Math.sin(M.bikeT.p);
+  return { x: G.CRK.x + x * c - y * s, y: G.CRK.y + x * s + y * c + M.bob + M.bikeY.p };
+}
+function pelicanTf(fn) {
+  ctx.save();
+  ctx.translate(0, G.body.y + M.bob);
+  ctx.rotate(M.pitch - 0.05);
+  ctx.translate(0, -G.body.y);
+  fn();
+  ctx.restore();
+}
+function bikeTf(fn) {
+  ctx.save();
+  ctx.translate(0, M.bob + M.bikeY.p);
+  ctx.translate(G.CRK.x, G.CRK.y);
+  ctx.rotate(M.bikeT.p);
+  ctx.translate(-G.CRK.x, -G.CRK.y);
+  fn();
+  ctx.restore();
+}
+function footPos(ph) {
+  const s = Math.sin(ph), c = Math.cos(ph);
+  const amp = 26 + 8 * M.act;
+  return { x: amp * c, y: -4 - 15 * Math.max(0, s) };
+}
+
+/* ============ 粒子 ============ */
+function spawnDust(x, y, spd) {
+  const onStone = ST.road === 'stone';
+  const n = spd > 1.6 ? 2 : 1;
+  for (let i = 0; i < n; i++) {
+    PART.push({
+      t: 'dust', layer: 0, x: x + rnd(-6, 6), y: y - rnd(0, 4),
+      vx: -spd * 26 + rnd(-18, 10), vy: rnd(-20, -4),
+      r: 4 + rnd(0, 3), age: 0, life: rnd(0.4, 0.75),
+      col: onStone ? 'rgba(186,184,180,' : 'rgba(214,196,168,'
+    });
+  }
+}
+function spawnFeather(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    PART.push({
+      t: 'feather', layer: 1, x: x + rnd(-14, 14), y: y + rnd(-10, 10),
+      vx: rnd(-70, 25), vy: rnd(-55, -8), rot: rnd(0, TAU), vr: rnd(-2.4, 2.4),
+      seed: rnd(0, 9), age: 0, life: rnd(1.6, 2.4)
+    });
+  }
+}
+function spawnSweat() {
+  PART.push({
+    t: 'sweat', layer: 1, x: headW.x + rnd(-8, 10) * S, y: headW.y - rnd(2, 12) * S,
+    vx: rnd(-70, -25), vy: rnd(-70, -30), age: 0, life: rnd(0.55, 0.85)
+  });
+}
+function spawnHearts() {
+  for (let i = 0; i < 3; i++) {
+    PART.push({
+      t: 'heart', layer: 1, x: headW.x + 26 * S + rnd(-10, 10), y: headW.y + 22 * S,
+      vx: rnd(-14, 14), vy: rnd(-46, -30), age: -i * 0.1, life: 1.1
+    });
+  }
+}
+function spawnBellFx(x, y) {
+  for (let k = 0; k < 3; k++) PART.push({ t: 'ring', layer: 1, x, y, age: -k * 0.07, life: 0.5 });
+  for (let k = 0; k < 6; k++) {
+    PART.push({ t: 'spark', layer: 1, x: x + rnd(-14, 14), y: y + rnd(-12, 8), age: -rnd(0, 0.12), life: rnd(0.4, 0.7) });
+  }
+}
+
+/* ============ 对话气泡 ============ */
+function say(text, dur, from) { BUB = { text, dur, t: 0, from: from || 'head' }; }
+
+/* ============ 交互动作 ============ */
+function ringBell() {
+  ST.bellShake = 1;
+  ST.startleT = 1.2;
+  sfx.bell(); sfx.squawk(false);
+  const bp = bikeXf(44, -141);
+  spawnBellFx(RX + bp.x * S, GY + bp.y * S);
+  spawnFeather(headW.x, headW.y, 4);
+  M.jig.v += 90; M.bikeT.v += 3.2;
+  say('嘎!!', 0.9, 'head');
+}
+function feedFish() {
+  if (ST.fishCd > 0 || ST.gulpT > 0) return;
+  ST.fishCd = 5;
+  ST.gulpT = 1.05;
+  ST.fishApplied = false;
+  sfx.gulp();
+  ST.happyT = 2;
+  say('有鱼鱼!', 1.1, 'head');
+}
+function setSprint(on) {
+  if (on === ST.sprint) return;
+  ST.sprint = on;
+  if (on && !ST.exhausted) {
+    sfx.whoosh();
+    say('冲呀——!', 1.1, 'bike');
+  }
+}
+function poke() {
+  if (ST.pokeCd > 0) return;
+  ST.pokeCd = 0.45;
+  ST.pokes++;
+  sfx.squawk(true);
+  if (ST.pokes < 3) {
+    say(ST.pokes === 1 ? '别戳!' : '说了别戳!', 1.1, 'head');
+    spawnFeather(headW.x, headW.y, 2);
+    M.jig.v += 60; M.bikeT.v += 2.5;
+  } else {
+    ST.sulkT = 2.4;
+    say('哼! 罢工一下…', 1.6, 'head');
+    spawnFeather(headW.x, headW.y, 4);
+    M.bikeT.v -= 4;
+  }
+}
+function jia() {
+  const now = performance.now();
+  if (now - ST.lastJia > 2500) {
+    ST.lastJia = now;
+    ST.boostT = 0.9;
+    M.bikeT.v += 3;
+    say('驾——!', 1.2, 'bike');
+  }
+}
+
+/* ============ 表情 ============ */
+function exprState() {
+  if (ST.blink > 0) return 'blink';
+  if (ST.startleT > 0.82) return 'shock';
+  if (ST.exhausted) return 'pant';
+  if (ST.sulkT > 0) return 'sulk';
+  if (ST.startleT > 0) return 'grim';
+  if (ST.happyT > 0) return 'happy';
+  if (ST.sprint && ST.spd > 1.2) return 'grim';
+  if (ST.stamina < 32) return 'tired';
+  return 'normal';
+}
+
+/* ============ 更新 ============ */
+function update(dt) {
+  if (palT < 1) { palT = Math.min(1, palT + dt / 0.9); computePal(); }
+
+  ST.startleT = Math.max(0, ST.startleT - dt);
+  ST.bellShake = Math.max(0, ST.bellShake - dt * 1.5);
+  ST.happyT = Math.max(0, ST.happyT - dt);
+  ST.sulkT = Math.max(0, ST.sulkT - dt);
+  ST.boostT = Math.max(0, ST.boostT - dt);
+  ST.pokeCd = Math.max(0, ST.pokeCd - dt);
+  ST.fishCd = Math.max(0, ST.fishCd - dt);
+  if (ST.gulpT > 0) ST.gulpT = Math.max(0, ST.gulpT - dt);
+  if (ST.blink > 0) ST.blink -= dt;
+
+  // 体力系统
+  const moving = ST.spd > 0.06;
+  if (ST.exhausted) {
+    ST.stamina += 5.5 * dt;
+    if (ST.stamina >= 30) { ST.exhausted = false; say('缓过来啦!', 1.2, 'head'); }
+  } else {
+    let drain = moving ? 1.6 * ST.spd : 0;
+    if (ST.sprint && moving) drain += 15;
+    ST.stamina -= drain * dt;
+    if (ST.spd < 0.7) ST.stamina += 6 * dt;
+    if (ST.stamina <= 0) {
+      ST.stamina = 0; ST.exhausted = true;
+      say('呼…呼…跑不动了', 1.8, 'head');
+      setSprint(false);
+    }
+  }
+  ST.stamina = clamp(ST.stamina, 0, 100);
+
+  // 目标速度
+  let target = ST.slider * (ST.exhausted ? 0.62 : 1) * (ST.sulkT > 0 ? 0.45 : 1);
+  if (ST.sprint && !ST.exhausted) target += 1.5;
+  if (ST.boostT > 0) target += 0.5;
+  if (ST.startleT > 0) target += 1.25 * easeOut(clamp(ST.startleT / 1.2, 0, 1));
+  ST.spd += (target - ST.spd) * Math.min(1, dt * 1.9);
+
+  const pxs = ST.spd * 232;
+  ST.dist += pxs * dt;
+  ST.gait += pxs / 26 * dt;
+  M.act = clamp(0.35 + ST.spd * 0.55, 0.35, 1.35);
+  M.bob = Math.sin(ST.gait * 2) * 4.6 * M.act;
+  M.pitch = -0.045 * clamp(ST.spd / 2, 0, 1) + Math.sin(ST.gait * 2 + 0.8) * 0.02 * M.act;
+
+  springTo(M.bikeY, 0, 150, 8, dt);
+  springTo(M.bikeT, 0, 170, 7, dt);
+  springTo(M.headL, M.bob * 1.35, 210, 11, dt);
+  springTo(M.jig, 0, 90, 6.5, dt);
+
+  // 落步尘土 + 颠簸冲量
+  const offs = [0, Math.PI * 0.95];
+  for (let i = 0; i < 2; i++) {
+    const idx = Math.floor((ST.gait + offs[i]) / Math.PI);
+    if (idx > M.legPrev[i]) {
+      M.legPrev[i] = idx;
+      if (ST.spd > 0.45) {
+        const f = footPos(ST.gait + offs[i]);
+        spawnDust(RX + f.x * S, GY - 2, ST.spd);
+        M.jig.v += (i ? -1 : 1) * (28 + 38 * ST.spd);
+        M.bikeY.v += 24 + 28 * ST.spd;
+      }
+    }
+  }
+
+  ST.wing += dt * (4.5 + ST.spd * 5.5 + (ST.startleT > 0 ? 9 : 0));
+  ST.wheel += pxs / 23 * dt;
+  ST.crank += pxs / 23 / 2.6 * dt;
+  ST.chain += pxs / 6 * dt;
+
+  // 石子路颠簸
+  if (ST.road === 'stone') {
+    ST.joltT -= dt;
+    if (ST.joltT <= 0) {
+      ST.joltT = 0.65 + Math.random() * 0.9;
+      if (ST.spd > 0.35) {
+        M.bikeY.v += 110 + Math.random() * 120;
+        M.bikeT.v += (Math.random() - 0.5) * 10;
+        M.jig.v += 70;
+        sfx.clack();
+        if (Math.random() < 0.28) spawnFeather(RX + rnd(-40, 60) * S, GY - rnd(120, 190) * S, 1);
+      }
+    }
+  }
+
+  // 眨眼
+  ST.blinkT -= dt;
+  if (ST.blinkT <= 0) { ST.blinkT = 2.2 + Math.random() * 3.4; ST.blink = 0.13; }
+
+  // 汗滴
+  if ((ST.stamina < 40 || ST.exhausted) && ST.spd > 0.2) {
+    ST.sweatT -= dt;
+    if (ST.sweatT <= 0) { ST.sweatT = 0.26 + Math.random() * 0.22; spawnSweat(); }
+  }
+
+  // 吞鱼
+  if (ST.gulpT > 0) {
+    const p = 1 - ST.gulpT / 1.05;
+    if (!ST.fishApplied && p > 0.5) {
+      ST.fishApplied = true;
+      ST.stamina = Math.min(100, ST.stamina + 38);
+      if (ST.stamina >= 30) ST.exhausted = false;
+      ST.happyT = 1.7;
+      spawnHearts();
+      say('咕嘟~ 满血复活!', 1.4, 'head');
+    }
+  }
+
+  // 速度线
+  if (ST.spd > 1.9 || (ST.sprint && !ST.exhausted && ST.spd > 1)) {
+    for (let k = 0; k < 2; k++) {
+      PART.push({
+        t: 'line', layer: 1, lit: true,
+        x: W + rnd(0, 130), y: rnd(H * 0.06, H * 0.72),
+        len: rnd(70, 150), v: pxs * 2.6 + rnd(100, 300),
+        a: rnd(0.08, 0.18), age: 0, life: 3
+      });
+    }
+  }
+
+  // 飞鸟
+  birdT -= dt;
+  if (birdT <= 0) {
+    birdT = 7 + Math.random() * 9;
+    if (C.birdA > 0.05) {
+      const by = rnd(H * 0.1, H * 0.3);
+      for (let k = 0; k < 3; k++) BIRDS.push({ x: W + 40 + k * 34 + rnd(0, 20), y: by + rnd(-24, 24), f: Math.random() * 9 });
+    }
+  }
+  for (let i = BIRDS.length - 1; i >= 0; i--) {
+    const b = BIRDS[i];
+    b.x -= (pxs * 0.22 + 42) * dt;
+    if (b.x < -60) BIRDS.splice(i, 1);
+  }
+
+  // 粒子物理
+  for (let i = PART.length - 1; i >= 0; i--) {
+    const p = PART[i];
+    p.age += dt;
+    if (p.age > p.life || p.age > p.life && false) { PART.splice(i, 1); continue; }
+    if (p.t === 'dust') { p.x += p.vx * dt; p.y += p.vy * dt; p.vy *= (1 - dt * 2); }
+    else if (p.t === 'feather') { p.vy = Math.min(p.vy + 30 * dt, 34); p.x += (p.vx + Math.sin(p.age * 3 + p.seed) * 24) * dt; p.y += p.vy * dt; p.rot += p.vr * dt; }
+    else if (p.t === 'sweat') { p.vy += 340 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+    else if (p.t === 'heart') { p.x += (p.vx + Math.sin(p.age * 5) * 12) * dt; p.y += p.vy * dt; }
+    else if (p.t === 'spark') { p.y -= 14 * dt; }
+    else if (p.t === 'line') { p.x -= p.v * dt; if (p.x + p.len < 0) PART.splice(i, 1); }
+    if (p.y > H + 60) PART.splice(i, 1);
+  }
+
+  // 气泡计时
+  if (BUB) { BUB.t += dt; if (BUB.t >= BUB.dur) BUB = null; }
+
+  // 怠速催促
+  if (ST.spd < 0.5) {
+    ST.idleT += dt;
+    if (ST.idleT > 7) { ST.idleT = 0; say('驾! 走呀!', 1.4, 'bike'); }
+  } else ST.idleT = 0;
+}
+
+/* ============ 场景绘制 ============ */
+function drawSkySea(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, DUNE0);
+  g.addColorStop(0, css(C.sky0));
+  g.addColorStop(0.55, css(C.sky1));
+  g.addColorStop(1, css(C.sky2));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, DUNE0);
+
+  // 星星
+  if (C.starA > 0.03) {
+    for (let i = 0; i < 110; i++) {
+      const sx = hash01(i * 3.71) * W, sy = hash01(i * 9.13) * (HOR * 0.92);
+      const tw = 0.5 + 0.5 * Math.sin(t * (0.5 + hash01(i) * 1.7) + i * 2.1);
+      const a = C.starA * tw * (0.35 + 0.65 * hash01(i * 5.7));
+      const r = 0.7 + hash01(i * 2.3) * 1.5;
+      ctx.fillStyle = css([255, 246, 216], a);
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
+      if (i % 19 === 0) {
+        ctx.strokeStyle = css([255, 246, 216], a * 0.7);
+        ctx.lineWidth = 1;
+        const L = r * 3.4;
+        ctx.beginPath();
+        ctx.moveTo(sx - L, sy); ctx.lineTo(sx + L, sy);
+        ctx.moveTo(sx, sy - L); ctx.lineTo(sx, sy + L);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // 太阳 / 月亮
+  const sx = C.sunX * W, sy = C.sunY * HOR;
+  const rg = ctx.createRadialGradient(sx, sy, 0, sx, sy, C.glowR);
+  rg.addColorStop(0, css(C.sunGlow, 0.5));
+  rg.addColorStop(1, css(C.sunGlow, 0));
+  ctx.fillStyle = rg;
+  ctx.beginPath(); ctx.arc(sx, sy, C.glowR, 0, TAU); ctx.fill();
+  ctx.fillStyle = css(C.sun);
+  ctx.beginPath(); ctx.arc(sx, sy, C.sunR, 0, TAU); ctx.fill();
+  if (C.moon > 0.05) {
+    ctx.fillStyle = css(mixC(C.sun, [176, 170, 150], 0.55), 0.6 * C.moon);
+    const cr = [[-0.3, -0.15, 0.22], [0.2, 0.18, 0.16], [-0.05, 0.32, 0.12]];
+    for (let i = 0; i < cr.length; i++) {
+      ctx.beginPath();
+      ctx.arc(sx + cr[i][0] * C.sunR, sy + cr[i][1] * C.sunR, cr[i][2] * C.sunR, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // 云
+  for (let i = 0; i < CLOUDS.length; i++) {
+    const cl = CLOUDS[i];
+    const x = wrap(cl.seed * 997 - ST.dist * cl.f + t * cl.drift, W + 520) - 260;
+    const y = (0.06 + hash01(cl.seed) * 0.24) * HOR + 14;
+    const s = cl.sc;
+    ctx.fillStyle = css(C.cloud, C.cloudA);
+    ctx.beginPath();
+    ctx.ellipse(x, y, 46 * s, 15 * s, 0, 0, TAU);
+    ctx.ellipse(x - 22 * s, y - 6 * s, 18 * s, 12 * s, 0, 0, TAU);
+    ctx.ellipse(x + 2 * s, y - 12 * s, 22 * s, 14 * s, 0, 0, TAU);
+    ctx.ellipse(x + 24 * s, y - 4 * s, 15 * s, 10 * s, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = css(C.cloudSh, C.cloudA * 0.5);
+    ctx.beginPath();
+    ctx.ellipse(x + 4 * s, y + 7 * s, 36 * s, 7 * s, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  // 海
+  const sg = ctx.createLinearGradient(0, HOR, 0, DUNE0);
+  sg.addColorStop(0, css(C.sea0));
+  sg.addColorStop(1, css(C.sea1));
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, HOR, W, DUNE0 - HOR);
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.3 + 0.25 * C.sparkA).toFixed(3) + ')';
+  ctx.fillRect(0, HOR, W, 1.6);
+
+  // 海浪涌线
+  for (let k = 0; k < 3; k++) {
+    const yy = HOR + (DUNE0 - HOR) * (0.22 + 0.28 * k);
+    ctx.strokeStyle = css([255, 255, 255], 0.07 + 0.05 * C.sparkA);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = -10; x <= W + 10; x += 26) {
+      const y2 = yy + Math.sin(x * 0.018 - ST.dist * 0.004 + t * (0.7 + k * 0.35) + k * 2.4) * 2.4;
+      if (x === -10) ctx.moveTo(x, y2); else ctx.lineTo(x, y2);
+    }
+    ctx.stroke();
+  }
+
+  // 波光
+  for (let i = 0; i < 46; i++) {
+    const xx = wrap(i * 97 + hash01(i * 1.7) * 70 - ST.dist * 0.07, W + 80) - 40;
+    const row = i % 4;
+    const yy = HOR + 10 + row * ((DUNE0 - HOR - 20) / 3);
+    const a = C.sparkA * (0.2 + 0.8 * (0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.93)));
+    ctx.fillStyle = css([255, 255, 255], a * 0.75);
+    ctx.fillRect(xx, yy, 16 + hash01(i * 3.1) * 26, 1.8);
+  }
+
+  // 月光倒影
+  if (C.moon > 0.15) {
+    for (let k = 0; k < 7; k++) {
+      const yy = HOR + 8 + k * ((DUNE0 - HOR - 18) / 7);
+      const wl = 44 - k * 4.4;
+      const xx = sx + Math.sin(t * 1.4 + k * 1.8) * 9 - wl / 2;
+      const a = C.moon * C.sparkA * (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(t * 2.1 + k * 2.2)));
+      ctx.fillStyle = css([255, 240, 205], a * 0.8);
+      ctx.fillRect(xx, yy, wl, 2);
+    }
+  }
+
+  // 帆船
+  for (let i = 0; i < BOATS.length; i++) {
+    const b = BOATS[i];
+    const x = wrap(b.seed * 1201 - ST.dist * b.f, W + 300) - 150;
+    const y = HOR + 16 + b.yF * (DUNE0 - HOR - 40) + Math.sin(t * 0.8 + b.seed * 7) * 2.4;
+    const s = b.sc;
+    ctx.fillStyle = css(C.boat);
+    ctx.beginPath();
+    ctx.moveTo(x - 20 * s, y);
+    ctx.quadraticCurveTo(x - 14 * s, y + 9 * s, x, y + 9 * s);
+    ctx.quadraticCurveTo(x + 16 * s, y + 8 * s, x + 24 * s, y - 2 * s);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = css(C.boat);
+    ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(x + 2 * s, y + 8 * s); ctx.lineTo(x + 2 * s, y - 26 * s); ctx.stroke();
+    ctx.fillStyle = css(mixC(C.boat, [252, 250, 242], 0.82), 0.95);
+    ctx.beginPath();
+    ctx.moveTo(x + 4 * s, y - 26 * s);
+    ctx.quadraticCurveTo(x + 20 * s, y - 18 * s, x + 4 * s, y - 2 * s);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x, y - 22 * s);
+    ctx.quadraticCurveTo(x - 12 * s, y - 14 * s, x, y - 2 * s);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 飞鸟
+  if (BIRDS.length && C.birdA > 0.03) {
+    ctx.strokeStyle = css([52, 62, 84], C.birdA);
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    for (const b of BIRDS) {
+      const fl = Math.sin(t * 7 + b.f) * 2.6;
+      ctx.beginPath();
+      ctx.moveTo(b.x - 7, b.y);
+      ctx.quadraticCurveTo(b.x - 3.5, b.y - 3 - fl, b.x, b.y);
+      ctx.quadraticCurveTo(b.x + 3.5, b.y - 3 - fl, b.x + 7, b.y);
+      ctx.stroke();
+    }
+  }
+
+  // 沙丘
+  ctx.fillStyle = css(C.dune);
+  ctx.fillRect(0, DUNE0, W, GY - DUNE0);
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  ctx.fillRect(0, DUNE0, W, 2);
+
+  // 草丛
+  const gsp = 110, gi0 = Math.floor(ST.dist * 0.55 / gsp) - 1, gn = Math.ceil(W / gsp) + 2;
+  ctx.strokeStyle = css(C.grass);
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let i = gi0; i < gi0 + gn; i++) {
+    const bx = i * gsp - ST.dist * 0.55 + hash01(i * 3.3) * 40;
+    const by = DUNE0 + (GY - DUNE0) * 0.42 + hash01(i * 7.1) * 10;
+    for (let k = 0; k < 4; k++) {
+      const dx = (k - 1.5) * 3;
+      const len = 13 + hash01(i * 5 + k) * 10;
+      const sway = Math.sin(t * 1.5 + i * 1.3 + k) * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(bx + dx, by);
+      ctx.quadraticCurveTo(bx + dx + sway * 0.5, by - len * 0.6, bx + dx + sway + (k - 1.5) * 1.5, by - len);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawBoardwalk() {
+  const bw = W, bh = H - GY;
+  ctx.fillStyle = css(C.wood);
+  ctx.fillRect(0, GY, bw, bh + 2);
+  const g = ctx.createLinearGradient(0, GY, 0, H);
+  g.addColorStop(0, 'rgba(255,240,214,.14)');
+  g.addColorStop(1, 'rgba(46,24,6,.28)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, GY, bw, bh + 2);
+
+  if (ST.road === 'smooth') {
+    const sp = 68, n = Math.ceil(bw / sp) + 2, i0 = Math.floor(ST.dist / sp) - 1;
+    for (let i = i0; i < i0 + n; i++) {
+      const x = i * sp - ST.dist;
+      const h1 = hash01(i * 13.3 + 5.1);
+      ctx.fillStyle = (i & 1)
+        ? 'rgba(255,232,196,' + (0.05 + h1 * 0.07).toFixed(3) + ')'
+        : 'rgba(92,52,20,' + (0.05 + h1 * 0.06).toFixed(3) + ')';
+      ctx.fillRect(x, GY, sp, bh);
+      ctx.fillStyle = 'rgba(58,30,10,.5)';
+      ctx.fillRect(x - 1.2, GY, 2.2, bh);
+      ctx.fillStyle = 'rgba(255,240,210,.16)';
+      ctx.fillRect(x + 1.6, GY, 1.2, bh);
+      if (h1 > 0.87) {
+        const kx = x + sp * (0.25 + hash01(i * 3.7) * 0.5);
+        const ky = GY + bh * (0.22 + hash01(i * 5.3) * 0.55);
+        ctx.fillStyle = 'rgba(70,40,16,.5)';
+        ctx.beginPath(); ctx.ellipse(kx, ky, 3.4, 2.3, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(70,40,16,.35)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.ellipse(kx, ky, 6, 4.2, 0, 0, TAU); ctx.stroke();
+      }
+    }
+    ctx.fillStyle = css(C.lip);
+    ctx.fillRect(0, GY - 5, bw, 6);
+    ctx.fillStyle = 'rgba(255,244,220,.4)';
+    ctx.fillRect(0, GY - 5, bw, 1.6);
+  } else {
+    ctx.fillStyle = css(mixC(C.stoneD, [0, 0, 0], 0.18));
+    ctx.fillRect(0, GY, bw, bh + 2);
+    const cw = 78, ch = 34, rows = Math.ceil((bh + 26) / ch);
+    for (let r = 0; r < rows; r++) {
+      const y = GY - 14 + r * ch;
+      const stag = (r & 1) ? cw / 2 : 0;
+      const i0 = Math.floor((ST.dist - stag) / cw) - 1;
+      const n = Math.ceil(bw / cw) + 3;
+      for (let i = i0; i < i0 + n; i++) {
+        const h1 = hash01(i * 7.7 + r * 13.1), h2 = hash01(i * 3.3 + r * 5.9), h3 = hash01(i * 9.1 + r * 2.3);
+        const cx = i * cw + stag + cw / 2 - ST.dist;
+        const cy = y + ch / 2 + (h3 - 0.5) * 5;
+        const rx = cw * 0.44 * (0.85 + h1 * 0.3), ry = ch * 0.42 * (0.85 + h2 * 0.28);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate((h3 - 0.5) * 0.24);
+        ctx.fillStyle = css(mixC(C.stone, C.stoneD, h1 * 0.85));
+        ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = css(C.stoneD, 0.55);
+        ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,.22)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(-rx * 0.2, -ry * 0.25, rx * 0.6, Math.PI * 1.05, Math.PI * 1.7); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.fillStyle = css(mixC(C.stone, C.stoneD, 0.35));
+    ctx.fillRect(0, GY - 5, bw, 6);
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fillRect(0, GY - 5, bw, 1.6);
+  }
+}
+
+function drawRailing() {
+  const sp = 320, i0 = Math.floor(ST.dist / sp) - 1, n = Math.ceil(W / sp) + 2;
+  const post = css(mixC(C.rope, [40, 26, 12], 0.35));
+  ctx.lineCap = 'round';
+  for (let i = i0; i < i0 + n; i++) {
+    const x = i * sp - ST.dist + sp * 0.5;
+    ctx.fillStyle = post;
+    ctx.fillRect(x - 3.5, GY - 58, 7, 60);
+    ctx.beginPath(); ctx.arc(x, GY - 58, 5, Math.PI, 0); ctx.fill();
+    ctx.fillRect(x - 5, GY - 62, 10, 4);
+    const x2 = x + sp;
+    ctx.strokeStyle = css(C.rope);
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.moveTo(x, GY - 46);
+    ctx.quadraticCurveTo(x + sp / 2, GY - 30, x2, GY - 46);
+    ctx.stroke();
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.moveTo(x, GY - 30);
+    ctx.quadraticCurveTo(x + sp / 2, GY - 18, x2, GY - 30);
+    ctx.stroke();
+  }
+}
+
+/* ============ 角色：鹈鹕 + 自行车 ============ */
+function drawWheel(x, y, r, rot, far) {
+  const tire = far ? '#2c2f36' : '#3b3f47';
+  const rim = far ? '#a29b8a' : '#eae4d4';
+  const spk = far ? '#878c96' : '#d2d6db';
+  ctx.lineWidth = 6.5;
+  ctx.strokeStyle = tire;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = rim;
+  ctx.beginPath(); ctx.arc(x, y, r - 4.6, 0, TAU); ctx.stroke();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.strokeStyle = spk;
+  ctx.lineWidth = 1.5;
+  for (let k = 0; k < 8; k++) {
+    const a = k * TAU / 8;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 3.5, Math.sin(a) * 3.5);
+    ctx.lineTo(Math.cos(a) * (r - 5.5), Math.sin(a) * (r - 5.5));
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(x, y, 3.6, 0, TAU);
+  ctx.fillStyle = '#43464e'; ctx.fill();
+}
+function drawCrankFar() {
+  const a = ST.crank + Math.PI;
+  const px = G.CRK.x + Math.cos(a) * 15, py = G.CRK.y + Math.sin(a) * 15;
+  ctx.strokeStyle = '#23262c';
+  ctx.lineWidth = 4.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(G.CRK.x, G.CRK.y); ctx.lineTo(px, py); ctx.stroke();
+  rrectPath(px - 8, py - 3.5, 16, 7, 3);
+  ctx.fillStyle = '#1d2025'; ctx.fill();
+}
+function drawLeg(far) {
+  const off = far ? Math.PI * 0.95 : 0;
+  const f = footPos(ST.gait + off);
+  const hip = far ? { x: -6, y: -56 + M.bob * 0.85 } : { x: 20, y: -54 + M.bob * 0.85 };
+  const kx = (hip.x + f.x) / 2 - 9, ky = (hip.y + f.y) / 2 + 2;
+  ctx.strokeStyle = far ? C_LEG_D : C_LEG;
+  ctx.lineWidth = 6.5;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hip.x, hip.y);
+  ctx.lineTo(kx, ky);
+  ctx.lineTo(f.x, f.y - 5);
+  ctx.stroke();
+  // 蹼足
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.rotate(-0.32 * Math.cos(ST.gait + off));
+  ctx.fillStyle = far ? C_LEG_D : C_LEG;
+  ctx.beginPath();
+  ctx.moveTo(0, -7);
+  ctx.quadraticCurveTo(10, -3, 19, 0);
+  ctx.quadraticCurveTo(13, 2, 10, 5);
+  ctx.quadraticCurveTo(5, 3, 2, 6);
+  ctx.quadraticCurveTo(-2, 2, -4, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.restore();
+}
+function drawTail() {
+  const bx = -56, by = -14;
+  const wag = Math.sin(ST.gait * 2 + 1.2) * 0.07;
+  const L = [24, 32, 40, 30], A = [2.32, 2.58, 2.84, 3.08], Wd = [7, 9, 10, 8];
+  for (let k = 0; k < 4; k++) {
+    petal(bx, by, A[k] + wag * (k - 1.5) * 0.3, L[k], Wd[k], (k === 1 || k === 3) ? C_SHADE : C_BODY, 1.6);
+  }
+}
+function drawBody() {
+  const rx = G.body.rx, ry = G.body.ry;
+  const bodyPath = () => { ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, -0.06, 0, TAU); };
+  bodyPath();
+  ctx.fillStyle = C_BODY; ctx.fill();
+  ctx.save();
+  bodyPath(); ctx.clip();
+  ctx.fillStyle = 'rgba(120,100,75,.12)';
+  ctx.beginPath(); ctx.ellipse(-22, 16, rx * 0.8, ry * 0.6, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.beginPath(); ctx.ellipse(8, 20, rx * 0.7, ry * 0.52, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  bodyPath();
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 2.6;
+  ctx.stroke();
+}
+function drawWing(far) {
+  const shx = 30, shy = -18;
+  const tired = ST.stamina < 32 || ST.exhausted || ST.sulkT > 0;
+  const amp = 0.34 + ((ST.sprint && !ST.exhausted) ? 0.22 : 0) + (ST.startleT > 0 ? 0.34 : 0);
+  const flap = Math.sin(ST.wing + (far ? 0.9 : 0)) * amp - (tired ? 0.2 : 0);
+  const base = Math.PI + 0.16 + flap;
+  const L = [40, 52, 58, 46], Wd = [8.5, 10.5, 11.5, 9];
+  for (let k = 0; k < 4; k++) {
+    const ang = base + (k - 1.5) * 0.17;
+    const col = far ? (k === 2 ? C_TIP_D : C_SHADE) : (k === 2 ? C_TIP : C_BODY);
+    petal(shx, shy, ang, L[k] * (far ? 0.92 : 1), Wd[k], col, 1.6);
+  }
+  ctx.beginPath(); ctx.arc(shx, shy, 7, 0, TAU);
+  ctx.fillStyle = far ? C_SHADE : C_BODY; ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 1.8; ctx.stroke();
+}
+function drawFishShape(x, y, sc, rot, col) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(sc, sc);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.ellipse(0, 0, 8, 3.6, 0, 0, TAU); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-6, 0); ctx.lineTo(-13, -4); ctx.lineTo(-13, 4);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawHeadNeck() {
+  const posture = clamp((ST.spd - 0.35) / 1.6, 0, 1);
+  let hx = lerp(88, 114, posture), hy = lerp(-172, -150, posture);
+  const age = 1.2 - ST.startleT;
+  if (ST.startleT > 0) {
+    const k = age < 0.38 ? easeOut(age / 0.38) : Math.max(0, 1 - (age - 0.38) / 0.5);
+    hx = lerp(hx, 74, k);
+    hy = lerp(hy, -182, k);
+  }
+  if (ST.exhausted) hy += 7;
+  if (ST.sulkT > 0) hy += 5;
+  hy += M.bob * 0.55 + M.headL.p * 0.5;
+  hx += M.bob * 0.15;
+
+  const nb = { x: 44, y: -114 + M.bob * 0.85 };
+  const midx = (nb.x + hx) / 2 - 8, midy = (nb.y + hy) / 2 + 6;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = OUT; ctx.lineWidth = 17;
+  ctx.beginPath(); ctx.moveTo(nb.x, nb.y); ctx.quadraticCurveTo(midx, midy, hx, hy + 6); ctx.stroke();
+  ctx.strokeStyle = C_BODY; ctx.lineWidth = 12.5;
+  ctx.beginPath(); ctx.moveTo(nb.x, nb.y); ctx.quadraticCurveTo(midx, midy, hx, hy + 6); ctx.stroke();
+
+  ctx.beginPath(); ctx.arc(hx, hy, 16.5, 0, TAU);
+  ctx.fillStyle = C_BODY; ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+
+  petal(hx - 11, hy - 12, -2.35, 13, 4.5, C_BODY, 1.5);
+  petal(hx - 14, hy - 9, -2.75, 15, 4.5, C_SHADE, 1.5);
+
+  // 上喙
+  ctx.beginPath();
+  ctx.moveTo(hx + 7, hy - 7);
+  ctx.quadraticCurveTo(hx + 34, hy - 9, hx + 57, hy + 1);
+  ctx.quadraticCurveTo(hx + 60, hy + 3, hx + 54, hy + 5);
+  ctx.quadraticCurveTo(hx + 30, hy - 2, hx + 8, hy + 2);
+  ctx.closePath();
+  ctx.fillStyle = C_BEAK; ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+
+  // 喉囊（带弹性抖动与吞鱼鼓起）
+  const gsin = ST.gulpT > 0 ? Math.sin((1 - ST.gulpT / 1.05) * Math.PI) * 0.42 : 0;
+  const bulge = 1 + clamp(M.jig.p, -0.3, 0.6) * 0.6 + gsin;
+  const px = hx + 8, py = hy + 2;
+  const pouch = new Path2D();
+  pouch.moveTo(px, py);
+  pouch.bezierCurveTo(px + 2, py + 40 * bulge, hx + 34, py + 46 * bulge, hx + 55, hy + 6);
+  pouch.quadraticCurveTo(hx + 30, hy + 11, px, py + 6);
+  pouch.closePath();
+  ctx.fillStyle = C_POUCH;
+  ctx.fill(pouch);
+  if (ST.gulpT > 0) {
+    const fp = 1 - ST.gulpT / 1.05;
+    if (fp < 0.62) {
+      const q = fp / 0.62;
+      ctx.save();
+      ctx.clip(pouch);
+      drawFishShape(hx + 22 + q * 16, py + 8 + 34 * bulge * q, 0.85, q * 0.6, 'rgba(190,110,40,.55)');
+      ctx.restore();
+    }
+  }
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 2;
+  ctx.stroke(pouch);
+  ctx.strokeStyle = 'rgba(122,62,20,.55)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(px + 1, py + 4);
+  ctx.quadraticCurveTo(hx + 30, py + 8, hx + 53, hy + 7);
+  ctx.stroke();
+
+  // 喘气张嘴 + 舌头
+  const pant = ST.exhausted || ST.stamina < 22;
+  if (pant) {
+    ctx.fillStyle = 'rgba(110,52,24,.85)';
+    ctx.beginPath();
+    ctx.moveTo(hx + 10, hy + 2);
+    ctx.lineTo(hx + 50, hy + 5);
+    ctx.lineTo(hx + 14, hy + 11);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e88a8a';
+    ctx.beginPath(); ctx.ellipse(hx + 30, hy + 11, 6, 3, 0.2, 0, TAU); ctx.fill();
+  }
+
+  // 眼睛
+  const st = exprState();
+  const ex = hx + 3, ey = hy - 8;
+  if (st === 'happy') {
+    ctx.strokeStyle = '#4a3a28';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.arc(ex, ey + 2, 4.6, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+  } else {
+    const er = st === 'shock' ? 7.2 : 5.6;
+    ctx.beginPath(); ctx.arc(ex, ey, er, 0, TAU);
+    ctx.fillStyle = st === 'shock' ? '#fdfbf4' : '#f4efe2';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(87,69,51,.7)';
+    ctx.lineWidth = 1.4; ctx.stroke();
+    if (st !== 'blink') {
+      const pr = st === 'shock' ? 1.7 : (st === 'grim' ? 2.1 : 2.6);
+      const wander = ST.spd < 0.5 && st === 'normal' ? Math.sin(tNow * 0.9) * 1.2 : 0;
+      const gyv = (st === 'tired' || st === 'sulk') ? 0.8 : 0;
+      ctx.beginPath(); ctx.arc(ex + 1.8 + wander, ey + gyv, pr, 0, TAU);
+      ctx.fillStyle = '#372c20'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 1.8 + wander - 0.9, ey + gyv - 1, 0.9, 0, TAU);
+      ctx.fillStyle = '#fff'; ctx.fill();
+    }
+    let lid = 0;
+    if (st === 'blink') lid = 1;
+    else if (st === 'tired' || st === 'sulk') lid = 0.42;
+    else if (st === 'pant') lid = 0.3;
+    if (lid > 0) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(ex, ey, er + 0.4, 0, TAU); ctx.clip();
+      ctx.fillStyle = C_BODY;
+      const hh = lid * (er * 2 + 2);
+      ctx.fillRect(ex - er - 1, ey - er - 1, (er + 1) * 2, hh);
+      ctx.restore();
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(ex - er, ey - er + hh);
+      ctx.lineTo(ex + er, ey - er + hh);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#4a3a28';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    if (st === 'grim') { ctx.moveTo(ex - 8, ey - 10); ctx.lineTo(ex + 6, ey - 7); }
+    else if (st === 'tired' || st === 'sulk') { ctx.moveTo(ex - 7, ey - 8); ctx.lineTo(ex + 6, ey - 11); }
+    else if (st === 'shock') { ctx.moveTo(ex - 7, ey - 13); ctx.lineTo(ex + 6, ey - 13); }
+    ctx.stroke();
+  }
+  if (ST.happyT > 0) {
+    ctx.fillStyle = 'rgba(238,120,110,.35)';
+    ctx.beginPath(); ctx.ellipse(hx - 4, hy + 3, 4.5, 2.6, -0.2, 0, TAU); ctx.fill();
+  }
+
+  HEAD_L.hx = hx; HEAD_L.hy = hy;
+  headW.x = RX + hx * S;
+  headW.y = GY + hy * S;
+}
+function drawReins() {
+  const gp = bikeXf(72, -134);
+  const ex = HEAD_L.hx + 16, ey = HEAD_L.hy - 4;
+  const tight = ST.startleT > 0 ? 0.3 : 1;
+  const sag = (16 + Math.sin(tNow * 2.6) * 3) * tight;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#7c4a2c';
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(gp.x, gp.y + 3);
+  ctx.quadraticCurveTo((gp.x + ex) / 2, (gp.y + ey) / 2 + sag, ex, ey);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(124,74,44,.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(gp.x, gp.y - 1);
+  ctx.quadraticCurveTo((gp.x + ex) / 2, (gp.y + ey) / 2 + sag + 4, ex, ey + 3);
+  ctx.stroke();
+}
+function drawBicycle() {
+  // 后轮 / 前轮（近侧）
+  drawWheel(G.RA.x, G.RA.y, G.WR, ST.wheel, false);
+  drawWheel(G.FA.x, G.FA.y, G.WR, ST.wheel * 1.02, false);
+
+  // 后飞轮
+  ctx.beginPath(); ctx.arc(G.RA.x, G.RA.y, 5.5, 0, TAU);
+  ctx.fillStyle = '#3f434b'; ctx.fill();
+  ctx.setLineDash([1.8, 2.2]);
+  ctx.lineWidth = 3.4; ctx.strokeStyle = '#3f434b';
+  ctx.beginPath(); ctx.arc(G.RA.x, G.RA.y, 7.2, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 链条
+  ctx.setLineDash([4.5, 3.2]);
+  ctx.lineDashOffset = -ST.chain;
+  ctx.strokeStyle = '#33363d';
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  ctx.moveTo(G.CRK.x + 2, G.CRK.y - 10.5);
+  ctx.lineTo(G.RA.x + 2, G.RA.y - 5.5);
+  ctx.moveTo(G.CRK.x + 2, G.CRK.y + 10.5);
+  ctx.lineTo(G.RA.x + 2, G.RA.y + 5.5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineCap = 'round';
+
+  // 车架（菱形）
+  ctx.strokeStyle = FRAME_D;
+  ctx.lineWidth = 4.6;
+  ctx.beginPath(); ctx.moveTo(G.CRK.x, G.CRK.y); ctx.lineTo(G.RA.x, G.RA.y); ctx.stroke();       // 后下叉
+  ctx.beginPath(); ctx.moveTo(-8, -128); ctx.lineTo(G.RA.x, G.RA.y); ctx.stroke();               // 后上叉
+  ctx.strokeStyle = FRAME;
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(G.CRK.x, G.CRK.y); ctx.lineTo(-8, -128); ctx.stroke();             // 座管
+  ctx.beginPath(); ctx.moveTo(G.CRK.x, G.CRK.y); ctx.lineTo(62, -114); ctx.stroke();             // 下管
+  ctx.lineWidth = 5.5;
+  ctx.beginPath(); ctx.moveTo(-8, -128); ctx.lineTo(60, -130); ctx.stroke();                     // 上管
+  ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(60, -130); ctx.lineTo(64, -112); ctx.stroke();                     // 头管
+  ctx.strokeStyle = FRAME_D;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(64, -112); ctx.lineTo(G.FA.x, G.FA.y); ctx.stroke();               // 前叉
+
+  // 座杆 + 车座
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(-8, -128); ctx.lineTo(-11, -139); ctx.stroke();
+  rrectPath(-27, -146, 32, 9, 4.5);
+  ctx.fillStyle = '#6b4a36'; ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.fillStyle = '#4a4e57';
+  ctx.beginPath(); ctx.arc(-22, -136, 2.2, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(-12, -136, 2.2, 0, TAU); ctx.fill();
+
+  // 牙盘 + 近侧曲柄 + 脚踏
+  ctx.beginPath(); ctx.arc(G.CRK.x, G.CRK.y, 10, 0, TAU);
+  ctx.fillStyle = '#cfcabd'; ctx.fill();
+  ctx.strokeStyle = '#3f434b'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.setLineDash([2.4, 3]);
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(G.CRK.x, G.CRK.y, 12.4, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  const ca = ST.crank;
+  const ppx = G.CRK.x + Math.cos(ca) * 15, ppy = G.CRK.y + Math.sin(ca) * 15;
+  ctx.strokeStyle = '#2f333b';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(G.CRK.x, G.CRK.y); ctx.lineTo(ppx, ppy); ctx.stroke();
+  rrectPath(ppx - 8, ppy - 3.5, 16, 7, 3);
+  ctx.fillStyle = '#23262c'; ctx.fill();
+
+  // 车把 + 握把
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(60, -130); ctx.lineTo(58, -140); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(58, -140); ctx.quadraticCurveTo(70, -146, 76, -134); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(58, -140); ctx.quadraticCurveTo(46, -148, 42, -134); ctx.stroke();
+  ctx.fillStyle = '#2f333b';
+  rrectPath(71, -137, 10, 6.5, 3); ctx.fill();
+  rrectPath(37, -137, 10, 6.5, 3); ctx.fill();
+
+  // 车铃（受震摇摆）
+  ctx.save();
+  ctx.translate(44, -141);
+  ctx.rotate(Math.sin(ST.bellShake * 38) * 0.35 * ST.bellShake);
+  ctx.beginPath(); ctx.arc(0, 0, 5.5, Math.PI, 0);
+  ctx.fillStyle = '#f3c34d'; ctx.fill();
+  ctx.strokeStyle = '#b98a25'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, 0, 5.5, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = '#ffe9a8';
+  ctx.beginPath(); ctx.arc(-1.6, -2, 1.4, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#b98a25';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 4); ctx.stroke();
+  ctx.restore();
+
+  // 车灯
+  rrectPath(64, -129, 9, 7, 2);
+  ctx.fillStyle = '#2f333b'; ctx.fill();
+  ctx.beginPath(); ctx.arc(70, -125.5, 2.6, 0, TAU);
+  ctx.fillStyle = '#ffe9a8'; ctx.fill();
+
+  // 尾架 + 旗帜
+  ctx.strokeStyle = '#5a4634';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-58, -136); ctx.lineTo(-58, -178); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-58, -140); ctx.lineTo(-46, -126); ctx.stroke();
+  const wv = Math.sin(tNow * 7) * 4;
+  ctx.beginPath();
+  ctx.moveTo(-58, -178);
+  ctx.lineTo(-34 + wv, -172 + Math.sin(tNow * 7 + 1) * 2);
+  ctx.lineTo(-58, -164);
+  ctx.closePath();
+  ctx.fillStyle = '#e2574b'; ctx.fill();
+  ctx.strokeStyle = 'rgba(140,50,40,.6)'; ctx.lineWidth = 1.4; ctx.stroke();
+
+  // 挂篮 + 小鱼
+  ctx.strokeStyle = '#7c5a34';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(75, -133); ctx.lineTo(80, -124); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(79, -130); ctx.lineTo(85, -123); ctx.stroke();
+  if (ST.fishCd < 0.9) {
+    const pop = clamp((0.9 - ST.fishCd) / 0.25, 0, 1);
+    drawFishShape(84, -121, pop, -0.25, '#8fd0ee');
+    ctx.fillStyle = '#31465a';
+    ctx.beginPath(); ctx.arc(87.5, -122, 0.9 * pop, 0, TAU); ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(74, -124); ctx.lineTo(94, -124); ctx.lineTo(90, -106); ctx.lineTo(78, -106);
+  ctx.closePath();
+  ctx.fillStyle = '#b98954'; ctx.fill();
+  ctx.strokeStyle = '#8f6a3e'; ctx.lineWidth = 2.4; ctx.stroke();
+  ctx.strokeStyle = 'rgba(90,60,25,.4)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(75.5, -118); ctx.lineTo(92.5, -118); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(76.8, -112); ctx.lineTo(91.2, -112); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(80, -124); ctx.lineTo(81.5, -106); ctx.moveTo(86, -124); ctx.lineTo(86, -106); ctx.stroke();
+}
+function drawCharacter() {
+  // 影子
+  const shw = (150 - M.bob * 4) * S;
+  const shA = 0.15 + 0.03 * M.act;
+  ctx.fillStyle = 'rgba(50,30,10,' + shA.toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(RX, GY + 4 * S, shw, 13 * S, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(RX, GY);
+  ctx.scale(S, S);
+
+  // 远侧层：远轮 + 远踏
+  bikeTf(() => {
+    drawWheel(G.RA.x + 7, G.RA.y - 7, G.WR, ST.wheel * 0.98, true);
+    drawWheel(G.FA.x + 7, G.FA.y - 7, G.WR, ST.wheel, true);
+    drawCrankFar();
+  });
+
+  // 鹈鹕远翅 / 远腿
+  pelicanTf(() => drawWing(true));
+  drawLeg(true);
+
+  // 身体（尾羽 + 躯干）
+  pelicanTf(() => { drawTail(); drawBody(); });
+
+  // 颈 + 头 + 喙 + 喉囊
+  drawHeadNeck();
+
+  // 近腿 / 近翅
+  drawLeg(false);
+  pelicanTf(() => drawWing(false));
+
+  // 自行车主体
+  bikeTf(() => drawBicycle());
+
+  // 缰绳（车把 → 喙环）
+  drawReins();
+
+  ctx.restore();
+
+  // 脚下小接触影
+  const f1 = footPos(ST.gait), f2 = footPos(ST.gait + Math.PI * 0.95);
+  ctx.fillStyle = 'rgba(50,30,10,.12)';
+  ctx.beginPath(); ctx.ellipse(RX + f1.x * S, GY + 2, 15 * S, 4 * S, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(RX + f2.x * S, GY + 2, 15 * S, 4 * S, 0, 0, TAU); ctx.fill();
+}
+
+/* ============ 粒子绘制 ============ */
+function drawParts(layer, lit) {
+  for (let i = 0; i < PART.length; i++) {
+    const p = PART[i];
+    if (p.layer !== layer || (!!p.lit) !== lit) continue;
+    if (p.age < 0) continue;
+    const q = p.age / p.life;
+    if (q >= 1) continue;
+    if (p.t === 'dust') {
+      ctx.fillStyle = p.col + (0.22 * (1 - q)).toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + q * 20, 0, TAU); ctx.fill();
+    } else if (p.t === 'feather') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot + Math.sin(p.age * 4 + p.seed) * 0.5);
+      ctx.globalAlpha = 1 - q * q;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(8, -5.5, 16, 0);
+      ctx.quadraticCurveTo(8, 5.5, 0, 0);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(250,248,240,.95)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(120,100,80,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    } else if (p.t === 'sweat') {
+      ctx.globalAlpha = 1 - q;
+      ctx.fillStyle = '#8fd0ee';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 2.6, 3.6, clamp(p.vy * 0.002, -0.6, 0.6), 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.t === 'heart') {
+      ctx.globalAlpha = 1 - q;
+      ctx.fillStyle = '#ef6e7e';
+      const sc = 1 - q * 0.4;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(sc, sc);
+      ctx.beginPath();
+      ctx.moveTo(0, 3.2);
+      ctx.bezierCurveTo(-6.4, -2.4, -3, -7.4, 0, -3.6);
+      ctx.bezierCurveTo(3, -7.4, 6.4, -2.4, 0, 3.2);
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    } else if (p.t === 'ring') {
+      ctx.strokeStyle = css([255, 206, 92], (1 - q) * 0.7);
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7 + q * 26, 0, TAU); ctx.stroke();
+    } else if (p.t === 'spark') {
+      ctx.strokeStyle = css([255, 224, 130], 1 - q);
+      ctx.lineWidth = 1.8;
+      const L = 4 + (1 - q) * 5;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.age * 3);
+      ctx.beginPath();
+      ctx.moveTo(-L, 0); ctx.lineTo(L, 0);
+      ctx.moveTo(0, -L); ctx.lineTo(0, L);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.t === 'line') {
+      ctx.strokeStyle = css([255, 255, 255], p.a * (1 - q));
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.len, p.y); ctx.stroke();
+    }
+  }
+}
+
+/* ============ 光效层 ============ */
+function drawLamp() {
+  if (C.lampA < 0.03) return;
+  const lp = bikeXf(68, -124);
+  const lx = RX + lp.x * S, ly = GY + lp.y * S;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const endX = lx + 300 * S;
+  const g = ctx.createLinearGradient(lx, ly, endX, ly);
+  g.addColorStop(0, 'rgba(255,224,140,' + (0.3 * C.lampA).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,224,140,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(lx, ly);
+  ctx.lineTo(endX, ly - 46 * S);
+  ctx.lineTo(endX, ly + 52 * S);
+  ctx.closePath(); ctx.fill();
+  const rg = ctx.createRadialGradient(lx + 5 * S, ly, 0, lx + 5 * S, ly, 16 * S);
+  rg.addColorStop(0, 'rgba(255,240,190,' + (0.85 * C.lampA).toFixed(3) + ')');
+  rg.addColorStop(1, 'rgba(255,240,190,0)');
+  ctx.fillStyle = rg;
+  ctx.beginPath(); ctx.arc(lx + 5 * S, ly, 16 * S, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function drawFireflies(t) {
+  if (C.fireflyA < 0.03) return;
+  for (let i = 0; i < 12; i++) {
+    const x = wrap(hash01(i * 3.3) * W * 1.4 - ST.dist * 0.3 + Math.sin(t * 0.35 + i * 2.2) * 46, W + 80) - 40;
+    const y = GY - 14 - hash01(i * 7.1) * 70 + Math.sin(t * 0.8 + i * 1.7) * 13;
+    const a = C.fireflyA * (0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(t * 2.4 + i * 2.9), 2));
+    ctx.fillStyle = css([217, 247, 154], a * 0.35);
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill();
+    ctx.fillStyle = css([228, 250, 180], a);
+    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, TAU); ctx.fill();
+  }
+}
+function drawBubble() {
+  if (!BUB) return;
+  const inT = Math.min(1, BUB.t * 6);
+  const remain = BUB.dur - BUB.t;
+  const a = Math.min(inT, Math.max(0, remain) / 0.25);
+  if (a <= 0) return;
+  const sc = 0.7 + 0.3 * easeOut(inT);
+  let bx, by, tx;
+  if (BUB.from === 'bike') {
+    bx = RX - 14 * S; by = GY - 210 * S; tx = 8;
+  } else {
+    bx = headW.x + 70 * S; by = headW.y - 58 * S; tx = -30;
+  }
+  bx = clamp(bx, 80, W - 80);
+  by = clamp(by, 64, GY - 50);
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.scale(sc, sc);
+  ctx.globalAlpha = a;
+  ctx.font = '700 14px "PingFang SC","Microsoft YaHei",system-ui,sans-serif';
+  const tw = ctx.measureText(BUB.text).width;
+  const bw = tw + 24, bh = 30;
+  rrectPath(-bw / 2, -bh, bw, bh, 10);
+  ctx.fillStyle = 'rgba(255,253,247,.94)'; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(tx - 8, -1.5); ctx.lineTo(tx, 15); ctx.lineTo(tx + 9, -1.5);
+  ctx.closePath(); ctx.fill();
+  rrectPath(-bw / 2, -bh, bw, bh, 10);
+  ctx.strokeStyle = 'rgba(96,72,48,.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(tx - 8, -1); ctx.lineTo(tx, 15); ctx.lineTo(tx + 9, -1);
+  ctx.strokeStyle = 'rgba(96,72,48,.45)'; ctx.stroke();
+  ctx.fillStyle = '#4a3c2a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(BUB.text, 0, -bh / 2 + 1);
+  ctx.restore();
+}
+
+/* ============ 渲染主流程 ============ */
+function render() {
+  const t = tNow;
+  drawSkySea(t);
+  drawBoardwalk();
+  drawRailing();
+  drawParts(0, false);          // 地面尘土
+  drawCharacter();
+  drawParts(1, false);          // 羽毛 / 汗滴（实体层）
+  if (C.dimA > 0.003) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = C.dimA;
+    ctx.fillStyle = css(C.dim);
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  drawLamp();
+  drawFireflies(t);
+  drawParts(1, true);           // 光效粒子：铃音圈 / 星光 / 爱心 / 速度线
+  drawBubble();
+  ctx.fillStyle = vigGrad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* ============ HUD ============ */
+const el = id => document.getElementById(id);
+const bellBtn = el('bellBtn'), fishBtn = el('fishBtn'), sprintBtn = el('sprintBtn');
+const spdEl = el('spd'), spdLabel = el('spdLabel');
+const stbar = el('stbar'), stv = el('stv'), spdv = el('spdv'), distv = el('distv');
+const roadSeg = el('roadSeg'), todSeg = el('todSeg');
+
+function hud() {
+  stbar.style.width = ST.stamina.toFixed(1) + '%';
+  stbar.style.background = ST.stamina > 55 ? '#5fbf7a' : (ST.stamina > 28 ? '#e2a54b' : '#dd6a57');
+  stv.textContent = Math.round(ST.stamina);
+  spdv.textContent = (ST.spd * 9).toFixed(1) + ' km/h';
+  distv.textContent = Math.round(ST.dist / 14) + ' m';
+  fishBtn.classList.toggle('off', ST.fishCd > 0);
+  fishBtn.style.setProperty('--cd', (ST.fishCd / 5).toFixed(3));
+  sprintBtn.classList.toggle('on', ST.sprint && ST.stamina > 0);
+}
+
+/* ============ UI 绑定 ============ */
+function setSeg(elSeg, v) {
+  elSeg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+}
+function setTod(v) {
+  if (v === ST.tod) return;
+  ST.tod = v;
+  palFrom = snapPal(C);
+  palTo = PALS[v];
+  palT = 0;
+  setSeg(todSeg, v);
+}
+function setRoad(v) {
+  if (v === ST.road) return;
+  ST.road = v;
+  setSeg(roadSeg, v);
+}
+bellBtn.addEventListener('click', ringBell);
+fishBtn.addEventListener('click', feedFish);
+
+sprintBtn.addEventListener('pointerdown', e => { e.preventDefault(); sfx.ensure(); setSprint(true); });
+sprintBtn.addEventListener('pointerup', () => setSprint(false));
+sprintBtn.addEventListener('pointerleave', () => setSprint(false));
+sprintBtn.addEventListener('pointercancel', () => setSprint(false));
+sprintBtn.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSprint(!ST.sprint); }
+});
+sprintBtn.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') setSprint(false); });
+
+function applySlider(v) {
+  ST.slider = v;
+  spdLabel.textContent = v.toFixed(1) + '×';
+  spdEl.style.setProperty('--fill', ((v - 0.4) / 2.0 * 100).toFixed(1) + '%');
+  if (v >= 2.2) jia();
+}
+spdEl.addEventListener('input', () => applySlider(parseFloat(spdEl.value)));
+applySlider(1.2);
+
+roadSeg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setRoad(b.dataset.v)));
+todSeg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setTod(b.dataset.v)));
+
+window.addEventListener('keydown', e => {
+  const k = e.key;
+  if (k === 'b' || k === 'B') { e.preventDefault(); if (!e.repeat) ringBell(); }
+  else if (k === 'f' || k === 'F') { e.preventDefault(); if (!e.repeat) feedFish(); }
+  else if (k === 'Shift') { if (!e.repeat) { sfx.ensure(); setSprint(true); } }
+  else if (k === '1') setTod('day');
+  else if (k === '2') setTod('dusk');
+  else if (k === '3') setTod('night');
+  else if (k === 'r' || k === 'R') { if (!e.repeat) setRoad(ST.road === 'smooth' ? 'stone' : 'smooth'); }
+});
+window.addEventListener('keyup', e => { if (e.key === 'Shift') setSprint(false); });
+
+cv.addEventListener('pointerdown', e => {
+  sfx.ensure();
+  const lx = (e.clientX - RX) / S, ly = (e.clientY - GY) / S;
+  if (lx > -130 && lx < 175 && ly > -215 && ly < 12) poke();
+});
+
+/* ============ 主循环 ============ */
+computePal();
+let lastT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!lastT) lastT = now;
+  let dt = (now - lastT) / 1000;
+  lastT = now;
+  if (!(dt > 0) || dt > 0.05) dt = Math.min(Math.max(dt, 0.001), 0.05);
+  tNow = now / 1000;
+  update(dt);
+  render();
+  hud();
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

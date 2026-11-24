@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>自行车骑鹈鹕</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #e0f7ff;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #a0d8f1, #64b5f6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #a0d8f1;
+      z-index: 1;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(8px);
+    }
+
+    .control-btn {
+      background: #4fc3f7;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-btn:hover {
+      background: #29b6f6;
+      transform: translateY(-2px);
+    }
+
+    .control-btn:active {
+      transform: translateY(0);
+    }
+
+    .slider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #2c3e50;
+    }
+
+    .slider input {
+      width: 80px;
+      height: 6px;
+      background: #e0f7fa;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .slider label {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .fish-splash {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,17c-2.76,0-5-2.24-5-5s2.24-5,5-5s5,2.24,5,5S14.76,17,12,17z M12,8.5c-1.38,0-2.5,1.12-2.5,2.5s1.12,2.5,2.5,2.5s2.5-1.12,2.5-2.5S13.38,8.5,12,8.5z'/%3E%3Cpath fill='%2300c853' d='M12,11.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S12.83,11.5,12,11.5z'/%3E%3C/svg%3E") no-repeat center;
+      opacity: 0;
+      pointer-events: none;
+      animation: splash 0.8s forwards;
+    }
+
+    @keyframes splash {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.7;
+      box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.7);
+    }
+
+    .sun {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      background: #ffeb3b;
+      border-radius: 50%;
+      box-shadow: 0 0 40px #ffeb3b, 0 0 80px #ffcc00;
+      top: 100px;
+      right: 100px;
+      z-index: 0;
+    }
+
+    .cloud {
+      position: absolute;
+      width: 120px;
+      height: 40px;
+      background: #fff;
+      border-radius: 20px;
+      opacity: 0.9;
+      z-index: 0;
+    }
+
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    .cloud::before {
+      width: 40px;
+      height: 40px;
+      top: -15px;
+      left: 10px;
+    }
+
+    .cloud::after {
+      width: 50px;
+      height: 50px;
+      top: -20px;
+      right: 10px;
+    }
+
+    .wave {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 40px;
+      background: #64b5f6;
+      border-radius: 50% 50% 0 0;
+      opacity: 0.5;
+      z-index: 0;
+    }
+
+    .wooden-pier {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 10px;
+      background: #8d6e63;
+      border-top: 2px solid #5d4037;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="canvas"></canvas>
+
+    <div class="sun"></div>
+    <div class="cloud" style="left: 100px; top: 120px; animation: float 15s ease-in-out infinite;"></div>
+    <div class="cloud" style="left: 600px; top: 80px; animation: float 20s ease-in-out infinite;"></div>
+    <div class="cloud" style="left: 1000px; top: 140px; animation: float 18s ease-in-out infinite;"></div>
+
+    <div class="wave"></div>
+    <div class="wooden-pier"></div>
+
+    <div class="controls">
+      <button class="control-btn" id="bellBtn">按车铃</button>
+      <div class="slider">
+        <label>速度</label>
+        <input type="range" id="speedSlider" min="1" max="5" value="2" step="0.1" />
+      </div>
+      <button class="control-btn" id="fishBtn">投喂小鱼</button>
+      <button class="control-btn" id="modeBtn">切换天气</button>
+    </div>
+  </div>
+
+  <script>
+    // 全局状态
+    const state = {
+      speed: 2,
+      isNight: false,
+      isRough: false,
+      energy: 100,
+      bellActive: false,
+      fishCount: 0,
+      lastFish: 0,
+      particles: [],
+      clouds: [],
+      fishSplash: [],
+      animationId: null,
+      audioContext: null,
+      bellOsc: null,
+      bellGain: null,
+      lastTime: 0,
+      deltaTime: 0
+    };
+
+    // DOM 元素
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const bellBtn = document.getElementById('bellBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const fishBtn = document.getElementById('fishBtn');
+    const modeBtn = document.getElementById('modeBtn');
+
+    // 初始化画布尺寸
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 云朵动画
+    const cloudElements = document.querySelectorAll('.cloud');
+    cloudElements.forEach(el => {
+      const speed = Math.random() * 2 + 1;
+      const delay = Math.random() * 10;
+      el.style.animation = `float ${15 + speed * 5}s ease-in-out infinite ${delay}s`;
+    });
+
+    // 生成粒子
+    function createParticle(x, y, vx, vy, life, color = '#fff') {
+      return {
+        x, y, vx, vy, life, maxLife: life, color
+      };
+    }
+
+    // 生成羽毛粒子
+    function spawnFeathers() {
+      if (Math.random() < 0.05) {
+        const x = 300 + Math.random() * 200;
+        const y = 200 + Math.random() * 100;
+        const vx = -1 - Math.random() * 2;
+        const vy = -1 - Math.random() * 2;
+        const life = 100 + Math.random() * 100;
+        state.particles.push(createParticle(x, y, vx, vy, life));
+      }
+    }
+
+    // 生成汗珠粒子
+    function spawnSweat() {
+      if (Math.random() < 0.03) {
+        const x = 350 + Math.random() * 100;
+        const y = 250 + Math.random() * 50;
+        const vx = -0.5 - Math.random() * 1;
+        const vy = 1 + Math.random() * 1.5;
+        const life = 80 + Math.random() * 40;
+        state.particles.push(createParticle(x, y, vx, vy, life, '#f8f8f8'));
+      }
+    }
+
+    // 生成小鱼溅水效果
+    function spawnFishSplash() {
+      const x = 300 + Math.random() * 200;
+      const y = 300 + Math.random() * 50;
+      const splash = document.createElement('div');
+      splash.className = 'fish-splash';
+      splash.style.left = `${x}px`;
+      splash.style.top = `${y}px`;
+      document.getElementById('container').appendChild(splash);
+      setTimeout(() => splash.remove(), 800);
+    }
+
+    // 生成云朵
+    function createClouds() {
+      for (let i = 0; i < 3; i++) {
+        const x = Math.random() * canvas.width;
+        const y = 50 + Math.random() * 100;
+        const size = 80 + Math.random() * 80;
+        state.clouds.push({ x, y, size, speed: 0.5 + Math.random() * 1.5 });
+      }
+    }
+
+    // 画背景
+    function drawBackground() {
+      // 渐变背景
+      ctx.fillStyle = state.isNight ? '#1e3a8a' : '#a0d8f1';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 海浪
+      ctx.fillStyle = state.isNight ? '#254c8f' : '#64b5f6';
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - 40);
+      for (let x = 0; x < canvas.width; x += 10) {
+        const y = canvas.height - 40 + Math.sin(x * 0.02) * 10;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(canvas.width, canvas.height);
+      ctx.lineTo(0, canvas.height);
+      ctx.closePath();
+      ctx.fill();
+
+      // 木栈道
+      ctx.fillStyle = '#8d6e63';
+      ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
+      ctx.strokeStyle = '#5d4037';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < canvas.width; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, canvas.height - 10);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+      }
+
+      // 云朵
+      state.clouds.forEach(cloud => {
+        const { x, y, size } = cloud;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.6, 0, Math.PI * 2);
+        ctx.arc(x + size * 0.4, y - size * 0.2, size * 0.5, 0, Math.PI * 2);
+        ctx.arc(x - size * 0.4, y - size * 0.1, size * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 太阳/月亮
+      if (!state.isNight) {
+        ctx.fillStyle = '#ffeb3b';
+        ctx.beginPath();
+        ctx.arc(100, 100, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = '#ffcc00';
+        ctx.shadowBlur = 20;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = '#c0c0c0';
+        ctx.beginPath();
+        ctx.arc(100, 100, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#a0a0a0';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // 月牙
+        ctx.beginPath();
+        ctx.arc(100, 100, 40, 0.2, 0.8, false);
+        ctx.arc(100, 100, 40, 0.8, 0.2, true);
+        ctx.stroke();
+      }
+    }
+
+    // 画鹈鹕
+    function drawPelican(x, y, scale, angle, bounce, wingAngle) {
+      const bodyX = x;
+      const bodyY = y;
+
+      // 身体
+      ctx.save();
+      ctx.translate(bodyX, bodyY);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      // 身体轮廓
+      ctx.fillStyle = '#455a64';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 30, 40, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 喉囊
+      ctx.fillStyle = '#f57c00';
+      ctx.beginPath();
+      ctx.ellipse(0, 10, 35, 25, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 喉囊波纹
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const offset = i * 5;
+        ctx.beginPath();
+        ctx.ellipse(0, 10 + offset, 30 - i * 5, 20 - i * 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 眼睛
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(-10, -10, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 嘴
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(50, -10);
+      ctx.lineTo(50, 10);
+      ctx.lineTo(0, 0);
+      ctx.fill();
+
+      // 嘴内
+      ctx.fillStyle = '#ff5722';
+      ctx.beginPath();
+      ctx.moveTo(10, -5);
+      ctx.lineTo(40, -8);
+      ctx.lineTo(40, 8);
+      ctx.lineTo(10, 5);
+      ctx.fill();
+
+      // 翅膀
+      ctx.save();
+      ctx.translate(20, 10);
+      ctx.rotate(wingAngle);
+      ctx.fillStyle = '#546e7a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 40, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 尾羽
+      ctx.fillStyle = '#37474f';
+      ctx.beginPath();
+      ctx.ellipse(0, 30, 15, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 脚
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.ellipse(-10, 40, 8, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(10, 40, 8, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 蹼足
+      ctx.fillStyle = '#ffcc80';
+      ctx.beginPath();
+      ctx.ellipse(-10, 40, 10, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(10, 40, 10, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 脚蹼连接
+      ctx.fillStyle = '#ffab40';
+      ctx.beginPath();
+      ctx.moveTo(-12, 40);
+      ctx.lineTo(-18, 42);
+      ctx.lineTo(-18, 38);
+      ctx.lineTo(-12, 40);
+      ctx.fill();
+
+      ctx.restore();
+
+      // 振动效果
+      const bounceOffset = Math.sin(bounce * 10) * 3;
+      ctx.save();
+      ctx.translate(0, bounceOffset);
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath();
+      ctx.arc(-20, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 画自行车
+    function drawBicycle(x, y, scale, angle, tilt, chainRotation) {
+      const frameX = x;
+      const frameY = y;
+
+      ctx.save();
+      ctx.translate(frameX, frameY);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      // 车架
+      ctx.strokeStyle = '#424242';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -30);
+      ctx.lineTo(20, -50);
+      ctx.lineTo(40, -50);
+      ctx.lineTo(50, -30);
+      ctx.lineTo(50, 0);
+      ctx.stroke();
+
+      // 车座
+      ctx.fillStyle = '#757575';
+      ctx.beginPath();
+      ctx.ellipse(45, -25, 10, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 车把
+      ctx.strokeStyle = '#424242';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-10, -5);
+      ctx.lineTo(-15, -10);
+      ctx.lineTo(-15, -20);
+      ctx.lineTo(-10, -25);
+      ctx.lineTo(0, -30);
+      ctx.stroke();
+
+      // 前轮
+      ctx.fillStyle = '#f5f5f5';
+      ctx.strokeStyle = '#212121';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(40, 0, 15, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 前轮辐条
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const x1 = 40 + Math.cos(angle) * 10;
+        const y1 = 0 + Math.sin(angle) * 10;
+        const x2 = 40 + Math.cos(angle) * 14;
+        const y2 = 0 + Math.sin(angle) * 14;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      // 前轮轴
+      ctx.fillStyle = '#212121';
+      ctx.beginPath();
+      ctx.ellipse(40, 0, 3, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 后轮
+      ctx.fillStyle = '#f5f5f5';
+      ctx.strokeStyle = '#212121';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(20, 0, 15, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 后轮辐条
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const x1 = 20 + Math.cos(angle) * 10;
+        const y1 = 0 + Math.sin(angle) * 10;
+        const x2 = 20 + Math.cos(angle) * 14;
+        const y2 = 0 + Math.sin(angle) * 14;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      // 后轮轴
+      ctx.fillStyle = '#212121';
+      ctx.beginPath();
+      ctx.ellipse(20, 0, 3, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 脚踏
+      const pedalAngle = chainRotation * 0.8;
+      const pedalX = 20 + Math.cos(pedalAngle) * 10;
+      const pedalY = 0 + Math.sin(pedalAngle) * 10;
+
+      ctx.fillStyle = '#d32f2f';
+      ctx.beginPath();
+      ctx.ellipse(pedalX, pedalY, 8, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 链条
+      ctx.strokeStyle = '#212121';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(20, -15);
+      ctx.lineTo(40, -15);
+      ctx.stroke();
+
+      // 车铃
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath();
+      ctx.ellipse(-10, -10, 6, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 车铃小锤
+      if (state.bellActive) {
+        ctx.fillStyle = '#f44336';
+        ctx.beginPath();
+        ctx.ellipse(-10, -10, 3, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 车把牵绳
+      ctx.strokeStyle = '#795548';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-15, -20);
+      ctx.lineTo(-25, -40);
+      ctx.stroke();
+
+      // 车把绳结
+      ctx.fillStyle = '#795548';
+      ctx.beginPath();
+      ctx.ellipse(-25, -40, 4, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 车把绳
+      ctx.strokeStyle = '#795548';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-25, -40);
+      ctx.lineTo(-25, -60);
+      ctx.stroke();
+
+      // 车把绳尾
+      ctx.fillStyle = '#795548';
+      ctx.beginPath();
+      ctx.ellipse(-25, -60, 3, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // 动画主循环
+    function animate(timestamp) {
+      const dt = timestamp - state.lastTime;
+      state.deltaTime = dt / 1000;
+      state.lastTime = timestamp;
+
+      // 清空画布
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 更新状态
+      state.speed = parseFloat(speedSlider.value);
+      const baseSpeed = 0.5 + state.speed * 0.5;
+      const runSpeed = baseSpeed * (state.isRough ? 0.6 : 1);
+      const runOffset = (timestamp * runSpeed) % 1000;
+
+      // 鹈鹕位置
+      const pelicanX = canvas.width / 2 + Math.sin(runOffset * 0.002) * 10;
+      const pelicanY = canvas.height - 100;
+      const pelicanScale = 0.8;
+      const pelicanAngle = Math.sin(runOffset * 0.003) * 0.1;
+      const pelicanBounce = runOffset * 0.002;
+      const pelicanWingAngle = Math.sin(runOffset * 0.004) * 0.3;
+
+      // 自行车位置（骑在鹈鹕背上）
+      const bikeX = pelicanX;
+      const bikeY = pelicanY - 40;
+      const bikeScale = 0.5;
+      const bikeAngle = pelicanAngle * 0.5;
+      const bikeTilt = Math.sin(runOffset * 0.005) * 0.2;
+      const chainRotation = runOffset * 0.008;
+
+      // 背景
+      drawBackground();
+
+      // 鹈鹕
+      drawPelican(pelicanX, pelicanY, pelicanScale, pelicanAngle, pelicanBounce, pelicanWingAngle);
+
+      // 自行车
+      drawBicycle(bikeX, bikeY, bikeScale, bikeAngle, bikeTilt, chainRotation);
+
+      // 粒子系统
+      state.particles = state.particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+        if (p.life <= 0) return false;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        return true;
+      });
+
+      // 汗珠
+      spawnSweat();
+
+      // 羽毛
+      spawnFeathers();
+
+      // 云朵移动
+      state.clouds.forEach(cloud => {
+        cloud.x += cloud.speed;
+        if (cloud.x > canvas.width + 100) cloud.x = -100;
+      });
+
+      // 体力反馈
+      if (state.energy > 0) {
+        state.energy -= dt * 0.0005;
+      } else {
+        state.energy = 0;
+      }
+
+      // 随机投喂
+      if (timestamp - state.lastFish > 3000 && Math.random() < 0.001) {
+        state.fishCount++;
+        spawnFishSplash();
+      }
+
+      // 下次动画
+      state.animationId = requestAnimationFrame(animate);
+    }
+
+    // 启动动画
+    animate(0);
+
+    // 车铃
+    bellBtn.addEventListener('click', () => {
+      if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      // 铃声合成
+      const osc = state.audioContext.createOscillator();
+      const gain = state.audioContext.createGain();
+      osc.connect(gain);
+      gain.connect(state.audioContext.destination);
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, state.audioContext.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, state.audioContext.currentTime + 0.1);
+
+      gain.gain.setValueAtTime(0.3, state.audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, state.audioContext.currentTime + 0.1);
+
+      osc.start();
+      osc.stop(state.audioContext.currentTime + 0.1);
+
+      // 视觉反馈
+      state.bellActive = true;
+      setTimeout(() => { state.bellActive = false; }, 100);
+
+      // 鹈鹕受惊加速
+      state.speed = Math.min(state.speed + 1, 5);
+      speedSlider.value = state.speed;
+      state.energy = Math.max(state.energy - 20, 0);
+    });
+
+    // 速度控制
+    speedSlider.addEventListener('input', () => {
+      state.speed = parseFloat(speedSlider.value);
+    });
+
+    // 投喂小鱼
+    fishBtn.addEventListener('click', () => {
+      if (state.energy < 100) {
+        state.energy = Math.min(state.energy + 30, 100);
+        state.fishCount++;
+        spawnFishSplash();
+      }
+    });
+
+    // 切换天气
+    modeBtn.addEventListener('click', () => {
+      state.isNight = !state.isNight;
+      if (state.isNight) {
+        modeBtn.textContent = '切换白天';
+      } else {
+        modeBtn.textContent = '切换夜晚';
+      }
+    });
+
+    // 生成云朵
+    createClouds();
+
+    // 防止页面滚动
+    document.body.style.overflow = 'hidden';
+
+    // 零错误检查
+    window.addEventListener('error', (e) => {
+      console.error('Runtime error:', e.error);
+    });
+  </script>
+</body>
+</html>

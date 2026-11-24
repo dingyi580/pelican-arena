@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕 | The Bicycle Rides the Pelican</title>
+    <style>
+        :root {
+            --sky-top: #87CEEB;
+            --sky-bottom: #E0F7FA;
+            --sea-color: #2E8B57;
+            --board-color: #DEB887;
+            --ui-bg: rgba(255, 255, 255, 0.9);
+            --accent: #FF6B6B;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--sky-top);
+            user-select: none;
+        }
+
+        /* --- 舞台容器 --- */
+        #stage {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- 背景层 --- */
+        .layer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #sky-gradient {
+            background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+            z-index: 1;
+        }
+
+        #sun-moon {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, #FFF 0%, #FFD700 60%, transparent 70%);
+            border-radius: 50%;
+            opacity: 0.8;
+            filter: blur(2px);
+        }
+
+        #clouds {
+            background-image: 
+                radial-gradient(circle at 20% 20%, white 20px, transparent 25px),
+                radial-gradient(circle at 60% 10%, white 40px, transparent 50px),
+                radial-gradient(circle at 80% 40%, white 30px, transparent 35px);
+            background-repeat: repeat-x;
+            background-position: 0 50px;
+            background-size: 1500px 100%; /* Wide enough for scrolling */
+            animation: cloudScroll 60s linear infinite;
+            z-index: 2;
+        }
+
+        @keyframes cloudScroll {
+            from { background-position: 0 50px; }
+            to { background-position: -1500px 50px; }
+        }
+
+        #sea {
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 50px,
+                rgba(255,255,255,0.1) 50px,
+                rgba(255,255,255,0.1) 60px
+            );
+            height: 150px;
+            bottom: 0;
+            width: 100%;
+            z-index: 3;
+            transform: skewY(-5deg);
+            transform-origin: bottom;
+        }
+
+        #boards {
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 40px;
+            background: repeating-linear-gradient(
+                90deg,
+                var(--board-color),
+                var(--board-color) 20px,
+                #C19A6B 20px,
+                #C19A6B 40px
+            );
+            z-index: 3;
+            /* Boards move fastest relative to world to create depth */
+        }
+
+        /* --- 角色区 --- */
+        #character-stage {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 600px;
+            height: 300px;
+            /* Slight perspective tilt */
+            perspective: 800px;
+        }
+
+        /* 鹈鹕 SVG 样式 */
+        .pelican-svg {
+            width: 300px;
+            height: 250px;
+            overflow: visible;
+        }
+
+        /* 自行车 SVG 样式 */
+        .bike-svg {
+            position: absolute;
+            top: -80px; /* Sit on top */
+            left: -40px;
+            width: 200px;
+            height: 150px;
+            z-index: 20;
+            transform-origin: center bottom;
+        }
+
+        /* --- 粒子效果 --- */
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 15;
+            background: rgba(255,255,255,0.7);
+            box-shadow: 0 0 4px rgba(0,0,0,0.2);
+            transition: all 0.5s ease-out;
+        }
+
+        /* --- UI 控件 --- */
+        #ui-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ui-bg);
+            padding: 15px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 100;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 12px;
+            color: #555;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+            background: #fff;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        input[type=range] {
+            width: 120px;
+            accent-color: var(--accent);
+        }
+
+        #status-text {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+            color: #333;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* 交互提示 */
+        .fish-target {
+            cursor: pointer;
+            animation: floatFish 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes floatFish {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-10px); }
+        }
+
+        /* 状态颜色类 */
+        .panting { fill: pink !important; }
+        .panicked .eyes circle { stroke: red; stroke-width: 2px; fill: white; }
+        .panicked { animation: shake 0.5s infinite; }
+        
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* 铃铛动画 */
+        .bell-pulse {
+            animation: ring 0.5s ease-out;
+        }
+        @keyframes ring {
+            0% { transform: rotate(0deg) scaleX(1); }
+            25% { transform: rotate(15deg) scaleX(0.9); }
+            50% { transform: rotate(-15deg) scaleX(1.1); }
+            75% { transform: rotate(10deg) scaleX(0.95); }
+            100% { transform: rotate(0deg) scaleX(1); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="stage">
+    <!-- 背景 -->
+    <div class="layer" id="sky-gradient"></div>
+    <div id="sun-moon"></div>
+    <div class="layer" id="clouds"></div>
+    <div class="layer" id="sea"></div>
+    
+    <!-- 前景角色 -->
+    <div id="character-stage">
+        <!-- 鹈鹕 (底层，被骑乘者) -->
+        <!-- 注意：这里是反向逻辑，鹈鹕身体在下方支撑 -->
+        <svg class="pelican-svg" viewBox="0 0 300 250" id="pelicanSvg">
+            <defs>
+                <linearGradient id="featherGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#f0f0f0" />
+                    <stop offset="100%" stop-color="#dcdcdc" />
+                </linearGradient>
+            </defs>
+            
+            <!-- 腿部 -->
+            <g id="pelican-legs">
+                <path d="M140 180 Q130 220 120 210 L130 180" stroke="#555" stroke-width="8" fill="none"/>
+                <path d="M160 180 Q170 220 180 210 L170 180" stroke="#555" stroke-width="8" fill="none"/>
+            </g>
+
+            <!-- 尾巴 -->
+            <path d="M150 140 C120 140, 110 120, 130 100" fill="#ccc" stroke="#aaa" stroke-width="2"/>
+
+            <!-- 身体 -->
+            <ellipse cx="150" cy="140" rx="60" ry="40" fill="url(#featherGrad)" stroke="#bbb" stroke-width="2"/>
+
+            <!-- 翅膀 (扑腾用) -->
+            <path id="wing" d="M150 120 C100 100, 90 80, 110 60 C130 40, 160 50, 180 70 Z" fill="white" stroke="#ddd" stroke-width="1"/>
+
+            <!-- 脖子与头 -->
+            <path d="M200 130 Q230 110, 220 70 L240 60" fill="none" stroke="none" /> <!-- Helper curve -->
+            
+            <!-- 脖子主体 -->
+            <rect x="205" y="80" width="20" height="70" rx="10" fill="url(#featherGrad)" stroke="#bbb" stroke-width="2"/>
+
+            <!-- 头 -->
+            <circle cx="215" cy="70" r="15" fill="url(#featherGrad)" stroke="#bbb" stroke-width="2"/>
+
+            <!-- 眼睛 -->
+            <g class="eyes">
+                <circle cx="218" cy="65" r="3" fill="black"/>
+                <circle cx="215" cy="65" r="1" fill="white"/>
+            </g>
+
+            <!-- 喙 (长嘴) -->
+            <g transform="translate(215, 65)">
+                <!-- 上喙 -->
+                <path d="M-5 -5 L10 -10 L15 10 L-5 5 Z" fill="#FFA500" stroke="#D2691E" stroke-width="1"/>
+                <!-- 下喙/喉囊 -->
+                <path id="throatPouch" d="M0 -5 Q5 20 12 5 L5 10 Z" fill="#FFDAB9" stroke="#D2691E" stroke-width="1"/>
+            </g>
+        </svg>
+
+        <!-- 自行车 (上层，骑乘者) -->
+        <svg class="bike-svg" viewBox="0 0 200 150" id="bikeSvg">
+            <!-- 链条护罩 -->
+            <path d="M80 120 L110 120 L110 125 L80 125 Z" fill="#ddd"/>
+            
+            <!-- 踏板曲柄联动组 -->
+            <g id="pedals">
+                 <!-- 曲柄臂 -->
+                <line id="crankL" x1="95" y1="120" x2="95" y2="135" stroke="#555" stroke-width="4" transform="rotate(0 95 120)"/>
+                <line id="crankR" x1="95" y1="120" x2="95" y2="135" stroke="#555" stroke-width="4" transform="rotate(180 95 120)"/>
+                
+                <!-- 脚踏板 -->
+                <rect id="pedalL" x="90" y="132" width="10" height="4" fill="#333"/>
+                <rect id="pedalR" x="90" y="132" width="10" height="4" fill="#333"/>
+            </g>
+
+            <!-- 前轮 -->
+            <g id="wheel-front">
+                <circle cx="160" cy="120" r="25" fill="none" stroke="#333" stroke-width="3"/>
+                <line x1="160" y1="95" x2="160" y2="145" stroke="#888" stroke-width="1"/> <!-- Spoke 1 -->
+                <line x1="135" y1="120" x2="185" y2="120" stroke="#888" stroke-width="1"/> <!-- Spoke 2 -->
+                <line x1="143" y1="107" x2="177" y2="133" stroke="#888" stroke-width="1"/> <!-- Spoke 3 -->
+            </g>
+
+            <!-- 后轮 -->
+            <g id="wheel-rear">
+                <circle cx="40" cy="120" r="25" fill="none" stroke="#333" stroke-width="3"/>
+                <line x1="40" y1="95" x2="40" y2="145" stroke="#888" stroke-width="1"/> <!-- Spoke 1 -->
+                <line x1="15" y1="120" x2="65" y2="120" stroke="#888" stroke-width="1"/> <!-- Spoke 2 -->
+                <line x1="53" y1="107" x2="27" y2="133" stroke="#888" stroke-width="1"/> <!-- Spoke 3 -->
+            </g>
+
+            <!-- 车架 (菱形结构) -->
+            <path d="M40 120 L95 60 L160 120 L95 120 Z" fill="none" stroke="#D32F2F" stroke-width="4"/>
+            <line x1="95" y1="120" x2="95" y2="60" stroke="#D32F2F" stroke-width="4"/>
+            
+            <!-- 后叉延伸 -->
+            <line x1="95" y1="120" x2="25" y2="130" stroke="#D32F2F" stroke-width="3" transform="rotate(-5 95 120)"/>
+
+            <!-- 车座 (高高在上) -->
+            <path d="M80 60 L110 60 L105 50 L85 50 Z" fill="#333"/>
+            <line x1="95" y1="60" x2="95" y2="45" stroke="#333" stroke-width="3"/>
+
+            <!-- 车把 (像缰绳一样控制鸟) -->
+            <path id="handlebar" d="M160 120 C180 120, 190 100, 200 100" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+            <!-- 连接缰绳视觉效果 (假装抓住鸟的喙) -->
+            <path d="M200 100 Q210 80, 215 80" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="2,2"/>
+
+            <!-- 车头灯 (装饰) -->
+            <circle cx="160" cy="120" r="3" fill="yellow" stroke="red" stroke-width="0.5"/>
+            
+            <!-- 车铃声波示意 (JS 控制显示) -->
+            <circle id="bell-ring" cx="200" cy="100" r="2" fill="transparent" stroke="gold" stroke-width="2" opacity="0" />
+        </svg>
+    </div>
+
+    <!-- 背景地面 (移动最快) -->
+    <div class="layer" id="boards" style="left: 0;"></div>
+    <div class="layer" id="boards-salt" style="left: -50%;"> <!-- Duplicate for seamless scroll -->
+         background-image: inherit;
+    </div>
+
+    <!-- 文本状态 -->
+    <div id="status-text">体力值：<span id="stamina-val">100%</span></div>
+
+    <!-- UI 控制面板 -->
+    <div id="ui-panel">
+        <div class="control-group">
+            <label>速度 / 冲刺</label>
+            <input type="range" id="speed-slider" min="0" max="20" value="3">
+        </div>
+
+        <button id="btn-bell">按车铃 🔔</button>
+
+        <button id="btn-fish">🐟 投喂小鱼 (回体)</button>
+
+        <div class="control-group">
+            <label>路况</label>
+            <select id="road-select" style="padding: 5px;">
+                <option value="flat">木栈道 (平)</option>
+                <option value="rough">碎石路 (震)</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * 核心逻辑：自行车骑鹈鹕
+     * 物理模拟：无手脚的自行车如何产生动力？假设脚踏板是“踩”在空气里，但节奏同步于奔跑。
+     * 互动性：
+     * 1. 速度改变 -> 翅膀频率、腿频率、车轮转速变化。
+     * 2. 速度极高 -> 喘气变重 (panting)，羽毛乱翘。
+     * 3. 按铃 -> 鹈鹕受惊加速 (panic burst)。
+     * 4. 投鱼 -> 恢复体力。
+     */
+
+    // --- 变量状态 ---
+    const state = {
+        speed: 3,           // 基础速度
+        currentSpeed: 0,    // 瞬时速度
+        stamina: 100,       // 0-100
+        isPanic: false,     // 是否受惊
+        roadType: 'flat',   // 路面类型
+        time: 0,            // 时间步
+        lastFrame: Date.now()
+    };
+
+    // --- DOM 元素 ---
+    const els = {
+        wheelFront: document.getElementById('wheel-front'),
+        wheelRear: document.getElementById('wheel-rear'),
+        pedalL: document.getElementById('pedalL'),
+        crankL: document.getElementById('crankL'),
+        wing: document.getElementById('wing'),
+        throatPouch: document.getElementById('throatPouch'),
+        boards: [document.getElementById('boards')], // 多个用于无缝滚动
+        pelican: document.getElementById('pelicanSvg'),
+        bike: document.getElementById('bikeSvg'),
+        statusText: document.getElementById('stamina-val'),
+        bellRing: document.getElementById('bell-ring'),
+        handlebar: document.getElementById('handlebar'),
+        sunMoon: document.getElementById('sun-moon'),
+        clouds: document.getElementById('clouds')
+    };
+
+    // --- 初始化 ---
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // 监听控件
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            state.speed = parseFloat(e.target.value);
+            resetPanic();
+        });
+        
+        document.getElementById('btn-bell').addEventListener('click', triggerBell);
+        
+        document.getElementById('btn-fish').addEventListener('click', feedPelican);
+
+        document.getElementById('road-select').addEventListener('change', (e) => {
+            state.roadType = e.target.value;
+        });
+
+        // 启动循环
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resize() {
+        // 简单的响应式处理
+        if(window.innerWidth < 600) {
+             els.bike.style.transform = "scale(0.7)";
+        } else {
+             els.bike.style.transform = "scale(1)";
+        }
+    }
+
+    // --- 音频上下文 (Web Audio API) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playBellSound() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.type = 'triangle';
+        // 两个泛音构成清脆铃声
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.5);
+        
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.8);
+    }
+
+    // --- 核心游戏循环 ---
+    function gameLoop() {
+        const now = Date.now();
+        const dt = (now - state.lastFrame) / 16; // Normalize to ~60fps
+        state.lastFrame = now;
+        state.time += dt;
+
+        updatePhysics(dt);
+        render();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // --- 更新物理与状态 ---
+    function updatePhysics(dt) {
+        // 1. 目标速度插值 (平滑减速)
+        const targetSpeed = state.isPanic ? state.speed * 1.8 : state.speed;
+        // 如果体力极低，强制减速
+        if(state.stamina < 5) state.currentSpeed *= 0.9;
+        else state.currentSpeed += (targetSpeed - state.currentSpeed) * 0.1;
+
+        // 消耗体力
+        if (state.currentSpeed > 0.5 && state.stamina > 0) {
+            state.stamina -= (state.currentSpeed * 0.005);
+            if (state.stamina < 0) state.stamina = 0;
+        }
+
+        // 自动恢复一点点 (如果不快跑)
+        if (state.currentSpeed < 2 && state.stamina < 100) {
+            state.stamina += 0.02;
+        }
+        if (state.stamina > 100) state.stamina = 100;
+
+        // 更新 UI 文字
+        els.statusText.innerText = Math.floor(state.stamina) + '%';
+        els.statusText.style.color = state.stamina < 20 ? 'red' : '#333';
+
+        // --- 动画计算参数 ---
+        const moveDist = state.currentSpeed * dt * 2; // 地面移动距离
+        const rotationSpeed = state.currentSpeed * 5;
+        
+        // 2. 视差滚动背景
+        // 远山/云不动太慢，木板动太快。这里我们用 CSS 动画做云，JS 控制木板位置实现无缝衔接
+        // 实际上为了性能，我们移动一个大的背景块
+        
+        // 3. 鹈鹕动作 (Wiggle & Trot)
+        // 上下颠簸
+        const bounce = Math.sin(state.time * 20) * (state.currentSpeed * 0.5); 
+        
+        // 脖子摆动
+        const neckSwing = Math.sin(state.time * 10) * (state.currentSpeed * 0.5);
+
+        // 翅膀煽动幅度与速度挂钩
+        const wingFlap = Math.min(Math.abs(state.currentSpeed), 20); 
+
+        // 喉咙晃动 (高频低幅)
+        const throatJiggle = state.currentSpeed * Math.cos(state.time * 40) * 0.5;
+
+        // 应用变换到 SVG
+        els.pelican.style.transform = `translateY(${bounce}px)`;
+        // 脖子和头单独处理比较难画，简化为整体旋转头部
+        // 实际 SVG 内部可以用 group，这里简化为整体 SVG 的抖动
+        els.handlebar.style.transform = `rotate(${-neckSwing}deg)`;
+
+        // 喘气特效 (当速度快且没体力)
+        if(state.currentSpeed > 8 && state.stamina < 50) {
+            els.throatPouch.style.fill = "#ffcccc"; // 变成红色充血
+            els.wing.classList.add('panicked'); // 剧烈抖动
+        } else {
+            els.throatPouch.style.fill = "#FFDAB9";
+            els.wing.classList.remove('panicked');
+        }
+
+        // 4. 自行车动作
+        // 放在鹈鹕背上，随其一起颠簸，但自身有独立旋转
+        els.bike.style.transform = `translateY(${bounce * 1.5}px)`; // 悬空感，稍微更跳一点
+        
+        // 车轮旋转
+        const degFront = state.currentSpeed * dt * 100;
+        const degRear = state.currentSpeed * dt * 100;
+
+        els.wheelFront.setAttribute('transform', `rotate(${degFront}, 160, 120)`);
+        els.wheelRear.setAttribute('transform', `rotate(${degRear}, 40, 120)`);
+
+        // 踏板旋转
+        const pedalDeg = state.currentSpeed * dt * 60;
+        els.crankL.setAttribute('transform', `rotate(${pedalDeg}, 95, 120)`);
+        els.crankR.setAttribute('transform', `rotate(${pedalDeg + 180}, 95, 120)`);
+
+        // 5. 路面移动
+        let xPos = -(moveDist * dt); 
+        els.boards.forEach(el => {
+            // 获取当前左边距进行累加比较复杂，直接用 CSS left 属性重置即可，配合 JS 数值管理 totalOffset
+            // 简单起见：每次减少 left 值
+            const currentLeft = parseFloat(el.style.left || 0);
+            el.style.left = `${currentLeft - (moveDist * 0.5)}px`; // 木板速度系数
+        });
+        
+        // 检查是否超出边界重置 (保持两条带子循环)
+        const boardWidth = document.getElementById('boards').offsetWidth;
+        if (parseFloat(els.boards[0].style.left) < -boardWidth) {
+            els.boards.forEach(el => el.style.left = '0px');
+        }
+
+
+        // 6. 随机掉落羽毛或汗珠
+        if (Math.random() < 0.02 && state.currentSpeed > 2) {
+            createParticle(bounce + 100, neckSwing + 100, 'feather');
+        }
+    }
+
+    // --- 渲染部分 (额外绘制) ---
+    function render() {
+        // 此处主要为 UI 更新，大部分动画通过 transform 在 updatePhysics 中完成
+        // 如果需要更复杂的绘画（如飞溅的水花），可在此处增加 Canvas 覆盖层
+    }
+
+    // --- 粒子系统 ---
+    function createParticle(xBase, yBase, type) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const startX = window.innerWidth * 0.7; // 固定在右侧上方 (鸟屁股位置)
+        const startY = yBase + (xBase - window.innerWidth/2); // 粗略转换到屏幕坐标
+        
+        // 相对位置偏移
+        const offsetX = (Math.random() - 0.5) * 50;
+        const offsetY = (Math.random() - 1) * 30;
+
+        p.style.left = `${startX + offsetX}px`;
+        p.style.top = `${startY + offsetY}px`;
+        p.style.width = '8px';
+        p.style.height = '8px';
+        
+        if(type === 'feather') {
+            p.style.background = 'white';
+            p.style.borderRadius = '50% 0';
+            p.style.opacity = '0.6';
+        } else {
+            p.style.background = '#555';
+        }
+
+        document.body.appendChild(p);
+
+        // 动画结束后移除
+        setTimeout(() => {
+            p.style.transition = "all 1s ease-out";
+            p.style.transform = `translate(${Math.random()*100 - 50}px, ${window.innerHeight + 20}px) rotate(${Math.random()*360}deg)`;
+            p.style.opacity = 0;
+            setTimeout(() => p.remove(), 1000);
+        }, 50);
+    }
+
+    // --- 交互功能 ---
+
+    function triggerBell() {
+        playBellSound();
+        
+        // 视觉反馈
+        els.bellRing.style.opacity = 1;
+        els.bellRing.classList.add('bell-pulse');
+        
+        setTimeout(() => {
+            els.bellRing.style.opacity = 0;
+            els.bellRing.classList.remove('bell-pulse');
+        }, 500);
+
+        // 鹈鹕受惊反应
+        state.isPanic = true;
+        document.getElementById('pelicanSvg').classList.add('panicked');
+        
+        // 5 秒后恢复正常
+        setTimeout(resetPanic, 4000);
+    }
+
+    function resetPanic() {
+        state.isPanic = false;
+        document.getElementById('pelicanSvg').classList.remove('panicked');
+    }
+
+    function feedPelican() {
+        if (state.stamina >= 100) return;
+
+        // 播放吃口哨音效 (合成)
+        playEatSound();
+
+        // 视觉效果：一条鱼飞来
+        const rect = els.bike.getBoundingClientRect();
+        const fishEl = document.createElement('div');
+        fishEl.innerHTML = '🐟';
+        fishEl.style.fontSize = '30px';
+        fishEl.style.position = 'absolute';
+        fishEl.style.left = (rect.right) + 'px';
+        fishEl.style.top = (rect.top + 20) + 'px';
+        fishEl.style.zIndex = 1000;
+        document.body.appendChild(fishEl);
+
+        // 动画飞向鸟嘴
+        const birdRect = els.pelican.getBoundingClientRect();
+        // 使用 Web Animations API
+        const animation = fishEl.animate([
+            { transform: `translate(0, 0) scale(1)` },
+            { transform: `translate(${birdRect.left - rect.right}px, ${birdRect.top + 50 - (rect.top+20)}px) scale(1.5)` }
+        ], {
+            duration: 300,
+            easing: 'ease-in'
+        });
+
+        animation.onfinish = () => {
+            fishEl.remove();
+            // 恢复体力
+            state.stamina = Math.min(state.stamina + 15, 100);
+            els.statusText.innerText = Math.floor(state.stamina) + '%';
+        };
+    }
+
+    function playEatSound() {
+        // 快速下降的声音
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>

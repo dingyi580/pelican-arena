@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一辆自行车骑鹈鹕</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        
+        .container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 600px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .bike {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 150px;
+            background-color: #333;
+            border-radius: 10px;
+            transform-origin: bottom center;
+        }
+        
+        .pelican {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 150px;
+            background-color: #fff;
+            border-radius: 10px;
+            transform-origin: bottom center;
+        }
+        
+        .pelican-wing {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 100px;
+            background-color: #fff;
+            border-radius: 10px;
+            transform-origin: bottom center;
+            transform: rotate(0deg);
+            transition: transform 0.5s ease-in-out;
+        }
+        
+        .pelican-wing.flap {
+            transform: rotate(30deg);
+        }
+        
+        .pelican-throat {
+            position: absolute;
+            top: 70%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background-color: #fff;
+            border-radius: 50%;
+            transform-origin: center;
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        @keyframes flap {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        .pelican-leg {
+            position: absolute;
+            top: 80%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background-color: #fff;
+            border-radius: 50%;
+            transform-origin: center;
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        @keyframes flap {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        .pelican-wing.flap.pelican-throat {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .pelican-wing.flap.pelican-leg {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .pelican-throat.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .pelican-leg.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .bike-crank {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background-color: #fff;
+            border-radius: 50%;
+            transform-origin: center;
+            transition: transform 0.5s ease-in-out;
+        }
+        
+        .bike-crank.flap {
+            transform: rotate(30deg);
+        }
+        
+        .bike-crank.pelican-throat.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .bike-crank.pelican-leg.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .speed-control {
+            position: absolute;
+            top: 90%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 30px;
+            background-color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        
+        .speed-control button {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 10px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        
+        .pelican-joy {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            background-color: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .pelican-joy.pelican-throat.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+        
+        .pelican-joy.pelican-leg.flap {
+            animation: flap 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="bike">
+            <div class="pelican">
+                <div class="pelican-wing flap" style="transform: rotate(0deg)"> </div>
+                <div class="pelican-wing flap" style="transform: rotate(0deg)"> </div>
+                <div class="pelican-throat"> </div>
+                <div class="pelican-leg"> </div>
+                <div class="pelican-leg"> </div>
+            </div>
+            <div class="bike-crank"> </div>
+        </div>
+        <div class="speed-control">
+            <button onclick="speedUp()">加速</button>
+            <button onclick="slowDown()">减速</button>
+        </div>
+        <div class="pelican-joy"> </div>
+    </div>
+    
+    <script>
+        let pelican = document.querySelector('.pelican');
+        let pelicanThroat = document.querySelector('.pelican-throat');
+        let pelicanLeg = document.querySelector('.pelican-leg');
+        let bikeCrank = document.querySelector('.bike-crank');
+        let speedControl = document.querySelector('.speed-control');
+        let joy = document.querySelector('.pelican-joy');
+        
+        let isRunning = false;
+        let speed = 1;
+        
+        function speedUp() {
+            speed++;
+            pelican.style.transform = `translate(0, 0) scale(${speed})`;
+            pelicanThroat.style.transform = `translate(0, 0) scale(${speed})`;
+            pelicanLeg.style.transform = `translate(0, 0) scale(${speed})`;
+            bikeCrank.style.transform = `translate(0, 0) scale(${speed})`;
+            joy.style.transform = `translate(0, 0) scale(${speed})`;
+            if (speed > 10) {
+                speed = 1;
+            }
+        }
+        
+        function slowDown() {
+            speed--;
+            pelican.style.transform = `translate(0, 0) scale(${speed})`;
+            pelicanThroat.style.transform = `translate(0, 0) scale(${speed})`;
+            pelicanLeg.style.transform = `translate(0, 0) scale(${speed})`;
+            bikeCrank.style.transform = `translate(0, 0) scale(${speed})`;
+            joy.style.transform = `translate(0, 0) scale(${speed})`;
+            if (speed < 1) {
+                speed = 10;
+            }
+        }
+        
+        function flap() {
+            pelicanThroat.classList.toggle('flap');
+            pelicanLeg.classList.toggle('flap');
+            bikeCrank.classList.toggle('flap');
+            joy.classList.toggle('flap');
+        }
+        
+        function joy() {
+            joy.style.transform = 'translate(0, 0) scale(2)';
+            setTimeout(() => {
+                joy.style.transform = 'translate(0, 0) scale(1)';
+            }, 2000);
+        }
+        
+        function init() {
+            speedControl.addEventListener('click', () => {
+                if (isRunning) {
+                    slowDown();
+                } else {
+                    speedUp();
+                }
+            });
+            
+            pelican.addEventListener('click', flap);
+            joy.addEventListener('click', joy);
+        }
+        
+        init();
+    </script>
+</body>
+</html>

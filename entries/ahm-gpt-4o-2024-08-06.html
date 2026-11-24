@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Bicycle Riding a Pelican</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #a9d6f9 0%, #d9f3fc 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        button, input {
+            padding: 6px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #71b7db;
+            color: white;
+        }
+
+        input[type="range"] {
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="bell">🔔 Ring Bell</button>
+        <input type="range" id="speed" min="1" max="20" value="10">
+        <button id="feed">🍴 Feed Pelican</button>
+    </div>
+    <canvas id="animationCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('animationCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let pelican = { x: 100, y: canvas.height - 300, width: 200, height: 150, speed: 10, energy: 100 };
+        let bicycle = { width: 80, height: 45 };
+        let bellSound = new Audio();
+        let isRunning = true;
+        let angle = 0;
+
+        function drawPelican() {
+            ctx.fillStyle = '#f1c27d';
+            ctx.beginPath();
+            ctx.ellipse(pelican.x, pelican.y, pelican.width, pelican.height, Math.PI / 2, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = 'white';
+            ctx.fillRect(pelican.x - pelican.width / 2, pelican.y - pelican.height / 2, pelican.width, pelican.height / 3);
+
+            ctx.fillStyle = '#566d73';
+            ctx.beginPath();
+            ctx.arc(pelican.x - pelican.width / 2, pelican.y, pelican.width / 4, 0, Math.PI, true);
+            ctx.fill();
+
+            ctx.fillStyle = '#9d2a23';
+            ctx.fillRect(pelican.x + pelican.width / 4, pelican.y - pelican.height / 4, pelican.width / 6, pelican.height / 4);
+        }
+
+        function drawBicycle() {
+            ctx.fillStyle = '#3b3b3b';
+            ctx.fillRect(pelican.x - bicycle.width / 2, pelican.y - pelican.height - bicycle.height, bicycle.width, bicycle.height / 4);
+
+            ctx.beginPath();
+            ctx.arc(pelican.x - bicycle.width / 2, pelican.y - pelican.height, bicycle.height / 4, 0, 2 * Math.PI);
+            ctx.arc(pelican.x + bicycle.width / 2, pelican.y - pelican.height, bicycle.height / 4, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+
+        function update() {
+            if (isRunning) {
+                pelican.x += pelican.speed;
+                angle += 0.05;
+                if (pelican.x > canvas.width) pelican.x = -pelican.width;
+                
+                if (pelican.energy > 0) pelican.energy--;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawPelican();
+                drawBicycle();
+                requestAnimationFrame(update);
+            }
+        }
+
+        function ringBell() {
+            ctx.save();
+            ctx.translate(pelican.x, pelican.y);
+            ctx.rotate(Math.sin(angle) / 2);
+            drawBicycle();
+            ctx.restore();
+            pelican.speed += 5;
+            setTimeout(() => pelican.speed -= 5, 500);
+            bellSound.play();
+        }
+
+        function feedPelican() {
+            pelican.energy += 30;
+            if (pelican.energy > 100) pelican.energy = 100;
+        }
+
+        bellSound.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIAESsAAAB3AQAAWGF1eggAH1FVU1AdeGhnZwAAAFFZWFnaZm8/3zZ7b7fCjxHOHEZ8g//fj5/d0I9i3ppVkE2BhIkCAVBE)AIAgFCACAREAHgCFAACMCAICARDVEAQAgJQhBAAYkEEFQABCNQAlCADoCACAKACEAeQA==';
+        
+        document.getElementById('bell').onclick = ringBell;
+        document.getElementById('speed').oninput = function (e) {
+            pelican.speed = parseInt(e.target.value);
+        };
+        document.getElementById('feed').onclick = feedPelican;
+
+        update();
+    </script>
+</body>
+</html>

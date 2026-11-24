@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>自行车骑鹈鹕</title>
+<style>
+  body {
+    margin: 0;
+    background: #f0e6d2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  #container {
+    margin-top: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+  }
+  canvas {
+    display: block;
+    background: #87CEEB;
+  }
+  #controls {
+    padding: 16px 24px;
+    background: #f8f1e3;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 10px 18px;
+    font-size: 15px;
+    border: none;
+    border-radius: 9999px;
+    background: #5d4e37;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  button:hover {
+    background: #3f3426;
+    transform: translateY(-1px);
+  }
+  #speed {
+    width: 160px;
+    accent-color: #5d4e37;
+  }
+  .label {
+    font-size: 13px;
+    color: #5d4e37;
+    margin-right: 8px;
+  }
+</style>
+</head>
+<body>
+<div id="container">
+  <canvas id="canvas" width="800" height="520"></canvas>
+  <div id="controls">
+    <button id="bell">🛎️ 按车铃</button>
+    <div>
+      <span class="label">速度</span>
+      <input type="range" id="speed" min="20" max="120" value="65">
+    </div>
+    <button id="fish">🐟 投喂小鱼</button>
+    <button id="toggle">🌅 切换黄昏</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let speed = 65;
+let time = 0;
+let sprint = 0;
+let isDusk = false;
+let fishAnim = 0;
+let bellAnim = 0;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playBell() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  
+  osc.type = 'sine';
+  osc.frequency.value = 880;
+  filter.type = 'lowpass';
+  filter.frequency.value = 1200;
+  
+  gain.gain.value = 0.8;
+  
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  osc.start();
+  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+  osc.stop(audioCtx.currentTime + 0.7);
+  
+  // 第二声
+  setTimeout(() => {
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = 1180;
+    gain2.gain.value = 0.6;
+    osc2.connect(audioCtx.destination);
+    osc2.start();
+    gain2.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+    osc2.stop(audioCtx.currentTime + 0.5);
+  }, 120);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, 800, 520);
+  const t = time * 0.016;
+  const currentSpeed = speed + sprint * 40;
+  const bob = Math.sin(t * 8) * 3;
+  const wingAngle = Math.sin(t * 10) * 0.6;
+  const legAngle = Math.sin(t * 14) * 0.8;
+  const pouchSwing = Math.sin(t * 7) * 4;
+  
+  // 背景（视差）
+  const bgSpeed = currentSpeed * 0.008;
+  
+  // 天空
+  ctx.fillStyle = isDusk ? '#f4a261' : '#87CEEB';
+  ctx.fillRect(0, 0, 800, 300);
+  
+  // 远海
+  ctx.fillStyle = isDusk ? '#e76f51' : '#4a90a4';
+  ctx.fillRect(0, 280, 800, 80);
+  
+  // 海浪（视差）
+  ctx.strokeStyle = isDusk ? '#d35400' : '#3d7ea6';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    const y = 300 + i * 12;
+    ctx.moveTo(-50, y);
+    for (let x = 0; x < 900; x += 40) {
+      ctx.quadraticCurveTo(x + 20, y + Math.sin((x + t * bgSpeed * (3 + i)) * 0.03) * 8, x + 40, y);
+    }
+    ctx.stroke();
+  }
+  
+  // 木栈道
+  ctx.fillStyle = isDusk ? '#8d6e63' : '#d4a373';
+  ctx.fillRect(0, 380, 800, 140);
+  ctx.strokeStyle = '#5d4037';
+  ctx.lineWidth = 2;
+  for (let x = -40; x < 850; x += 60) {
+    const offset = ((x + t * bgSpeed * 2) % 60) - 30;
+    ctx.beginPath();
+    ctx.rect(offset, 380, 50, 140);
+    ctx.stroke();
+  }
+  
+  // 云朵
+  ctx.fillStyle = isDusk ? '#f5d5a8' : '#fff';
+  for (let i = 0; i < 3; i++) {
+    const cx = ((i * 280 + t * bgSpeed * (0.6 + i * 0.2)) % 1000) - 100;
+    ctx.beginPath();
+    ctx.ellipse(cx, 80 + i * 30, 50, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx + 35, 75 + i * 30, 35, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // 鹈鹕
+  const px = 400;
+  const py = 310 + bob;
+  
+  // 身体
+  ctx.fillStyle = '#f5e8c7';
+  ctx.beginPath();
+  ctx.ellipse(px, py + 30, 85, 55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#d4a373';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  
+  // 脖子
+  ctx.strokeStyle = '#d4a373';
+  ctx.lineWidth = 18;
+  ctx.beginPath();
+  ctx.moveTo(px + 20, py + 5);
+  ctx.quadraticCurveTo(px + 55, py - 25, px + 75, py - 45);
+  ctx.stroke();
+  
+  // 头
+  ctx.fillStyle = '#f5e8c7';
+  ctx.beginPath();
+  ctx.arc(px + 82, py - 48, 22, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 长喙
+  ctx.fillStyle = '#f4a261';
+  ctx.beginPath();
+  ctx.moveTo(px + 95, py - 48);
+  ctx.lineTo(px + 155, py - 42);
+  ctx.lineTo(px + 95, py - 36);
+  ctx.fill();
+  
+  // 喉囊
+  ctx.fillStyle = '#e76f51';
+  ctx.beginPath();
+  ctx.ellipse(px + 115, py - 25 + pouchSwing * 0.5, 28, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 翅膀
+  ctx.fillStyle = '#e8d5a3';
+  ctx.save();
+  ctx.translate(px - 10, py + 10);
+  ctx.rotate(wingAngle * 0.3 - 0.3);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 55, 28, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  
+  // 第二只翅膀
+  ctx.save();
+  ctx.translate(px + 25, py + 15);
+  ctx.rotate(wingAngle * 0.5);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 48, 24, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  
+  // 腿
+  ctx.strokeStyle = '#e76f51';
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  
+  // 左腿
+  ctx.beginPath();
+  ctx.moveTo(px - 25, py + 70);
+  ctx.lineTo(px - 45 + Math.sin(legAngle) * 18, py + 115);
+  ctx.stroke();
+  
+  // 右腿
+  ctx.beginPath();
+  ctx.moveTo(px + 20, py + 70);
+  ctx.lineTo(px + 35 - Math.sin(legAngle) * 18, py + 115);
+  ctx.stroke();
+  
+  // 蹼足
+  ctx.fillStyle = '#e76f51';
+  ctx.beginPath();
+  ctx.ellipse(px - 45 + Math.sin(legAngle) * 18, py + 118, 18, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(px + 35 - Math.sin(legAngle) * 18, py + 118, 18, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 自行车（骑在鹈鹕背上）
+  const bx = px + 15;
+  const by = py - 25 + bob * 0.8;
+  const bikeTilt = Math.sin(t * 7) * 0.08;
+  
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(bikeTilt);
+  
+  // 后轮
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(-55, 35, 28, 0, Math.PI * 2);
+  ctx.stroke();
+  // 辐条
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 8; i++) {
+    const angle = (t * currentSpeed * 0.15) + i * Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(-55, 35);
+    ctx.lineTo(-55 + Math.cos(angle) * 26, 35 + Math.sin(angle) * 26);
+    ctx.stroke();
+  }
+  
+  // 前轮
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(55, 35, 28, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 8; i++) {
+    const angle = (t * currentSpeed * 0.15) + i * Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(55, 35);
+    ctx.lineTo(55 + Math.cos(angle) * 26, 35 + Math.sin(angle) * 26);
+    ctx.stroke();
+  }
+  
+  // 车架
+  ctx.strokeStyle = '#5d4e37';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(-40, 35);
+  ctx.lineTo(0, 5);
+  ctx.lineTo(40, 35);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-25, 18);
+  ctx.lineTo(25, 18);
+  ctx.stroke();
+  
+  // 车把
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(35, 5);
+  ctx.lineTo(55, -15);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(45, -18);
+  ctx.lineTo(65, -12);
+  ctx.stroke();
+  
+  // 车座
+  ctx.fillStyle = '#3f2a1d';
+  ctx.fillRect(-15, -5, 35, 8);
+  
+  // 脚踏
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 18);
+  ctx.lineTo(12, 32);
+  ctx.stroke();
+  
+  // 缰绳（自行车“骑”鹈鹕）
+  ctx.strokeStyle = '#8d6e63';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(58, -12);
+  ctx.quadraticCurveTo(95, -35, 92, -55);
+  ctx.stroke();
+  
+  ctx.restore();
+  
+  // 粒子（汗珠/羽毛）
+  ctx.fillStyle = isDusk ? '#f4a261' : '#fff';
+  for (let i = 0; i < 6; i++) {
+    const px = 380 + ((i * 47 + t * 50) % 180);
+    const py = 290 + Math.sin(t * 5 + i) * 20;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(px, py, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+  
+  // 鱼投喂动画
+  if (fishAnim > 0) {
+    ctx.fillStyle = '#f4a261';
+    const fx = px + 130 - fishAnim * 2;
+    const fy = py - 60 + Math.sin(fishAnim * 0.3) * 10;
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(Math.sin(fishAnim * 0.4) * 0.3);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    fishAnim--;
+  }
+  
+  if (bellAnim > 0) {
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(bx + 55, by - 25, 18 + bellAnim * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    bellAnim--;
+  }
+  
+  time++;
+  if (sprint > 0) sprint -= 0.02;
+  
+  requestAnimationFrame(draw);
+}
+
+draw();
+
+// 控件
+document.getElementById('bell').onclick = () => {
+  playBell();
+  bellAnim = 12;
+  sprint = Math.min(1.5, sprint + 0.8);
+};
+
+document.getElementById('speed').oninput = function() {
+  speed = parseInt(this.value);
+};
+
+document.getElementById('fish').onclick = () => {
+  fishAnim = 60;
+  sprint = Math.min(1.8, sprint + 1.0);
+};
+
+document.getElementById('toggle').onclick = () => {
+  isDusk = !isDusk;
+};
+</script>
+</body>
+</html>

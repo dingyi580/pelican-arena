@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>跨代模型前端擂台赛 · 自行车骑鹈鹕</title>
+  <style>
+    /* 全局样式 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #87CEEB;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #87CEEB 0%, #e0f7fa 60%, #ffffff 100%);
+    }
+
+    #scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 1000px;
+    }
+
+    /* 鹈鹕 + 自行车容器 */
+    #bike-pelican-group {
+      position: relative;
+      width: 300px;
+      height: 250px;
+      transform-style: preserve-3d;
+      transition: transform 0.2s;
+    }
+
+    /* 背景层 */
+    .layer {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    #clouds {
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 30%;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" preserveAspectRatio="none"><path d="M10 30 Q20 10 35 30 T60 30 T85 30" fill="%23ffffff" /></svg>');
+      background-repeat: repeat-x;
+      background-size: 100px 50px;
+      animation: clouds 60s linear infinite;
+    }
+
+    #sea {
+      bottom: 10%;
+      left: 0;
+      width: 200%;
+      height: 15%;
+      background: linear-gradient(to top, #0077be, #00bfff);
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 100 Q50 0 100 100" fill="none" stroke="%23ffffff" stroke-width="2" /></svg>');
+      background-repeat: repeat-x;
+      background-size: 200px 100px;
+      animation: waves 15s ease-in-out infinite alternate;
+    }
+
+    #beach {
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 20%;
+      background: linear-gradient(to top, #f4e4bc, #fff1c5);
+      z-index: 1;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 90 Q30 60 40 90 T60 90 T80 90" fill="%23d4a373" stroke="%23c7925e" stroke-width="1" /></svg>');
+      background-repeat: repeat-x;
+      background-size: 80px 100px;
+    }
+
+    @keyframes clouds {
+      from { transform: translateX(-50%); }
+      to { transform: translateX(0%); }
+    }
+
+    @keyframes waves {
+      from { transform: translateX(-10%); }
+      to { transform: translateX(10%); }
+    }
+
+    /* 鹈鹕 */
+    #pelican {
+      position: relative;
+      width: 220px;
+      height: 160px;
+      animation: pelicanRun 0.8s infinite alternate ease-in-out;
+      transform-origin: center bottom;
+    }
+
+    @keyframes pelicanRun {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(-8px) rotate(1deg); }
+    }
+
+    @keyframes pelicanSprint {
+      0% { transform: translateY(-10px) rotate(-1deg); }
+      25% { transform: translateY(-2px) rotate(-0.5deg); }
+      50% { transform: translateY(-15px) rotate(-2deg); }
+      75% { transform: translateY(-2px) rotate(-0.5deg); }
+      100% { transform: translateY(-10px) rotate(-1deg); }
+    }
+
+    @keyframes pelicanBreathing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    @keyframes pelicanShock {
+      0% { transform: scale(1); }
+      10% { transform: scale(0.9) translateY(-20px); }
+      20% { transform: scale(1.1) translateY(-10px); }
+      30% { transform: scale(1.0) rotate(5deg); }
+      40% { transform: scale(1) rotate(-5deg); }
+      50% { transform: scale(1.05) translateY(-10px); }
+      100% { transform: scale(1) translateY(0) rotate(0); }
+    }
+
+    /* 车辆动画 */
+    @keyframes bikeBounce {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-3px) rotate(2deg); }
+      50% { transform: translateY(2px) rotate(0deg); }
+      75% { transform: translateY(-5px) rotate(-2deg); }
+    }
+
+    @keyframes wheelSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pedalSpin {
+      from { transform: rotate(-45deg); }
+      to { transform: rotate(315deg); }
+    }
+
+    @keyframes bellRattle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-15deg); }
+      75% { transform: rotate(15deg); }
+    }
+
+    @keyframes bodyTilt {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(3deg); }
+      75% { transform: rotate(-3deg); }
+    }
+
+    /* UI 控制器面板 */
+    .ui-panel {
+      position: absolute;
+      right: 20px;
+      bottom: 30px;
+      width: 200px;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ui-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: #2c3e50;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #ecf0f1;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .label {
+      font-size: 13px;
+      color: #5d6d7e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .value {
+      font-weight: 700;
+      color: #2980b9;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      height: 6px;
+      width: 100%;
+      background: #bdc3c7;
+      border-radius: 3px;
+      outline: none;
+      transition: background 0.3s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #3498db;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    button {
+      background: #27ae60;
+      border: none;
+      padding: 10px 16px;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    button:hover {
+      background: #2ecc71;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(39, 174, 96, 0.4);
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    button.bell {
+      background: #e67e22;
+    }
+
+    button.bell:hover {
+      background: #f39c12;
+      box-shadow: 0 4px 10px rgba(230, 126, 34, 0.4);
+    }
+
+    button.reset {
+      background: #e74c3c;
+    }
+
+    button.reset:hover {
+      background: #ec7063;
+      box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4);
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-indicator {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #2ecc71;
+      transition: all 0.3s;
+    }
+
+    .status-indicator.sprinting { background: #e74c3c; }
+    .status-indicator.lowEnergy { background: #f39c12; }
+
+    /* 动态提示 */
+    .hint {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.85);
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #34495e;
+      white-space: nowrap;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      transition: opacity 0.4s;
+    }
+
+    .hint::before {
+      content: "💡";
+      margin-right: 6px;
+    }
+
+    .hint.visible { opacity: 1; }
+    .hint.hidden { opacity: 0; }
+
+    /* 投喂动画 */
+    @keyframes fishDrop {
+      0% { transform: translate(-50%, 0) scale(0.8); opacity: 0; }
+      30% { opacity: 1; }
+      100% { transform: translate(-50%, 150px) scale(1); opacity: 0; }
+    }
+
+    #fishes-container {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .fish {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      font-size: 24px;
+      animation: fishDrop 2s ease-out forwards;
+    }
+
+    /* 震动类 */
+    .shake {
+      animation: bellRattle 0.2s ease-in-out 3;
+    }
+
+    /* 粒子效果 */
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      z-index: 90;
+      font-size: 14px;
+      font-weight: bold;
+      animation: particleFloat 1.5s ease-out forwards;
+    }
+
+    @keyframes particleFloat {
+      0% { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-60px) scale(1.5); opacity: 0; }
+    }
+
+    /* 汗珠粒子 */
+    .sweat {
+      position: absolute;
+      width: 6px;
+      height: 8px;
+      background: #bde0fe;
+      border-radius: 0 0 3px 3px;
+      left: 50%;
+      animation: sweatDrop 1.5s infinite;
+    }
+
+    @keyframes sweatDrop {
+      0% { transform: translateY(-5px); opacity: 1; }
+      70% { transform: translateY(3px); opacity: 1; }
+      100% { transform: translateY(8px); opacity: 0; }
+    }
+
+    /* 动态样式更新 */
+    body.day { background: linear-gradient(to bottom, #87CEEB 0%, #e0f7fa 60%, #ffffff 100%); }
+    body.sunset { background: linear-gradient(to bottom, #ff7e5f 0%, #feb47b 60%, #fff1c5 100%); }
+    body.night { background: linear-gradient(to bottom, #1b2735 0%, #090a0f 60%, #1a1a1a 100%); }
+
+    #clouds.day { opacity: 0.8; }
+    #clouds.sunset { opacity: 0.6; }
+    #clouds.night { opacity: 0.3; }
+
+    #sea.day { background: linear-gradient(to top, #0077be, #00bfff); }
+    #sea.sunset { background: linear-gradient(to top, #ff7e5f, #ff9a7b); }
+    #sea.night { background: linear-gradient(to top, #1b2735, #3e4a56); }
+
+    #beach.day { background: linear-gradient(to top, #f4e4bc, #fff1c5); }
+    #beach.sunset { background: linear-gradient(to top, #ff9a7b, #ffca8a); }
+    #beach.night { background: linear-gradient(to top, #3e4a56, #2c3e50); }
+
+  </style>
+</head>
+<body class="day">
+  <div id="stage">
+    <div id="scene">
+      <div class="layer" id="clouds"></div>
+      <div class="layer" id="sea"></div>
+      <div id="bike-pelican-group">
+        <!-- 自行车 -->
+        <div class="bike" style="position:absolute; top:-40px; left:10px; transform-origin: center center; animation: bikeBounce 0.8s infinite alternate ease-in-out; width:200px; height:140px;">
+          <!-- 自行车 SVG -->
+          <svg viewBox="0 0 200 140" width="100%" height="100%" style="overflow:visible">
+            <!-- 前轮 -->
+            <g transform="translate(100,80)">
+              <circle cx="0" cy="0" r="35" fill="none" stroke="#7f8c8d" stroke-width="2" />
+              <circle cx="0" cy="0" r="4" fill="#34495e" />
+              <!-- 辐条 -->
+              <line x1="-35" y1="0" x2="35" y2="0" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="-35" x2="0" y2="35" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="-24.75" y1="-24.75" x2="24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="24.75" y1="-24.75" x2="-24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="0" x2="24.75" y2="-24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="0" x2="-24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+            </g>
+            <!-- 后轮 -->
+            <g transform="translate(30,80)">
+              <circle cx="0" cy="0" r="35" fill="none" stroke="#7f8c8d" stroke-width="2" />
+              <circle cx="0" cy="0" r="4" fill="#34495e" />
+              <!-- 辐条 -->
+              <line x1="-35" y1="0" x2="35" y2="0" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="-35" x2="0" y2="35" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="-24.75" y1="-24.75" x2="24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="24.75" y1="-24.75" x2="-24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="0" x2="24.75" y2="-24.75" stroke="#bdc3c7" stroke-width="0.5" />
+              <line x1="0" y1="0" x2="-24.75" y2="24.75" stroke="#bdc3c7" stroke-width="0.5" />
+            </g>
+            <!-- 车架 -->
+            <path d="M30,80 L65,50 L95,45 L100,80 L65,50" fill="none" stroke="#2c3e50" stroke-width="6" stroke-linejoin="round" />
+            <path d="M65,50 L75,30" fill="none" stroke="#2c3e50" stroke-width="4" />
+            <path d="M75,30 L85,25 L100,25" fill="none" stroke="#e74c3c" stroke-width="3" />
+            <!-- 车把 -->
+            <path d="M75,30 L70,20 L80,20" fill="none" stroke="#95a5a6" stroke-width="3" />
+            <!-- 车座 -->
+            <path d="M65,50 L60,40" fill="none" stroke="#2c3e50" stroke-width="2" />
+            <rect x="55" y="35" width="20" height="6" rx="2" fill="#7f8c8d" />
+            <!-- 脚踏 -->
+            <g class="pedal" style="animation: pedalSpin 1s infinite linear;">
+              <line x1="65" y1="50" x2="60" y2="60" stroke="#7f8c8d" stroke-width="2" />
+              <rect x="56" y="58" width="8" height="8" fill="#2c3e50" />
+              <circle cx="56" cy="58" r="1" fill="#95a5a6" />
+            </g>
+            <!-- 前叉 -->
+            <path d="M100,80 L85,25" fill="none" stroke="#7f8c8d" stroke-width="3" />
+            <!-- 前轮方向控制（车把） -->
+            <path d="M85,25 L95,15" fill="none" stroke="#7f8c8d" stroke-width="2" />
+            <!-- 绳索 -->
+            <path d="M95,15 L90,40 L110,45" fill="none" stroke="#795548" stroke-width="2" />
+            <!-- 车铃 -->
+            <g id="bell" class="shake" style="animation:none;">
+              <circle cx="85" cy="12" r="5" fill="#f1c40f" stroke="#f39c12" stroke-width="1" />
+              <circle cx="85" cy="12" r="3" fill="#f1c40f" stroke="#f39c12" stroke-width="1" />
+              <circle cx="85" cy="12" r="1" fill="#e74c3c" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- 鹈鹕 -->
+        <div id="pelican">
+          <!-- 鹈鹕 SVG -->
+          <svg viewBox="0 0 200 160" width="100%" height="100%" style="overflow:visible;">
+            <!-- 鹈鹕身体 -->
+            <ellipse cx="100" cy="100" rx="50" ry="30" fill="#fff" />
+            <!-- 脖子 -->
+            <path d="M100,80 Q100,50 90,35" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" />
+            <!-- 头 -->
+            <circle cx="90" cy="35" r="14" fill="#fff" />
+            <!-- 眼睛 -->
+            <circle cx="94" cy="32" r="2" fill="#333" />
+            <!-- 喙 -->
+            <path d="M100,35 L130,30 L140,35 L130,40 L100,35" fill="#f1c40f" stroke="#f39c12" stroke-width="1" />
+            <!-- 喉囊 -->
+            <path id="pelican-bag" d="M130,30 Q155,55 130,60 Q115,60 115,30" fill="#e67e22" stroke="#d35400" stroke-width="1" />
+            <!-- 翅膀 -->
+            <path d="M100,90 Q120,100 140,110 Q150,115 150,100 Q140,90 130,95" fill="#f1f1f1" stroke="#bdc3c7" stroke-width="1" />
+            <!-- 尾羽 -->
+            <path d="M150,95 L160,105 L155,110 L150,100" fill="#bdc3c7" stroke="#7f8c8d" stroke-width="1" />
+            <!-- 腿 -->
+            <path d="M80,115 L85,135" fill="none" stroke="#e67e22" stroke-width="4" />
+            <path d="M120,115 L115,135" fill="none" stroke="#e67e22" stroke-width="4" />
+            <!-- 趾 -->
+            <path d="M85,135 L80,145 L90,145" fill="none" stroke="#e67e22" stroke-width="2" />
+            <path d="M115,135 L110,145 L120,145" fill="none" stroke="#e67e22" stroke-width="2" />
+            <!-- 胸部 -->
+            <ellipse cx="100" cy="95" rx="15" ry="8" fill="#f8f9fa" opacity="0.9" />
+            <!-- 汗珠 -->
+            <div class="sweat" style="top:20px; left:40%;"></div>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- 背景层 -->
+    <div id="beach"></div>
+
+    <!-- 投喂鱼容器 -->
+    <div id="fishes-container"></div>
+
+    <!-- 粒子容器 -->
+    <div id="particles-container"></div>
+
+    <!-- UI 控制面板 -->
+    <div class="ui-panel">
+      <div class="ui-title">骑行控制台</div>
+      
+      <!-- 速度控制 -->
+      <div class="control-row">
+        <div class="label">
+          <span>速度控制</span>
+          <span class="value" id="speedValue">1.0x</span>
+        </div>
+        <input type="range" id="speedControl" min="0.5" max="3.0" step="0.1" value="1.0" />
+      </div>
+      
+      <!-- 鸣铃按钮 -->
+      <button class="bell" id="bellBtn">
+        🚴 按车铃！
+      </button>
+      
+      <!-- 路况切换 -->
+      <div class="control-row">
+        <div class="label">路况模式</div>
+        <button id="roadBtn" style="margin-top:4px;">路况: 平路 🛣️</button>
+      </div>
+      
+      <!-- 光影切换 -->
+      <div class="control-row">
+        <div class="label">光影氛围</div>
+        <button id="themeBtn" style="margin-top:4px;">当前: 白天 ☀️</button>
+      </div>
+      
+      <!-- 体力状态 -->
+      <div class="control-row">
+        <div class="label">
+          <span>鹈鹕体力</span>
+          <span class="status-row">
+            <div class="status-indicator" id="energyIndicator"></div>
+            <span class="value" id="energyValue">100%</span>
+          </span>
+        </div>
+      </div>
+      
+      <!-- 投喂按钮 -->
+      <div class="control-row">
+        <button id="feedBtn" style="background:#3498db;">
+          🐟 投喂小鱼（+20能量）
+        </button>
+      </div>
+    </div>
+
+    <div id="hint" class="hint visible">一辆自行车正在骑着一只鹈鹕，非鹈鹕骑车！</div>
+  </div>
+
+  <script>
+    // 全局状态
+    let state = {
+      speed: 1.0,
+      roadType: "smooth", // smooth / bumpy
+      energy: 100,
+      theme: "day",
+      sprinting: false,
+      animating: true,
+      pelicanShock: false,
+    };
+
+    // DOM 元素
+    const stage = document.getElementById("stage");
+    const pelican = document.getElementById("pelican");
+    const pelicanBag = document.getElementById("pelican-bag");
+    const speedInput = document.getElementById("speedControl");
+    const speedValue = document.getElementById("speedValue");
+    const bellBtn = document.getElementById("bellBtn");
+    const roadBtn = document.getElementById("roadBtn");
+    const themeBtn = document.getElementById("themeBtn");
+    const energyIndicator = document.getElementById("energyIndicator");
+    const energyValue = document.getElementById("energyValue");
+    const feedBtn = document.getElementById("feedBtn");
+    const fishesContainer = document.getElementById("fishes-container");
+    const particlesContainer = document.getElementById("particles-container");
+    const hint = document.getElementById("hint");
+
+    // 音频合成
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playBell() {
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // 清脆铃声效果
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.15);
+      oscillator.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.3);
+
+      gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.45);
+
+      // 震动效果
+      bellBtn.classList.add("shake");
+      setTimeout(() => bellBtn.classList.remove("shake"), 600);
+    }
+
+    // 自定义事件：显示提示
+    function showFloatText(x, y, text) {
+      const floatEl = document.createElement("div");
+      floatEl.textContent = text;
+      floatEl.style.position = "absolute";
+      floatEl.style.left = x + "px";
+      floatEl.style.top = y + "px";
+      floatEl.style.color = "#fff";
+      floatEl.style.fontWeight = "bold";
+      floatEl.style.fontSize = "14px";
+      floatEl.style.textShadow = "1px 1px 0 #000";
+      floatEl.style.pointerEvents = "none";
+      floatEl.style.animation = "particleFloat 1.2s ease-out forwards";
+      document.body.appendChild(floatEl);
+
+      setTimeout(() => floatEl.remove(), 1200);
+    }
+
+    // 交互功能
+    function handleBellClick() {
+      playBell();
+      state.pelicanShock = true;
+      
+      // 鹈鹕受惊反应
+      pelican.style.animation = "none";
+      pelican.offsetHeight; // 强制重绘
+      pelican.style.animation = "pelicanShock 0.5s ease-in-out";
+      
+      // 恢复动画
+      setTimeout(() => {
+        if (state.sprinting) {
+          pelican.style.animation = "pelicanSprint 0.5s infinite alternate ease-in-out";
+        } else {
+          pelican.style.animation = "pelicanRun 0.8s infinite alternate ease-in-out";
+        }
+        state.pelicanShock = false;
+      }, 500);
+
+      // 增加能量消耗
+      if (state.energy > 5) {
+        state.energy = Math.max(0, state.energy - 5);
+        updateEnergyUI();
+      }
+
+      // 创建"叮铃铃"粒子
+      showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 3 - 50, "叮铃铃！");
+    }
+
+    function handleSpeedChange(e) {
+      state.speed = parseFloat(e.target.value);
+      speedValue.textContent = state.speed.toFixed(1) + "x";
+
+      // 调整动画持续时间
+      const baseDuration = state.sprinting ? 0.5 : 0.8;
+      const animationDuration = (baseDuration / state.speed).toFixed(2);
+      pelican.style.animationDuration = animationDuration + "s";
+      
+      // 更新车轮动画
+      const wheelAnimation = `wheelSpin ${animationDuration}s infinite linear`;
+      document.querySelector(".bike g").style.animation = wheelAnimation;
+      document.querySelector(".pedal").style.animation = `pedalSpin ${animationDuration/2}s infinite linear`;
+    }
+
+    function toggleRoad() {
+      state.roadType = state.roadType === "smooth" ? "bumpy" : "smooth";
+      roadBtn.textContent = `路况: ${state.roadType === "smooth" ? "平路 🛣️" : "颠簸石子路 🪨"}`;
+      
+      if (state.roadType === "bumpy") {
+        // 颠簸动画增强
+        document.querySelector(".bike").style.animation = "bikeBounce 0.4s infinite alternate ease-in-out";
+        // 显示颠簸提示
+        showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 2 - 100, "颠簸路！小心！");
+      } else {
+        document.querySelector(".bike").style.animation = "bikeBounce 0.8s infinite alternate ease-in-out";
+      }
+    }
+
+    function toggleTheme() {
+      const themes = ["day", "sunset", "night"];
+      const themeNames = ["白天 ☀️", "黄昏 🌇", "夜晚 🌙"];
+      const currentIdx = themes.indexOf(state.theme);
+      const nextIdx = (currentIdx + 1) % themes.length;
+      
+      state.theme = themes[nextIdx];
+      document.body.className = state.theme;
+      document.getElementById("clouds").className = state.theme;
+      document.getElementById("sea").className = state.theme;
+      document.getElementById("beach").className = state.theme;
+      
+      themeBtn.textContent = `当前: ${themeNames[nextIdx]}`;
+    }
+
+    function updateEnergyUI() {
+      energyValue.textContent = Math.round(state.energy) + "%";
+      if (state.energy <= 30) {
+        energyIndicator.className = "status-indicator lowEnergy";
+      } else if (state.energy < 80) {
+        energyIndicator.className = "status-indicator";
+      } else {
+        energyIndicator.className = "status-indicator";
+      }
+    }
+
+    function feedPelican() {
+      if (state.energy >= 100) {
+        showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 3 - 120, "鹈鹕不饿！");
+        return;
+      }
+
+      // 投喂鱼动画
+      const fish = document.createElement("div");
+      fish.className = "fish";
+      fishesContainer.appendChild(fish);
+      
+      setTimeout(() => fish.remove(), 2000);
+      
+      // 增加能量
+      state.energy = Math.min(100, state.energy + 20);
+      updateEnergyUI();
+      
+      showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 2, "美味小鱼！🐟");
+    }
+
+    function toggleSprint() {
+      state.sprinting = !state.sprinting;
+      if (state.sprinting) {
+        pelican.style.animation = "pelicanSprint 0.5s infinite alternate ease-in-out";
+        showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 3 - 80, "冲刺！💨");
+        energyIndicator.className = "status-indicator sprinting";
+      } else {
+        if (state.roadType === "bumpy") {
+          pelican.style.animation = "pelicanRun 0.5s infinite alternate ease-in-out";
+        } else {
+          pelican.style.animation = "pelicanRun 0.8s infinite alternate ease-in-out";
+        }
+        energyIndicator.className = "status-indicator";
+      }
+    }
+
+    // 脚踏联动
+    setInterval(() => {
+      if (state.animating) {
+        // 后轮持续旋转
+        document.querySelector(".bike g").style.animation = `wheelSpin ${0.8 / state.speed}s infinite linear`;
+        // 脚踏旋转
+        document.querySelector(".pedal").style.animation = `pedalSpin ${0.4 / state.speed}s infinite linear`;
+      }
+    }, 200);
+
+    // 速度控制变化监听
+    speedInput.addEventListener("input", handleSpeedChange);
+
+    // 事件绑定
+    bellBtn.addEventListener("click", handleBellClick);
+    roadBtn.addEventListener("click", toggleRoad);
+    themeBtn.addEventListener("click", toggleTheme);
+    feedBtn.addEventListener("click", feedPelican);
+
+    // 能量自动消耗
+    setInterval(() => {
+      if (state.sprinting && state.energy > 0) {
+        state.energy -= 1;
+        updateEnergyUI();
+      }
+      
+      if (state.energy <= 0 && state.sprinting) {
+        state.sprinting = false;
+        if (state.roadType === "bumpy") {
+          pelican.style.animation = "pelicanRun 0.5s infinite alternate ease-in-out";
+        } else {
+          pelican.style.animation = "pelicanRun 0.8s infinite alternate ease-in-out";
+        }
+        energyIndicator.className = "status-indicator lowEnergy";
+        showFloatText(stage.offsetWidth / 2, stage.offsetHeight / 3 - 80, "鹈鹕累了！");
+      }
+    }, 500);
+
+    // 肌肉疲劳反馈
+    setInterval(() => {
+      if (state.energy < 50 && Math.random() < 0.3) {
+        const sweat = document.createElement("div");
+        sweat.className = "sweat";
+        const randomX = 20 + Math.random() * 60;
+        sweat.style.left = randomX + "%";
+        document.getElementById("pelican").appendChild(sweat);
+        
+        setTimeout(() => sweat.remove(), 1500);
+      }
+    }, 2000);
+
+    // 动画持续检查
+    setInterval(() => {
+      // 更新喉咙囊大小（模拟呼吸）
+      if (state.energy > 0) {
+        const scale = state.sprinting ? 1.2 : 1.0;
+        pelicanBag.style.transform = `scale(${scale})`;
+      }
+    }, 500);
+
+    // 点击提示消失
+    setTimeout(() => {
+      hint.classList.add("hidden");
+    }, 3000);
+
+    // 响应窗口大小调整
+    window.addEventListener("resize", () => {
+      const w = stage.offsetWidth;
+      const h = stage.offsetHeight;
+      // 重新居中
+      if (w < 800) {
+        document.querySelector(".bike").style.transform = "scale(0.8)";
+      } else {
+        document.querySelector(".bike").style.transform = "scale(1)";
+      }
+    });
+
+    // 初始化动画
+    if (state.roadType === "bumpy") {
+      document.querySelector(".bike").style.animation = "bikeBounce 0.4s infinite alternate ease-in-out";
+    }
+    document.querySelector(".bike g").style.animation = `wheelSpin ${0.8 / state.speed}s infinite linear`;
+    document.querySelector(".pedal").style.animation = `pedalSpin ${0.4 / state.speed}s infinite linear`;
+    
+    if (state.sprinting) {
+      pelican.style.animation = "pelicanSprint 0.5s infinite alternate ease-in-out";
+    } else {
+      pelican.style.animation = "pelicanRun 0.8s infinite alternate ease-in-out";
+    }
+    
+    updateEnergyUI();
+
+    // 延迟加载，确保所有资源准备就绪
+    window.addEventListener("load", () => {
+      console.log("🚀 一键启动：自行车正在努力驾驭鹈鹕！");
+    });
+  </script>
+</body>
+</html>

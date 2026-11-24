@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自行车骑鹈鹕 - Cross-Generational Frontend Showdown</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  overflow: hidden;
+  background: #1a1a2e;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+}
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+#controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(12px);
+  padding: 12px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ctrl-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+button {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(238,90,36,0.4);
+}
+button:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(238,90,36,0.6); }
+button:active { transform: scale(0.95); }
+button.bell-btn { background: linear-gradient(135deg, #ffd32a, #f39c12); box-shadow: 0 2px 8px rgba(243,156,18,0.4); }
+button.fish-btn { background: linear-gradient(135deg, #74b9ff, #0984e3); box-shadow: 0 2px 8px rgba(9,132,227,0.4); }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 120px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #55c1ff, #2d3436);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+#title-bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+  opacity: 0.85;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+#stamina-bar-container {
+  position: fixed;
+  top: 50px;
+  right: 20px;
+  width: 160px;
+  z-index: 10;
+}
+.stamina-label {
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+  margin-bottom: 4px;
+  text-align: right;
+}
+.stamina-bar-bg {
+  width: 100%;
+  height: 10px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.stamina-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b6b, #ffd32a, #2ecc71);
+  border-radius: 5px;
+  transition: width 0.3s;
+}
+.weather-btn {
+  background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+  box-shadow: 0 2px 8px rgba(108,92,231,0.4);
+  padding: 8px 12px;
+  font-size: 12px;
+}
+</style>
+</head>
+<body>
+
+<div id="title-bar">🚲 一辆自行车正在骑着一只鹈鹕 🐦</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="stamina-bar-container">
+  <div class="stamina-label">鹈鹕体力</div>
+  <div class="stamina-bar-bg">
+    <div class="stamina-bar-fill" id="stamina-fill" style="width:100%"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">车铃 🔔</span>
+    <button class="bell-btn" id="bellBtn">按铃！</button>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">速度控制</span>
+    <input type="range" id="speedSlider" min="0" max="100" value="40">
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">投喂小鱼 🐟</span>
+    <button class="fish-btn" id="fishBtn">喂食恢复</button>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">天气切换</span>
+    <button class="weather-btn" id="weatherBtn">晴天 ☀️</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── State ───
+let time = 0;
+let scrollOffset = 0;
+let baseSpeed = 40;
+let currentSpeed = 1;
+let stamina = 100;
+let windupTimer = 0;
+let startledTimer = 0;
+let bellVibrate = 0;
+let feedAnim = [];
+let featherParticles = [];
+let sweatDrops = [];
+let waveRipples = [];
+let cloudOffset = [0, 0, 0];
+let weatherState = 0; // 0=sunny, 1=dusk, 2=night
+let weatherNames = ['晴天 ☀️', '黄昏 🌅', '夜晚 🌙'];
+let terrainType = 0; // 0=flat, 1=bumpy
+
+// ─── Colors per weather ───
+const weathers = [
+  { sky: ['#87CEEB','#4A9FE5'], ground: '#c4a35a', groundDark: '#a08040', water: '#3498db', waterLight: '#5dade2', accent: '#FFD700' },
+  { sky: ['#FF6B35','#E8A87C','#4158D0'], ground: '#8B7355', groundDark: '#6B5340', water: '#8B4513', waterLight: '#A0522D', accent: '#FF4500' },
+  { sky: ['#0c0c1d','#1a1a3e','#2d1b4e'], ground: '#2a2a3a', groundDark: '#1a1a2a', water: '#1a1a4e', waterLight: '#2a2a5e', accent: '#9B59B6' }
+];
+
+// ─── Audio ───
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playBell() {
+  initAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+
+  // second harmonic
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(1600, audioCtx.currentTime);
+  osc2.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.2);
+  gain2.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  osc2.connect(gain2);
+  gain2.connect(audioCtx.destination);
+  osc2.start();
+  osc2.stop(audioCtx.currentTime + 0.4);
+}
+
+function playFishSound() {
+  initAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.15);
+  osc.frequency.exponentialRampToValueAtTime(500, audioCtx.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.4);
+}
+
+// ─── Controls ───
+document.getElementById('bellBtn').addEventListener('click', () => {
+  playBell();
+  bellVibrate = 30;
+  startledTimer = 120;
+  stamina -= 5;
+});
+
+document.getElementById('speedSlider').addEventListener('input', e => {
+  baseSpeed = parseInt(e.target.value);
+  if (baseSpeed > 70) stamina -= 0.2;
+});
+
+document.getElementById('fishBtn').addEventListener('click', () => {
+  initAudio();
+  playFishSound();
+  stamina = Math.min(100, stamina + 25);
+  // spawning fish particles
+  for (let i = 0; i < 5; i++) {
+    feedAnim.push({ x: canvas.width * 0.5, y: canvas.height * 0.45, vx: (Math.random()-0.5)*3, vy: -2-Math.random()*2, life: 60, size: 8+Math.random()*6 });
+  }
+});
+
+document.getElementById('weatherBtn').addEventListener('click', () => {
+  weatherState = (weatherState + 1) % 3;
+  document.getElementById('weatherBtn').textContent = weatherNames[weatherState];
+});
+
+// ─── Drawing Helpers ───
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function drawWheel(cx, cy, r, rotation, color1, color2) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rotation);
+
+  // Tire
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#2c2c2c';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.stroke();
+
+  // Rim
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Spokes
+  ctx.strokeStyle = '#bbb';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI * 2 / 12) * i;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r * 0.82, Math.sin(a) * r * 0.82);
+    ctx.stroke();
+  }
+
+  // Hub
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2);
+  ctx.fillStyle = '#ccc';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawPelicanBody(x, y, scale, wingPhase, legPhase, mouthOpen) {
+  const s = scale;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+
+  // --- Tail feathers ---
+  ctx.save();
+  ctx.fillStyle = '#8B7355';
+  for (let i = 0; i < 5; i++) {
+    ctx.save();
+    ctx.translate(-60, -10 + i * 6);
+    ctx.rotate(-0.3 + i * 0.12 + Math.sin(time * 3 + i) * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(-15, 0, 20, 5, -0.2, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? '#7a6548' : '#8B7355';
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // --- Body (main) ---
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 70, 35, 0, 0, Math.PI * 2);
+  const bodyGrad = ctx.createRadialGradient(-10, -10, 5, 0, 0, 70);
+  bodyGrad.addColorStop(0, '#F5E6CA');
+  bodyGrad.addColorStop(0.5, '#E8D5B0');
+  bodyGrad.addColorStop(1, '#C4A882');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#A08060';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // --- Back (where bike sits) ---
+  ctx.beginPath();
+  ctx.ellipse(0, -25, 50, 18, 0, Math.PI, Math.PI * 2);
+  ctx.fillStyle = '#D4C4A8';
+  ctx.fill();
+
+  // --- Neck & Head ---
+  ctx.save();
+  ctx.translate(55, -20);
+  const neckBob = Math.sin(time * 2.5) * 3;
+  ctx.translate(0, neckBob);
+
+  // Neck curve
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(5, -25, 10, -50, 15, -60);
+  ctx.quadraticCurveTo(20, -65, 18, -70);
+  ctx.lineTo(5, -70);
+  ctx.quadraticCurveTo(8, -50, 2, -15);
+  ctx.closePath();
+  const neckGrad = ctx.createLinearGradient(0, 0, 20, -70);
+  neckGrad.addColorStop(0, '#E8D5B0');
+  neckGrad.addColorStop(1, '#F0E0C0');
+  ctx.fillStyle = neckGrad;
+  ctx.fill();
+
+  // Head
+  ctx.beginPath();
+  ctx.ellipse(12, -72, 18, 15, -0.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#F0E0C0';
+  ctx.fill();
+  ctx.strokeStyle = '#A08060';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Eye
+  ctx.beginPath();
+  ctx.arc(20, -78, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(21, -78, 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#222';
+  ctx.fill();
+  // Eye shine
+  ctx.beginPath();
+  ctx.arc(22, -79, 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Beak (upper)
+  ctx.beginPath();
+  ctx.moveTo(28, -75);
+  ctx.lineTo(90, -70);
+  ctx.lineTo(88, -68);
+  ctx.lineTo(28, -70);
+  ctx.closePath();
+  ctx.fillStyle = '#F4A460';
+  ctx.fill();
+  ctx.strokeStyle = '#D4844A';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Beak hook
+  ctx.beginPath();
+  ctx.moveTo(85, -69);
+  ctx.quadraticCurveTo(92, -67, 88, -64);
+  ctx.strokeStyle = '#D4844A';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Lower beak & throat pouch
+  ctx.beginPath();
+  const poucheDepth = mouthOpen ? 25 : 15 + Math.sin(time * 4) * 2;
+  ctx.moveTo(28, -69);
+  ctx.quadraticCurveTo(55, -69 + poucheDepth, 88, -68 + poucheDepth * 0.5);
+  ctx.lineTo(88, -68);
+  ctx.quadraticCurveTo(55, -69 + poucheDepth * 0.3, 28, -70);
+  ctx.closePath();
+  const pouchGrad = ctx.createLinearGradient(0, -69, 0, -69 + poucheDepth);
+  pouchGrad.addColorStop(0, '#F4A460');
+  pouchGrad.addColorStop(0.5, '#E88B5A');
+  pouchGrad.addColorStop(1, '#D47848');
+  ctx.fillStyle = pouchGrad;
+  ctx.fill();
+
+  // Pouch wrinkles
+  ctx.strokeStyle = 'rgba(180,120,60,0.4)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(40 + i * 15, -70 + i * 3);
+    ctx.quadraticCurveTo(50 + i * 10, -65 + poucheDepth * 0.5 + i * 3, 70 + i * 5, -68 + poucheDepth * 0.4 + i * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // --- Wings ---
+  // Left wing
+  ctx.save();
+  ctx.translate(0, -30);
+  ctx.rotate(wingPhase * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-20, -45, -5, -70);
+  ctx.quadraticCurveTo(10, -40, 5, 0);
+  ctx.closePath();
+  const wingGradL = ctx.createLinearGradient(0, -70, 0, 0);
+  wingGradL.addColorStop(0, '#C4A882');
+  wingGradL.addColorStop(0.5, '#D4B892');
+  wingGradL.addColorStop(1, '#BFA07A');
+  ctx.fillStyle = wingGradL;
+  ctx.fill();
+  ctx.strokeStyle = '#A08060';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Wing feathers lines
+  ctx.strokeStyle = 'rgba(160,128,96,0.3)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-3, -8);
+    ctx.lineTo(-i * 5 - 3, -55 + i * 10);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Right wing (slightly behind)
+  ctx.save();
+  ctx.translate(5, -28);
+  ctx.rotate((wingPhase + 0.3) * 0.4);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-15, -40, -3, -60);
+  ctx.quadraticCurveTo(8, -35, 3, 0);
+  ctx.closePath();
+  ctx.fillStyle = '#BFA07A';
+  ctx.fill();
+  ctx.strokeStyle = '#A08060';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Legs ---
+  // Left leg
+  ctx.save();
+  ctx.translate(-30, 30);
+  ctx.rotate(Math.sin(legPhase) * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(5, 25);
+  ctx.lineTo(15, 35);
+  ctx.strokeStyle = '#D4A040';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  // Webbed foot
+  ctx.beginPath();
+  ctx.moveTo(15, 35);
+  ctx.lineTo(25, 40);
+  ctx.lineTo(12, 38);
+  ctx.lineTo(18, 42);
+  ctx.lineTo(8, 37);
+  ctx.lineTo(15, 35);
+  ctx.fillStyle = '#D4A040';
+  ctx.fill();
+  ctx.restore();
+
+  // Right leg
+  ctx.save();
+  ctx.translate(-20, 30);
+  ctx.rotate(Math.sin(legPhase + Math.PI) * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-5, 25);
+  ctx.lineTo(-15, 35);
+  ctx.strokeStyle = '#D4A040';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-15, 35);
+  ctx.lineTo(-25, 40);
+  ctx.lineTo(-12, 38);
+  ctx.lineTo(-18, 42);
+  ctx.lineTo(-8, 37);
+  ctx.lineTo(-15, 35);
+  ctx.fillStyle = '#D4A040';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawBicycleOnPelican(x, y, wheelRot, pedalAngle, shakeX, shakeY) {
+  ctx.save();
+  ctx.translate(x + shakeX, y + shakeY);
+  ctx.rotate(Math.sin(time * 4) * 0.02); // slight tilt
+
+  const s = 0.85;
+  ctx.scale(s, s);
+
+  // Rear wheel
+  drawWheel(0, 0, 28, wheelRot, '#333', '#666');
+
+  // Front wheel
+  drawWheel(80, 0, 28, wheelRot, '#333', '#666');
+
+  // Frame - main triangle
+  ctx.strokeStyle = '#CC0000';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Seat tube
+  ctx.beginPath();
+  ctx.moveTo(-5, 0);
+  ctx.lineTo(5, -50);
+  ctx.stroke();
+
+  // Top tube
+  ctx.beginPath();
+  ctx.moveTo(5, -50);
+  ctx.lineTo(65, -45);
+  ctx.stroke();
+
+  // Down tube
+  ctx.beginPath();
+  ctx.moveTo(-5, 0);
+  ctx.lineTo(65, -45);
+  ctx.stroke();
+
+  // Chain stay
+  ctx.strokeStyle = '#AA0000';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-5, 0);
+  ctx.lineTo(55, -5);
+  ctx.stroke();
+
+  // Seat stay
+  ctx.beginPath();
+  ctx.moveTo(5, -50);
+  ctx.lineTo(55, -5);
+  ctx.stroke();
+
+  // Fork
+  ctx.strokeStyle = '#BB0000';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(65, -45);
+  ctx.lineTo(80, 0);
+  ctx.stroke();
+
+  // Handlebar stem
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(65, -45);
+  ctx.lineTo(68, -58);
+  ctx.stroke();
+
+  // Handlebars
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(58, -58);
+  ctx.quadraticCurveTo(68, -62, 78, -58);
+  ctx.stroke();
+  // Grips
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.ellipse(58, -57, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(78, -57, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Seat
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.ellipse(2, -52, 12, 5, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Pedal crank
+  ctx.save();
+  ctx.translate(-5, 5);
+  ctx.rotate(pedalAngle);
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(10, 0);
+  ctx.stroke();
+  // Pedals
+  ctx.fillStyle = '#444';
+  ctx.fillRect(-14, -3, 8, 6);
+  ctx.fillRect(6, -3, 8, 6);
+  // Chainring
+  ctx.beginPath();
+  ctx.arc(0, 0, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#666';
+  ctx.fill();
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  // Chain
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath();
+  ctx.moveTo(-5, 5);
+  ctx.quadraticCurveTo(25, -25, 55, -5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ═══ Creative: Bike appears to "control" the pelican ═══
+
+  // Reins/Ropes from handlebars down to pelican head area
+  ctx.strokeStyle = '#8B4513';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(78, -57);
+  ctx.quadraticCurveTo(95, -30, 105, -20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(58, -57);
+  ctx.quadraticCurveTo(75, -30, 80, -18);
+  ctx.stroke();
+
+  // Little decorative bits at reins end
+  ctx.fillStyle = '#D4A040';
+  ctx.beginPath();
+  ctx.arc(105, -20, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(80, -18, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Exhaust pipe / decorative exhaust from under bike
+  if (currentSpeed > 1.5) {
+    ctx.fillStyle = `rgba(200,200,200,${Math.min(0.3, currentSpeed * 0.1)})`;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(-20 - i * 12, 15 + Math.sin(time * 8 + i) * 3, 4 + i * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ─── Background Layers ───
+function drawBackground() {
+  const w = canvas.width;
+  const h = canvas.height;
+  const wf = weathers[weatherState];
+
+  // Sky gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, h * 0.65);
+  grad.addColorStop(0, wf.sky[0]);
+  grad.addColorStop(0.5, wf.sky[1] || wf.sky[0]);
+  grad.addColorStop(1, wf.sky[2] || wf.sky[1]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Sun/Moon
+  if (weatherState === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    const sunG = ctx.createRadialGradient(w * 0.8, h * 0.12, 10, w * 0.8, h * 0.12, 60);
+    sunG.addColorStop(0, '#FFFACD');
+    sunG.addColorStop(0.5, '#FFD700');
+    sunG.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = sunG;
+    ctx.fillRect(w * 0.6, h * 0, w * 0.4, h * 0.3);
+    ctx.restore();
+  } else if (weatherState === 2) {
+    // Moon
+    ctx.save();
+    const moonG = ctx.createRadialGradient(w * 0.15, h * 0.1, 5, w * 0.15, h * 0.1, 30);
+    moonG.addColorStop(0, '#F0F0F0');
+    moonG.addColorStop(0.7, '#E0E0E0');
+    moonG.addColorStop(1, 'rgba(240,240,240,0)');
+    ctx.fillStyle = moonG;
+    ctx.fillRect(w * 0.05, 0, w * 0.2, h * 0.25);
+    // Stars
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let i = 0; i < 50; i++) {
+      const sx = (i * 137.5 + scrollOffset * 0.02) % w;
+      const sy = (i * 97.3) % (h * 0.4);
+      const twinkle = Math.sin(time * 2 + i) * 0.5 + 0.5;
+      ctx.globalAlpha = twinkle * 0.8;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1 + (i % 3) * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Clouds
+  ctx.save();
+  ctx.globalAlpha = weatherState === 2 ? 0.15 : 0.6;
+  const cloudColors = weatherState === 2 ? 'rgba(100,100,150,' : weatherState === 1 ? 'rgba(200,150,100,' : 'rgba(255,255,255,';
+  for (let i = 0; i < 6; i++) {
+    const cx = ((i * 250 + cloudOffset[i]) % (w + 200)) - 100;
+    const cy = 40 + i * 30 + Math.sin(i * 2.5) * 20;
+    ctx.fillStyle = cloudColors + (0.3 + i * 0.05) + ')';
+    drawCloud(cx, cy, 40 + i * 10);
+  }
+  ctx.restore();
+
+  // Distant mountains/hills
+  ctx.save();
+  ctx.globalAlpha = weatherState === 2 ? 0.3 : 0.5;
+  ctx.fillStyle = weatherState === 2 ? '#1a1a3e' : weatherState === 1 ? '#6B5340' : '#6a994e';
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.55);
+  for (let x = 0; x <= w; x += 5) {
+    const mx = x + scrollOffset * 0.05;
+    const my = h * 0.55 - Math.sin(mx * 0.005) * 40 - Math.sin(mx * 0.013) * 25 - Math.cos(mx * 0.003) * 30;
+    ctx.lineTo(x, my);
+  }
+  ctx.lineTo(w, h * 0.65);
+  ctx.lineTo(0, h * 0.65);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Ocean/water
+  const waterY = h * 0.58;
+  const waterGrad = ctx.createLinearGradient(0, waterY, 0, h * 0.7);
+  waterGrad.addColorStop(0, wf.waterLight);
+  waterGrad.addColorStop(1, wf.water);
+  ctx.fillStyle = waterGrad;
+  ctx.fillRect(0, waterY, w, h * 0.15);
+
+  // Water waves
+  ctx.strokeStyle = weatherState === 2 ? 'rgba(100,100,200,0.3)' : 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1.5;
+  for (let row = 0; row < 4; row++) {
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 3) {
+      const wy = waterY + 10 + row * 25 + Math.sin((x + scrollOffset * (0.8 + row * 0.3)) * 0.03 + time * 1.5) * 4;
+      if (x === 0) ctx.moveTo(x, wy);
+      else ctx.lineTo(x, wy);
+    }
+    ctx.stroke();
+  }
+
+  // Ground / boardwalk
+  const groundY = h * 0.7;
+  const gGrad = ctx.createLinearGradient(0, groundY, 0, h);
+  gGrad.addColorStop(0, wf.ground);
+  gGrad.addColorStop(1, wf.groundDark);
+  ctx.fillStyle = gGrad;
+  ctx.fillRect(0, groundY, w, h - groundY);
+
+  // Boardwalk planks
+  ctx.strokeStyle = weatherState === 2 ? 'rgba(60,60,80,0.4)' : 'rgba(100,80,40,0.25)';
+  ctx.lineWidth = 1;
+  const plankSpacing = 40;
+  const plankOff = -(scrollOffset * 2) % plankSpacing;
+  for (let x = plankOff; x < w; x += plankSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(x, groundY);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  // Plank cross lines
+  for (let y = groundY; y < h; y += plankSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
+  // Road line dashes
+  ctx.strokeStyle = weatherState === 2 ? 'rgba(200,200,100,0.3)' : 'rgba(255,200,50,0.4)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([20, 15]);
+  const dashOff = -(scrollOffset * 2) % 35;
+  ctx.beginPath();
+  ctx.moveTo(dashOff, h * 0.72);
+  ctx.lineTo(w + dashOff, h * 0.72);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Birds in sky (small V shapes)
+  ctx.strokeStyle = weatherState === 2 ? 'rgba(150,150,200,0.4)' : 'rgba(50,50,50,0.3)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const bx = ((i * 300 + scrollOffset * 0.3 + 100) % (w + 100)) - 50;
+    const by = 80 + i * 45;
+    const wingF = Math.sin(time * 4 + i * 2) * 5;
+    ctx.beginPath();
+    ctx.moveTo(bx - 8, by + wingF);
+    ctx.lineTo(bx, by - 3);
+    ctx.lineTo(bx + 8, by + wingF);
+    ctx.stroke();
+  }
+}
+
+function drawCloud(x, y, size) {
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+  ctx.arc(x + size * 0.4, y - size * 0.15, size * 0.4, 0, Math.PI * 2);
+  ctx.arc(x + size * 0.8, y, size * 0.45, 0, Math.PI * 2);
+  ctx.arc(x + size * 0.3, y + size * 0.1, size * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── Particles ───
+function updateAndDrawParticles() {
+  // Feathers from pelican
+  if (currentSpeed > 1 && Math.random() < 0.05 * currentSpeed) {
+    featherParticles.push({
+      x: canvas.width * 0.5 + (Math.random() - 0.5) * 60,
+      y: canvas.height * 0.45 + Math.random() * 20,
+      vx: -1 - Math.random() * 2,
+      vy: -1 + Math.random() * 2,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.1,
+      life: 120,
+      size: 3 + Math.random() * 4
+    });
+  }
+
+  // Sweat drops when fast
+  if (currentSpeed > 2 && Math.random() < 0.03 * currentSpeed) {
+    sweatDrops.push({
+      x: canvas.width * 0.55 + Math.random() * 30,
+      y: canvas.height * 0.38,
+      vy: 1 + Math.random(),
+      life: 40
+    });
+  }
+
+  // Update & draw feathers
+  featherParticles = featherParticles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.rotV;
+    p.life--;
+    if (p.life <= 0) return false;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = p.life / 120;
+    ctx.fillStyle = ['#F0E0C0', '#D4B892', '#C4A882'][Math.floor(Math.random() * 3)];
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return true;
+  });
+
+  // Update & draw sweat
+  sweatDrops = sweatDrops.filter(d => {
+    d.y += d.vy;
+    d.life--;
+    if (d.life <= 0) return false;
+    ctx.save();
+    ctx.globalAlpha = d.life / 40;
+    ctx.fillStyle = '#87CEEB';
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return true;
+  });
+
+  // Feed animation fish
+  feedAnim = feedAnim.filter(f => {
+    f.x += f.vx;
+    f.y += f.vy;
+    f.vy += 0.05;
+    f.life--;
+    if (f.life <= 0) return false;
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.globalAlpha = Math.min(1, f.life / 20);
+    ctx.rotate(Math.atan2(f.vy, f.vx));
+    // Draw small fish
+    ctx.fillStyle = '#87CEEB';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, f.size, f.size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-f.size * 0.8, 0);
+    ctx.lineTo(-f.size * 1.5, -f.size * 0.5);
+    ctx.lineTo(-f.size * 1.5, f.size * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return true;
+  });
+}
+
+// ─── Main Scene ───
+function drawMainScene() {
+  const w = canvas.width;
+  const h = canvas.height;
+  const centerX = w * 0.5;
+  const pelicanY = h * 0.48;
+
+  // Bounce effect
+  const bounce = Math.sin(time * 6 * currentSpeed) * 4 * currentSpeed;
+  const bumpShake = terrainType === 1 ? Math.sin(time * 20) * 2 : 0;
+  const totalShake = bellVibrate > 0 ? Math.sin(bellVibrate * 30) * 4 : 0;
+
+  // ── Shadow under pelican ──
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(centerX + scrollOffset * 0.1 % w, h * 0.62, 100, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // ── Draw Pelican ──
+  const wingPhase = Math.sin(time * 5 * currentSpeed);
+  const legPhase = time * 6 * currentSpeed;
+  const mouthPulse = currentSpeed > 1.5 ? 1 : 0.5;
+  drawPelicanBody(centerX, pelicanY + bounce, 1.1, wingPhase, legPhase, mouthPulse);
+
+  // Struggle expression when tired
+  if (stamina < 30) {
+    ctx.save();
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#FF4444';
+    ctx.fillText('💨...', centerX + 80, pelicanY - 80 + bounce);
+    ctx.fillText('😫', centerX + 60, pelicanY - 100 + bounce);
+    ctx.restore();
+  }
+
+  // ── Draw Bicycle ON TOP of pelican ──
+  const bikeY = pelicanY - 35 + bounce;
+  const wheelRot = scrollOffset * 0.05;
+  const pedalAngle = scrollOffset * 0.08;
+  drawBicycleOnPelican(centerX, bikeY, wheelRot, pedalAngle, totalShake, bumpShake);
+
+  // ── Speed lines ──
+  if (currentSpeed > 2) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.3, (currentSpeed - 2) * 0.1);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 6; i++) {
+      const ly = h * 0.3 + i * h * 0.08;
+      const lx = ((scrollOffset * 3 + i * 150) % (w + 200)) - 100;
+      ctx.beginPath();
+      ctx.moveTo(lx - 40, ly);
+      ctx.lineTo(lx, ly);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Startled flash effect ──
+  if (startledTimer > 90) {
+    ctx.save();
+    ctx.globalAlpha = (startledTimer - 90) / 30 * 0.15;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  // ── Speech/thought bubble for pelican ──
+  if (windupTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, windupTimer / 30);
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = '#fff';
+    const bubbleTexts = ['哎哟慢点！', '我的腿...不行了', '车铃别按了！', '太沉了吧！', '我要喘死了...'];
+    ctx.fillText(bubbleTexts[Math.floor(windupTimer / 60) % bubbleTexts.length], centerX + 50, pelicanY - 120 + bounce);
+    ctx.restore();
+  }
+
+  // ── Stamina warning ──
+  if (stamina < 20) {
+    ctx.save();
+    ctx.globalAlpha = 0.5 + Math.sin(time * 4) * 0.3;
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = '#FF4444';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠️ 鹈鹕快要累垮了！快投喂小鱼！', w * 0.5, h * 0.15);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
+}
+
+// ─── Animation Loop ───
+let lastTime = performance.now();
+
+function animate(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  time += dt;
+
+  // Speed calculation
+  let targetSpeed = baseSpeed / 40;
+  if (startulledTimer > 0) {
+    targetSpeed = baseSpeed / 40 * 2.5;
+    startledTimer--;
+  } else {
+    startledTimer = Math.max(0, startledTimer - 1);
+  }
+  currentSpeed = lerp(currentSpeed, targetSpeed, 0.05);
+
+  // Stamina drain
+  if (currentSpeed > 1) {
+    stamina -= dt * (0.5 + currentSpeed * 0.3);
+  }
+  stamina = Math.max(0, Math.min(100, stamina));
+
+  // Scroll
+  scrollOffset += currentSpeed * 3;
+
+  // Bell vibration decay
+  if (bellVibrate > 0) bellVibrate--;
+
+  // Wind-up timer
+  if (windupTimer > 0) windupTimer--;
+
+  // Cloud offsets
+  for (let i = 0; i < cloudOffset.length; i++) {
+    cloudOffset[i] += currentSpeed * (0.2 + i * 0.1);
+  }
+
+  // Update stamina bar
+  document.getElementById('stamina-fill').style.width = stamina + '%';
+
+  // Clear & draw
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+  updateAndDrawParticles();
+  drawMainScene();
+
+  // Flash effect overlay for weather transitions
+  if (weatherState === 1) {
+    ctx.save();
+    ctx.globalAlpha = 0.05 + Math.sin(time) * 0.03;
+    ctx.fillStyle = '#FF6B35';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

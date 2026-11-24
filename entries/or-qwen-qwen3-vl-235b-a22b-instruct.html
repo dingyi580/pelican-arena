@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #f0f8ff;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            height: 80vh;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        #scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        #background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        #foreground {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+        }
+        
+        #pelican {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+            transition: transform 0.1s ease;
+        }
+        
+        #bicycle {
+            position: absolute;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            transition: transform 0.1s ease;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px 25px;
+            border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .control-btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        
+        #bell-btn {
+            background: #FFD700;
+            color: #333;
+        }
+        
+        #speed-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        #feed-btn {
+            background: #FF6347;
+            color: white;
+        }
+        
+        #weather-btn {
+            background: #2196F3;
+            color: white;
+        }
+        
+        #status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            z-index: 6;
+        }
+        
+        .cloud {
+            position: absolute;
+            z-index: 1;
+            opacity: 0.8;
+        }
+        
+        .wave {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(to bottom, #4FC3F7, #29B6F6);
+            z-index: 1;
+        }
+        
+        .wave::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: wave 5s linear infinite;
+        }
+        
+        @keyframes wave {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 100% 0;
+            }
+        }
+        
+        .bicycle-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            25% { transform: translateX(-50%) rotate(-2deg); }
+            50% { transform: translateX(-50%) rotate(2deg); }
+            75% { transform: translateX(-50%) rotate(-2deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
+        }
+        
+        .pelican-shake {
+            animation: pelicanShake 0.5s ease-in-out;
+        }
+        
+        @keyframes pelicanShake {
+            0% { transform: translateX(-50%) translateY(0); }
+            25% { transform: translateX(-50%) translateY(-5px); }
+            50% { transform: translateX(-50%) translateY(5px); }
+            75% { transform: translateX(-50%) translateY(-5px); }
+            100% { transform: translateX(-50%) translateY(0); }
+        }
+        
+        .sweat {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 6;
+        }
+        
+        .fish {
+            position: absolute;
+            width: 30px;
+            height: 15px;
+            background: #FFA500;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            z-index: 6;
+            transform: rotate(30deg);
+        }
+        
+        .fish::before {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 5px;
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        
+        .fish::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            right: 3px;
+            width: 5px;
+            height: 5px;
+            background: #000;
+            border-radius: 50%;
+        }
+        
+        .eye {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+            z-index: 7;
+        }
+        
+        .eye::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        
+        .beak {
+            position: absolute;
+            width: 30px;
+            height: 10px;
+            background: #FF6347;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            transform: rotate(15deg);
+            z-index: 6;
+        }
+        
+        .pouch {
+            position: absolute;
+            width: 40px;
+            height: 20px;
+            background: #FFA500;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            z-index: 6;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .wing {
+            position: absolute;
+            width: 50px;
+            height: 30px;
+            background: #87CEFA;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            z-index: 5;
+        }
+        
+        .wing.left {
+            left: -20px;
+            top: 20px;
+        }
+        
+        .wing.right {
+            right: -20px;
+            top: 20px;
+        }
+        
+        .foot {
+            position: absolute;
+            width: 20px;
+            height: 10px;
+            background: #FF6347;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            z-index: 5;
+        }
+        
+        .foot.left {
+            left: 10px;
+            bottom: -5px;
+        }
+        
+        .foot.right {
+            right: 10px;
+            bottom: -5px;
+        }
+        
+        .wheel {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #333;
+            border-radius: 50%;
+            z-index: 5;
+        }
+        
+        .wheel.front {
+            left: -15px;
+            top: 10px;
+        }
+        
+        .wheel.rear {
+            right: -15px;
+            top: 10px;
+        }
+        
+        .frame {
+            position: absolute;
+            width: 60px;
+            height: 40px;
+            border: 3px solid #333;
+            border-radius: 5px;
+            z-index: 5;
+        }
+        
+        .handlebar {
+            position: absolute;
+            width: 20px;
+            height: 5px;
+            background: #333;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+        
+        .seat {
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            background: #333;
+            top: 5px;
+            right: 5px;
+            z-index: 5;
+        }
+        
+        .pedal {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #333;
+            border-radius: 50%;
+            z-index: 5;
+        }
+        
+        .pedal.left {
+            left: 15px;
+            bottom: 5px;
+        }
+        
+        .pedal.right {
+            right: 15px;
+            bottom: 5px;
+        }
+        
+        .chain {
+            position: absolute;
+            width: 30px;
+            height: 3px;
+            background: #333;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+        
+        .bell {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #FFD700;
+            border-radius: 50%;
+            top: -10px;
+            right: 5px;
+            z-index: 6;
+        }
+        
+        .bell::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 4px;
+            height: 4px;
+            background: #333;
+            border-radius: 50%;
+        }
+        
+        .bell-shake {
+            animation: bellShake 0.3s ease-in-out;
+        }
+        
+        @keyframes bellShake {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+            75% { transform: rotate(-15deg); }
+            100% { transform: rotate(0deg); }
+        }
+        
+        .weather-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .rain {
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background: rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+        
+        .snow {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 2;
+        }
+        
+        .star {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 2;
+        }
+        
+        .moon {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #FFFACD;
+            border-radius: 50%;
+            z-index: 2;
+            top: 20px;
+            right: 20px;
+        }
+        
+        .moon::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 20px;
+            height: 20px;
+            background: #000;
+            border-radius: 50%;
+            z-index: 3;
+        }
+        
+        .sunset {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #FF6347, #FFD700, #E0F7FA);
+            z-index: 2;
+            opacity: 0.3;
+        }
+        
+        .day {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            z-index: 2;
+            opacity: 0.3;
+        }
+        
+        .night {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #000, #111);
+            z-index: 2;
+            opacity: 0.5;
+        }
+        
+        .cloud {
+            position: absolute;
+            width: 80px;
+            height: 40px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 1;
+            opacity: 0.8;
+        }
+        
+        .cloud::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            width: 50px;
+            height: 30px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        
+        .cloud::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            right: 10px;
+            width: 40px;
+            height: 25px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        
+        .feather {
+            position: absolute;
+            width: 10px;
+            height: 5px;
+            background: #87CEFA;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            z-index: 6;
+            transform: rotate(45deg);
+        }
+        
+        .feather::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 6px;
+            height: 1px;
+            background: #333;
+        }
+        
+        .sweat-drop {
+            position: absolute;
+            width: 3px;
+            height: 5px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 6;
+        }
+        
+        .sweat-drop::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border-radius: 50%;
+            animation: sweatDrop 1s ease-in-out infinite;
+        }
+        
+        @keyframes sweatDrop {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(20px) scale(0.5); opacity: 0; }
+        }
+        
+        .puff {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            z-index: 6;
+            animation: puff 1s ease-in-out infinite;
+        }
+        
+        @keyframes puff {
+            0% { transform: scale(0.5); opacity: 0.5; }
+            50% { transform: scale(1); opacity: 0.2; }
+            100% { transform: scale(0.5); opacity: 0; }
+        }
+        
+        .puff::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 10px;
+            height: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+        }
+        
+        .puff::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+        }
+        
+        .speed-meter {
+            position: absolute;
+            width: 40px;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            z-index: 5;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .speed-fill {
+            position: absolute;
+            width: 0%;
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        
+        .energy-meter {
+            position: absolute;
+            width: 40px;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            z-index: 5;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .energy-fill {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #FF6347;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        
+        .meter-label {
+            position: absolute;
+            font-size: 10px;
+            color: #333;
+            z-index: 5;
+            bottom: 38px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div id="scene">
+            <div id="background"></div>
+            <div id="pelican">
+                <div class="eye" style="left: 15px; top: 10px;"></div>
+                <div class="eye" style="right: 15px; top: 10px;"></div>
+                <div class="beak" style="left: 50%; transform: translateX(-50%) rotate(15deg);"></div>
+                <div class="pouch"></div>
+                <div class="wing left"></div>
+                <div class="wing right"></div>
+                <div class="foot left"></div>
+                <div class="foot right"></div>
+            </div>
+            <div id="bicycle">
+                <div class="frame"></div>
+                <div class="wheel front"></div>
+                <div class="wheel rear"></div>
+                <div class="handlebar"></div>
+                <div class="seat"></div>
+                <div class="pedal left"></div>
+                <div class="pedal right"></div>
+                <div class="chain"></div>
+                <div class="bell"></div>
+            </div>
+            <div id="foreground"></div>
+            <div class="wave"></div>
+            <div class="speed-meter">
+                <div class="speed-fill"></div>
+            </div>
+            <div class="energy-meter">
+                <div class="energy-fill"></div>
+            </div>
+            <div class="meter-label">速度 / 体力</div>
+        </div>
+        <div id="controls">
+            <button id="bell-btn" class="control-btn">🔔 按车铃</button>
+            <button id="speed-btn" class="control-btn">⚡ 加速</button>
+            <button id="feed-btn" class="control-btn">🐟 投喂小鱼</button>
+            <button id="weather-btn" class="control-btn">🌤️ 切换天气</button>
+        </div>
+        <div id="status">鹈鹕正在努力奔跑中...</div>
+    </div>
+
+    <script>
+        // 初始化音频上下文
+        let audioContext;
+        let isAudioContextInitialized = false;
+        
+        function initAudioContext() {
+            if (isAudioContextInitialized) return;
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            isAudioContextInitialized = true;
+        }
+        
+        // 播放车铃声
+        function playBellSound() {
+            initAudioContext();
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+        
+        // 创建粒子效果
+        function createParticle(x, y, type = 'sweat') {
+            const particle = document.createElement('div');
+            particle.className = type;
+            
+            if (type === 'sweat') {
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.animation = 'sweatDrop 1s ease-in-out infinite';
+            } else if (type === 'feather') {
+                particle.className = 'feather';
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.transform = `rotate(${Math.random() * 360}deg)`;
+                particle.style.animation = `float ${2 + Math.random()}s ease-in-out infinite`;
+            } else if (type === 'fish') {
+                particle.className = 'fish';
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.animation = `swim ${1 + Math.random()}s ease-in-out infinite`;
+            }
+            
+            document.getElementById('foreground').appendChild(particle);
+            
+            // 3秒后移除粒子
+            setTimeout(() => {
+                if (particle.parentNode) {
+                    particle.parentNode.removeChild(particle);
+                }
+            }, 3000);
+        }
+        
+        // 创建云朵
+        function createCloud(x, y) {
+            const cloud = document.createElement('div');
+            cloud.className = 'cloud';
+            cloud.style.left = `${x}px`;
+            cloud.style.top = `${y}px`;
+            
+            document.getElementById('background').appendChild(cloud);
+            
+            // 让云朵缓慢移动
+            let posX = x;
+            const moveCloud = () => {
+                posX += 0.1;
+                if (posX > window.innerWidth) {
+                    posX = -100;
+                }
+                cloud.style.left = `${posX}px`;
+                requestAnimationFrame(moveCloud);
+            };
+            
+            requestAnimationFrame(moveCloud);
+        }
+        
+        // 创建雨滴
+        function createRain() {
+            const rain = document.createElement('div');
+            rain.className = 'rain';
+            rain.style.left = `${Math.random() * window.innerWidth}px`;
+            rain.style.top = `-10px`;
+            rain.style.animation = `rain ${1 + Math.random()}s linear infinite`;
+            
+            document.getElementById('foreground').appendChild(rain);
+            
+            // 3秒后移除雨滴
+            setTimeout(() => {
+                if (rain.parentNode) {
+                    rain.parentNode.removeChild(rain);
+                }
+            }, 3000);
+        }
+        
+        // 创建雪花
+        function createSnow() {
+            const snow = document.createElement('div');
+            snow.className = 'snow';
+            snow.style.left = `${Math.random() * window.innerWidth}px`;
+            snow.style.top = `-10px`;
+            snow.style.animation = `snow ${3 + Math.random() * 2}s linear infinite`;
+            
+            document.getElementById('foreground').appendChild(snow);
+            
+            // 5秒后移除雪花
+            setTimeout(() => {
+                if (snow.parentNode) {
+                    snow.parentNode.removeChild(snow);
+                }
+            }, 5000);
+        }
+        
+        // 创建星星
+        function createStar() {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = `${Math.random() * window.innerWidth}px`;
+            star.style.top = `${Math.random() * window.innerHeight * 0.5}px`;
+            
+            document.getElementById('foreground').appendChild(star);
+        }
+        
+        // 创建烟雾效果
+        function createPuff(x, y) {
+            const puff = document.createElement('div');
+            puff.className = 'puff';
+            puff.style.left = `${x}px`;
+            puff.style.top = `${y}px`;
+            
+            document.getElementById('foreground').appendChild(puff);
+            
+            // 2秒后移除烟雾
+            setTimeout(() => {
+                if (puff.parentNode) {
+                    puff.parentNode.removeChild(puff);
+                }
+            }, 2000);
+        }
+        
+        // 动画状态
+        let animationId;
+        let pelicanX = 0;
+        let pelicanY = 0;
+        let bicycleX = 0;
+        let bicycleY = 0;
+        let pelicanAngle = 0;
+        let bicycleAngle = 0;
+        let pelicanWingAngle = 0;
+        let pelicanWingDirection = 1;
+        let pelicanPouchAngle = 0;
+        let pelicanPouchDirection = 1;
+        let pelicanSpeed = 1;
+        let pelicanEnergy = 100;
+        let isAccelerating = false;
+        let isRaining = false;
+        let isSnowing = false;
+        let isNight = false;
+        let isSunset = false;
+        let weatherType = 'day';
+        
+        // 初始化场景
+        function initScene() {
+            // 创建背景云朵
+            for (let i = 0; i < 5; i++) {
+                createCloud(Math.random() * window.innerWidth, Math.random() * 100 + 20);
+            }
+            
+            // 设置初始天气
+            updateWeather('day');
+            
+            // 开始动画
+            animate();
+        }
+        
+        // 更新天气效果
+        function updateWeather(type) {
+            weatherType = type;
+            const weatherEffect = document.querySelector('.weather-effect');
+            if (weatherEffect) {
+                weatherEffect.parentNode.removeChild(weatherEffect);
+            }
+            
+            const newWeather = document.createElement('div');
+            newWeather.className = 'weather-effect';
+            
+            if (type === 'rain') {
+                isRaining = true;
+                isSnowing = false;
+                isNight = false;
+                isSunset = false;
+                newWeather.innerHTML = '<div class="rain-effect"></div>';
+                newWeather.style.background = 'linear-gradient(to bottom, #87CEEB, #E0F7FA)';
+                newWeather.style.opacity = '0.3';
+            } else if (type === 'snow') {
+                isSnowing = true;
+                isRaining = false;
+                isNight = false;
+                isSunset = false;
+                newWeather.innerHTML = '<div class="snow-effect"></div>';
+                newWeather.style.background = 'linear-gradient(to bottom, #E0F7FA, #B3E5FC)';
+                newWeather.style.opacity = '0.5';
+            } else if (type === 'night') {
+                isNight = true;
+                isRaining = false;
+                isSnowing = false;
+                isSunset = false;
+                newWeather.innerHTML = '<div class="night-effect"></div>';
+                newWeather.style.background = 'linear-gradient(to bottom, #000, #111)';
+                newWeather.style.opacity = '0.5';
+                // 创建月亮
+                const moon = document.createElement('div');
+                moon.className = 'moon';
+                newWeather.appendChild(moon);
+                // 创建星星
+                for (let i = 0; i < 20; i++) {
+                    createStar();
+                }
+            } else if (type === 'sunset') {
+                isSunset = true;
+                isRaining = false;
+                isSnowing = false;
+                isNight = false;
+                newWeather.innerHTML = '<div class="sunset-effect"></div>';
+                newWeather.style.background = 'linear-gradient(to bottom, #FF6347, #FFD700, #E0F7FA)';
+                newWeather.style.opacity = '0.3';
+            } else { // day
+                isRaining = false;
+                isSnowing = false;
+                isNight = false;
+                isSunset = false;
+                newWeather.innerHTML = '<div class="day-effect"></div>';
+                newWeather.style.background = 'linear-gradient(to bottom, #87CEEB, #E0F7FA)';
+                newWeather.style.opacity = '0.3';
+            }
+            
+            document.getElementById('scene').appendChild(newWeather);
+            
+            // 更新状态文本
+            const status = document.getElementById('status');
+            if (type === 'rain') {
+                status.textContent = '鹈鹕在雨中奔跑中...';
+            } else if (type === 'snow') {
+                status.textContent = '鹈鹕在雪中奔跑中...';
+            } else if (type === 'night') {
+                status.textContent = '鹈鹕在夜色中奔跑中...';
+            } else if (type === 'sunset') {
+                status.textContent = '鹈鹕在夕阳下奔跑中...';
+            } else {
+                status.textContent = '鹈鹕正在努力奔跑中...';
+            }
+        }
+        
+        // 动画主循环
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            
+            // 更新鹈鹕位置和动画
+            updatePelican();
+            
+            // 更新自行车位置和动画
+            updateBicycle();
+            
+            // 更新天气效果
+            if (isRaining) {
+                if (Math.random() < 0.1) {
+                    createRain();
+                }
+            } else if (isSnowing) {
+                if (Math.random() < 0.05) {
+                    createSnow();
+                }
+            }
+            
+            // 更新体力和速度显示
+            updateMeters();
+            
+            // 随机产生汗珠
+            if (Math.random() < 0.02 && pelicanEnergy < 80) {
+                const pelican = document.getElementById('pelican');
+                const rect = pelican.getBoundingClientRect();
+                createParticle(rect.left + rect.width / 2, rect.top + 20, 'sweat');
+            }
+            
+            // 随机产生羽毛
+            if (Math.random() < 0.01) {
+                const pelican = document.getElementById('pelican');
+                const rect = pelican.getBoundingClientRect();
+                createParticle(rect.left + Math.random() * rect.width, rect.top + Math.random() * rect.height, 'feather');
+            }
+            
+            // 随机产生烟雾（加速时）
+            if (isAccelerating && Math.random() < 0.05) {
+                const pelican = document.getElementById('pelican');
+                const rect = pelican.getBoundingClientRect();
+                createPuff(rect.left + rect.width / 2, rect.top + rect.height + 10);
+            }
+        }
+        
+        // 更新鹈鹕动画
+        function updatePelican() {
+            const pelican = document.getElementById('pelican');
+            const wings = pelican.querySelectorAll('.wing');
+            const feet = pelican.querySelectorAll('.foot');
+            const pouch = pelican.querySelector('.pouch');
+            const eyes = pelican.querySelectorAll('.eye');
+            
+            // 更新翅膀角度
+            pelicanWingAngle += 0.1 * pelicanSpeed * pelicanWingDirection;
+            if (pelicanWingAngle > 0.5 || pelicanWingAngle < -0.5) {
+                pelicanWingDirection *= -1;
+            }
+            
+            // 更新喉囊角度
+            pelicanPouchAngle += 0.05 * pelicanSpeed * pelicanPouchDirection;
+            if (pelicanPouchAngle > 0.3 || pelicanPouchAngle < -0.3) {
+                pelicanPouchDirection *= -1;
+            }
+            
+            // 更新脚部位置（模拟奔跑）
+            const footOffset = Math.sin(Date.now() * 0.01 * pelicanSpeed) * 5;
+            feet[0].style.transform = `translateY(${footOffset}px)`;
+            feet[1].style.transform = `translateY(${-footOffset}px)`;
+            
+            // 更新翅膀位置
+            wings[0].style.transform = `rotate(${pelicanWingAngle}rad)`;
+            wings[1].style.transform = `rotate(${-pelicanWingAngle}rad)`;
+            
+            // 更新喉囊位置
+            pouch.style.transform = `translateX(-50%) translateY(${pelicanPouchAngle * 10}px)`;
+            
+            // 更新眼睛表情（根据体力）
+            if (pelicanEnergy < 30) {
+                eyes[0].style.transform = 'scale(0.8)';
+                eyes[1].style.transform = 'scale(0.8)';
+            } else {
+                eyes[0].style.transform = 'scale(1)';
+                eyes[1].style.transform = 'scale(1)';
+            }
+            
+            // 更新鹈鹕位置（模拟前进）
+            pelicanX += pelicanSpeed;
+            if (pelicanX > window.innerWidth) {
+                pelicanX = -100;
+            }
+            
+            // 更新鹈鹕角度（根据速度和颠簸）
+            pelicanAngle = Math.sin(Date.now() * 0.005) * 0.1 * pelicanSpeed;
+            
+            // 应用变换
+            pelican.style.transform = `translateX(-50%) rotate(${pelicanAngle}rad)`;
+            
+            // 更新体力（根据速度消耗）
+            if (pelicanSpeed > 1) {
+                pelicanEnergy -= 0.1;
+                if (pelicanEnergy < 0) pelicanEnergy = 0;
+            } else {
+                pelicanEnergy += 0.05;
+                if (pelicanEnergy > 100) pelicanEnergy = 100;
+            }
+        }
+        
+        // 更新自行车动画
+        function updateBicycle() {
+            const bicycle = document.getElementById('bicycle');
+            const wheels = bicycle.querySelectorAll('.wheel');
+            const pedals = bicycle.querySelectorAll('.pedal');
+            const bell = bicycle.querySelector('.bell');
+            
+            // 更新车轮旋转
+            const wheelRotation = Date.now() * 0.005 * pelicanSpeed;
+            wheels[0].style.transform = `rotate(${wheelRotation}rad)`;
+            wheels[1].style.transform = `rotate(${wheelRotation}rad)`;
+            
+            // 更新脚踏旋转
+            const pedalRotation = Date.now() * 0.008 * pelicanSpeed;
+            pedals[0].style.transform = `rotate(${pedalRotation}rad)`;
+            pedals[1].style.transform = `rotate(${pedalRotation + Math.PI}rad)`;
+            
+            // 更新自行车角度（跟随鹈鹕颠簸）
+            bicycleAngle = pelicanAngle * 0.8;
+            
+            // 应用变换
+            bicycle.style.transform = `translateX(-50%) rotate(${bicycleAngle}rad)`;
+            
+            // 如果正在加速，添加震动效果
+            if (isAccelerating) {
+                bicycle.classList.add('bicycle-shake');
+                setTimeout(() => {
+                    bicycle.classList.remove('bicycle-shake');
+                }, 500);
+            }
+        }
+        
+        // 更新速度和体力显示
+        function updateMeters() {
+            const speedFill = document.querySelector('.speed-fill');
+            const energyFill = document.querySelector('.energy-fill');
+            
+            // 速度条
+            const speedPercentage = Math.min(pelicanSpeed * 50, 100);
+            speedFill.style.width = `${speedPercentage}%`;
+            
+            // 体力条
+            energyFill.style.width = `${pelicanEnergy}%`;
+            
+            // 更新颜色（根据体力）
+            if (pelicanEnergy < 30) {
+                energyFill.style.background = '#FF6347';
+            } else if (pelicanEnergy < 70) {
+                energyFill.style.background = '#FFD700';
+            } else {
+                energyFill.style.background = '#4CAF50';
+            }
+        }
+        
+        // 事件监听器
+        document.getElementById('bell-btn').addEventListener('click', () => {
+            playBellSound();
+            
+            // 鹈鹕受惊反应
+            const pelican = document.getElementById('pelican');
+            pelican.classList.add('pelican-shake');
+            setTimeout(() => {
+                pelican.classList.remove('pelican-shake');
+            }, 500);
+            
+            // 自行车震动
+            const bicycle = document.getElementById('bicycle');
+            bicycle.classList.add('bicycle-shake');
+            setTimeout(() => {
+                bicycle.classList.remove('bicycle-shake');
+            }, 500);
+            
+            // 车铃震动
+            const bell = bicycle.querySelector('.bell');
+            bell.classList.add('bell-shake');
+            setTimeout(() => {
+                bell.classList.remove('bell-shake');
+            }, 300);
+            
+            // 更新状态
+            document.getElementById('status').textContent = '叮铃铃！鹈鹕被铃声惊到了！';
+            
+            // 随机增加速度
+            if (Math.random() < 0.5) {
+                pelicanSpeed = Math.min(pelicanSpeed + 0.5, 3);
+                isAccelerating = true;
+                setTimeout(() => {
+                    isAccelerating = false;
+                }, 2000);
+            }
+        });
+        
+        document.getElementById('speed-btn').addEventListener('click', () => {
+            // 加速冲刺
+            isAccelerating = true;
+            pelicanSpeed = Math.min(pelicanSpeed + 1, 4);
+            
+            // 更新状态
+            document.getElementById('status').textContent = '加速冲刺中！鹈鹕全力奔跑！';
+            
+            // 2秒后恢复正常速度
+            setTimeout(() => {
+                isAccelerating = false;
+                pelicanSpeed = Math.max(pelicanSpeed - 1, 1);
+                document.getElementById('status').textContent = '速度恢复正常，鹈鹕喘着气...';
+            }, 2000);
+        });
+        
+        document.getElementById('feed-btn').addEventListener('click', () => {
+            // 投喂小鱼恢复体力
+            const pelican = document.getElementById('pelican');
+            const rect = pelican.getBoundingClientRect();
+            
+            // 创建小鱼
+            const fish = document.createElement('div');
+            fish.className = 'fish';
+            fish.style.left = `${rect.left + rect.width / 2}px`;
+            fish.style.top = `${rect.top + rect.height / 2}px`;
+            fish.style.animation = 'swim 1s ease-in-out';
+            
+            document.getElementById('foreground').appendChild(fish);
+            
+            // 鱼游向鹈鹕嘴巴
+            let fishX = rect.left + rect.width / 2;
+            let fishY = rect.top + rect.height / 2;
+            const targetX = rect.left + rect.width / 2;
+            const targetY = rect.top + 20;
+            const duration = 1000;
+            const startTime = Date.now();
+            
+            const moveFish = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                fishX = targetX;
+                fishY = targetY - (targetY - rect.top - rect.height / 2) * (1 - progress);
+                
+                fish.style.left = `${fishX}px`;
+                fish.style.top = `${fishY}px`;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(moveFish);
+                } else {
+                    // 鱼被吃掉
+                    if (fish.parentNode) {
+                        fish.parentNode.removeChild(fish);
+                    }
+                    
+                    // 恢复体力
+                    pelicanEnergy = Math.min(pelicanEnergy + 30, 100);
+                    
+                    // 创建烟雾效果
+                    createPuff(targetX, targetY);
+                    
+                    // 更新状态
+                    document.getElementById('status').textContent = '小鱼被吃掉了！鹈鹕体力恢复！';
+                }
+            };
+            
+            requestAnimationFrame(moveFish);
+        });
+        
+        document.getElementById('weather-btn').addEventListener('click', () => {
+            // 切换天气
+            const weatherTypes = ['day', 'rain', 'snow', 'night', 'sunset'];
+            const currentIndex = weatherTypes.indexOf(weatherType);
+            const nextIndex = (currentIndex + 1) % weatherTypes.length;
+            const nextWeather = weatherTypes[nextIndex];
+            
+            updateWeather(nextWeather);
+        });
+        
+        // 窗口大小变化时更新
+        window.addEventListener('resize', () => {
+            // 重新定位元素
+            const pelican = document.getElementById('pelican');
+            const bicycle = document.getElementById('bicycle');
+            
+            pelican.style.bottom = '100px';
+            bicycle.style.bottom = '180px';
+        });
+        
+        // 初始化
+        window.addEventListener('load', initScene);
+    </script>
+</body>
+</html>

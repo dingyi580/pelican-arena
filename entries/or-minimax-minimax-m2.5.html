@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自行车骑鹈鹕：疯狂赛道</title>
+    <style>
+        :root {
+            --primary: #ff6b6b;
+            --secondary: #4ecdc4;
+            --dark: #2c3e50;
+            --light: #f7f9fc;
+            --ui-bg: rgba(255, 255, 255, 0.85);
+            --shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #87CEEB;
+            user-select: none;
+            transition: background 1s ease;
+        }
+
+        /* 画布全屏 */
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* UI 控制层 */
+        #ui-layer {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background: var(--ui-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(5px);
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 90vw;
+            z-index: 10;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-bell { background: #FFA502; }
+        .btn-sprint { background: #ff4757; }
+        .btn-feed { background: #2ed573; }
+        .btn-weather { background: #1e90ff; }
+
+        /* 状态条 */
+        .status-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+        
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* 天空控制 */
+        #sky-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--ui-bg);
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--dark);
+        }
+
+        /* 提示文字 */
+        #message {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            font-weight: 900;
+            color: white;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="message"></div>
+
+    <div id="sky-selector" onclick="toggleWeather()">
+        🌤️ 切换天气
+    </div>
+
+    <div id="ui-layer">
+        <div class="status-bar" style="width: 100%; justify-content: space-around; margin-bottom: 10px;">
+            <div class="stat">🦅 速度: <span id="speed-disp">0</span> km/h</div>
+            <div class="stat">❤️ 体力: <span id="stamina-disp">100</span>%</div>
+            <div class="stat">🍽️ 饥饿度: <span id="hunger-disp">0</span>%</div>
+        </div>
+
+        <div class="control-group">
+            <button class="btn btn-bell" onclick="ringBell()">🔔 按车铃</button>
+        </div>
+        <div class="control-group">
+            <button class="btn btn-sprint" onmousedown="startSprint()" onmouseup="endSprint()" onmouseleave="endSprint()" ontouchstart="startSprint()" ontouchend="endSprint()">💨 冲刺 (长按)</button>
+        </div>
+        <div class="control-group">
+            <button class="btn btn-feed" onclick="feedFish()">🐟 投喂小鱼</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * 核心逻辑：
+ * 1. Canvas 绘制所有内容 (背景、前景、角色)。
+ * 2. 物理模拟：速度、加速度、摩擦力、弹跳。
+ * 3. 骨骼动画：自行车和鹈鹕的部件相对运动。
+ * 4. Web Audio API：生成铃声。
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// 游戏状态
+const state = {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    frame: 0,
+    speed: 0,
+    maxSpeed: 25,
+    targetSpeed: 0,
+    distance: 0,
+    isSprinting: false,
+    stamina: 100, // 100 is full
+    hunger: 0,    // 0 is full, 100 is starving
+    shock: 0,     // 受到惊吓的震荡值
+    weather: 'day', // day, dusk, night
+    
+    // 环境
+    groundOffset: 0,
+    clouds: [],
+    particles: [] // 汗珠、羽毛等
+};
+
+// 初始化云朵
+for(let i=0; i<5; i++) {
+    state.clouds.push({
+        x: Math.random() * window.innerWidth,
+        y: 50 + Math.random() * 150,
+        scale: 0.5 + Math.random() * 1,
+        speed: 0.2 + Math.random() * 0.5
+    });
+}
+
+// 调整画布大小
+function resize() {
+    state.width = window.innerWidth;
+    state.height = window.innerHeight;
+    canvas.width = state.width;
+    canvas.height = state.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 音频上下文
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+
+function playDing() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+    osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    
+    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+}
+
+// 交互控制
+function ringBell() {
+    playDing();
+    // 鹈鹕受惊
+    state.shock = 20;
+    showMessage("叮!!! 🚨");
+}
+
+function startSprint() {
+    state.isSprinting = true;
+}
+
+function endSprint() {
+    state.isSprinting = false;
+}
+
+function feedFish() {
+    if (state.stamina >= 90) {
+        showMessage("太饱了!撑!");
+        return;
+    }
+    state.stamina = Math.min(100, state.stamina + 40);
+    state.hunger = 0; // 不饿了
+    showMessage("🐟 嘎嘎嘎!(好吃)");
+}
+
+function toggleWeather() {
+    if (state.weather === 'day') state.weather = 'dusk';
+    else if (state.weather === 'dusk') state.weather = 'night';
+    else state.weather = 'day';
+    
+    updateBackground();
+}
+
+function updateBackground() {
+    const body = document.body;
+    if (state.weather === 'day') body.style.background = '#87CEEB';
+    else if (state.weather === 'dusk') body.style.background = '#FF7F50';
+    else if (state.weather === 'night') body.style.background = '#1a1a2e';
+}
+
+function showMessage(text) {
+    const el = document.getElementById('message');
+    el.innerText = text;
+    el.style.opacity = 1;
+    setTimeout(() => el.style.opacity = 0, 1500);
+}
+
+// ---------------- 绘图辅助函数 ----------------
+
+function drawCircle(x, y, r, color, stroke) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if(stroke) {
+        ctx.lineWidth = stroke;
+        ctx.strokeStyle = "#333";
+        ctx.stroke();
+    }
+}
+
+function drawLine(x1, y1, x2, y2, width, color, cap) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = color;
+    ctx.lineCap = cap || 'round';
+    ctx.stroke();
+}
+
+// ---------------- 实体绘制 ----------------
+
+function drawBackground() {
+    // 天空颜色由CSS控制，这里只画远处的物体
+    // 云
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    state.clouds.forEach(c => {
+        c.x -= c.speed + (state.speed * 0.05);
+        if (c.x < -100) c.x = state.width + 100;
+        
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 30 * c.scale, 0, Math.PI * 2);
+        ctx.arc(c.x + 20 * c.scale, c.y - 10 * c.scale, 35 * c.scale, 0, Math.PI * 2);
+        ctx.arc(c.x + 40 * c.scale, c.y, 30 * c.scale, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // 地面
+    const groundY = state.height * 0.75;
+    
+    // 远景 (沙滩/草地)
+    ctx.fillStyle = state.weather === 'night' ? '#0f1520' : '#deb887';
+    ctx.fillRect(0, groundY, state.width, state.height - groundY);
+    
+    // 近景 (路面)
+    ctx.fillStyle = state.weather === 'night' ? '#222' : '#e6c288';
+    ctx.fillRect(0, groundY + 20, state.width, state.height - groundY);
+
+    // 路面线条 (产生速度感)
+    ctx.strokeStyle = state.weather === 'night' ? '#555' : '#c2a070';
+    ctx.lineWidth = 4;
+    let spacing = 60;
+    let offset = (state.distance * 20) % spacing;
+    
+    for(let x = -offset; x < state.width; x += spacing) {
+        // 稍微倾斜一点，形成透视感
+        ctx.beginPath();
+        ctx.moveTo(x, groundY + 20);
+        ctx.lineTo(x - 20, state.height);
+        ctx.stroke();
+    }
+}
+
+function drawPelican(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    // 跑步时的上下颠簸
+    const bounce = Math.sin(state.frame * 0.5) * 10 * (state.speed / state.maxSpeed);
+    ctx.translate(0, bounce);
+    // 受到惊吓时的震动
+    if(state.shock > 0) {
+        ctx.translate((Math.random()-0.5)*10, (Math.random()-0.5)*10);
+        state.shock--;
+    }
+
+    const angle = -0.1 + (state.speed / 100); // 身体前倾
+    
+    // 颜色
+    const bodyColor = "#fff";
+    const beakColor = "#ff9f43";
+    const pouchColor = "#ffccbc";
+
+    // 腿部
+    const legCycle = state.frame * 0.4;
+    const leg1 = Math.sin(legCycle) * 30;
+    const leg2 = Math.sin(legCycle + Math.PI) * 30;
+    
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = state.weather === 'night' ? '#aaa' : '#ffeaa7'; // 脚蹼颜色
+
+    // 腿1 (后)
+    drawLine(-20, 60, -20 + leg1/2, 120, 8, ctx.strokeStyle);
+    // 腿2 (前)
+    drawLine(10, 60, 10 + leg2/2, 120, 8, ctx.strokeStyle);
+
+    // 身体
+    ctx.fillStyle = bodyColor;
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 20, 70, 40, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 翅膀 (奔跑时摆动)
+    const wingFlap = Math.sin(state.frame * 0.3) * 20 * (state.speed/state.maxSpeed);
+    ctx.beginPath();
+    ctx.moveTo(-10, 10);
+    ctx.quadraticCurveTo(-40, 10 + wingFlap, -50, -20 + wingFlap);
+    ctx.strokeStyle = bodyColor;
+    ctx.lineTo(-10, 30);
+    ctx.fill();
+    ctx.stroke();
+    // 翅膀尖羽毛
+    ctx.beginPath();
+    ctx.moveTo(-50, -20 + wingFlap);
+    ctx.lineTo(-60, -30 + wingFlap);
+    ctx.stroke();
+
+    // 头
+    ctx.translate(50, -20); // 移到脖子位置
+    
+    // 脖子晃动
+    ctx.rotate(Math.sin(state.frame * 0.2) * 0.1);
+
+    // 头主体
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 25, 20, 0.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 喙
+    ctx.fillStyle = beakColor;
+    ctx.beginPath();
+    ctx.moveTo(15, -5);
+    ctx.lineTo(60, 5); // 喙尖
+    ctx.lineTo(15, 15);
+    ctx.fill();
+    ctx.stroke();
+
+    // 喉囊 (关键特征)
+    ctx.fillStyle = pouchColor;
+    ctx.beginPath();
+    ctx.moveTo(20, 5);
+    ctx.quadraticCurveTo(50, 40, 20, 30); // 下垂的囊
+    ctx.quadraticCurveTo(10, 20, 20, 5);
+    ctx.fill();
+    // 囊的摆动
+    ctx.stroke();
+
+    // 眼睛
+    ctx.fillStyle = "#333";
+    ctx.beginPath();
+    ctx.arc(5, -8, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    // 汗珠 (冲刺时)
+    if(state.isSprinting && state.frame % 10 === 0) {
+        state.particles.push({
+            x: x + 50*scale, y: y - 20*scale, 
+            vx: 2, vy: -2, 
+            life: 1.0, type: 'sweat'
+        });
+    }
+
+    ctx.restore();
+}
+
+function drawBicycle(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    
+    // 自行车随鹈鹕颠簸，但有独立悬挂模拟
+    const suspension = Math.sin(state.frame * 0.5) * 5;
+    // 速度越快，车身越稳定一点点，但会震动
+    const vibration = Math.sin(state.frame * 2) * (state.speed/50);
+    ctx.translate(vibration, suspension - 10); // 坐在鹈鹕背上
+
+    // 颜色定义
+    const frameColor = "#e74c3c"; // 红色复古
+    const wheelColor = "#333";
+    const metalColor = "#95a5a6";
+
+    // --- 轮子 ---
+    const wheelRotation = state.distance * 2; 
+
+    // 前轮
+    ctx.save();
+    ctx.translate(60, 50);
+    ctx.rotate(wheelRotation);
+    // 轮胎
+    ctx.beginPath(); ctx.arc(0,0,30,0,Math.PI*2); 
+    ctx.strokeStyle=wheelColor; ctx.lineWidth=4; ctx.stroke();
+    // 辐条
+    for(let i=0; i<8; i++) {
+        ctx.rotate(Math.PI/4);
+        drawLine(-30, 0, 30, 0, 1, "#ccc");
+    }
+    // 轮毂
+    drawCircle(0,0, 5, "#666");
+    ctx.restore();
+
+    // 后轮
+    ctx.save();
+    ctx.translate(-50, 50);
+    ctx.rotate(wheelRotation);
+    ctx.beginPath(); ctx.arc(0,0,30,0,Math.PI*2); 
+    ctx.strokeStyle=wheelColor; ctx.lineWidth=4; ctx.stroke();
+    for(let i=0; i<8; i++) {
+        ctx.rotate(Math.PI/4);
+        drawLine(-30, 0, 30, 0, 1, "#ccc");
+    }
+    drawCircle(0,0, 5, "#666");
+    ctx.restore();
+
+    // --- 车架 (三角结构) ---
+    ctx.strokeStyle = frameColor;
+    ctx.lineWidth = 5;
+    ctx.lineJoin = "round";
+
+    // 下管
+    drawLine(-50, 50, 40, 10, 5, frameColor);
+    // 上管
+    drawLine(-20, 0, 60, 10, 5, frameColor);
+    // 座管
+    drawLine(-20, 0, -30, 50, 5, frameColor);
+    // 前后叉
+    drawLine(-50, 50, -50, 10, 4, "#c0392b"); // 后叉
+    drawLine(60, 50, 40, 10, 4, "#c0392b");   // 前叉
+
+    // --- 配件 ---
+    
+    // 车座
+    ctx.fillStyle = "#333";
+    ctx.fillRect(-35, -5, 20, 5);
+
+    // 车把
+    ctx.strokeStyle = metalColor;
+    drawLine(55, 10, 70, -10, 4, metalColor);
+    drawLine(60, -10, 80, -10, 4, metalColor); // 握把
+
+    // 脚蹬 & 链条
+    const crankAngle = wheelRotation;
+    ctx.strokeStyle = "#888";
+    
+    // 曲柄
+    drawLine(-20, 50, -10 + Math.sin(crankAngle)*15, 60 + Math.cos(crankAngle)*15, 3, "#888");
+    drawLine(10, 50, 20 + Math.sin(crankAngle)*15, 60 + Math.cos(crankAngle)*15, 3, "#888");
+    
+    // 踏板
+    ctx.fillStyle = "#000";
+    ctx.fillRect(-25 + Math.sin(crankAngle)*15, 60 + Math.cos(crankAngle)*15 - 5, 15, 5);
+
+    // 隐形的“缰绳” (连接车把和鹈鹕的头，为了解释为什么车能骑鸟)
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    // 起点：车把 (80, -10)
+    // 终点：鹈鹕头 (需要根据父级坐标计算，这里简单做个相对固定的角度)
+    // 实际上由于在canvas里分层，这只是一个视觉玩笑
+    ctx.moveTo(80, -10); 
+    ctx.quadraticCurveTo(100, 20, 60, 50); // 垂下
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+}
+
+function drawParticles() {
+    for(let i=state.particles.length-1; i>=0; i--) {
+        let p = state.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.02;
+        
+        if(p.life <= 0) {
+            state.particles.splice(i, 1);
+            continue;
+        }
+
+        ctx.globalAlpha = p.life;
+        if(p.type === 'sweat') {
+            ctx.fillStyle = "#81ecec";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+            ctx.fill();
+        } else if (p.type === 'feather') {
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(p.x, p.y, 6, 2);
+        }
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// ---------------- 游戏循环 ----------------
+
+function update() {
+    state.frame++;
+
+    // 速度物理逻辑
+    if (state.isSprinting) {
+        if (state.stamina > 0) {
+            state.targetSpeed = state.maxSpeed;
+            state.stamina -= 0.2;
+            state.hunger = Math.min(100, state.hunger + 0.1);
+        } else {
+            state.targetSpeed = 5; // 累垮了
+            showMessage("喘...喘不上气了...");
+        }
+    } else {
+        state.targetSpeed = 0; // 怠速
+        if(state.speed > 0) state.stamina = Math.min(100, state.stamina + 0.05);
+    }
+
+    // 简单的惯性
+    if (state.speed < state.targetSpeed) state.speed += 0.1;
+    if (state.speed > state.targetSpeed) state.speed -= 0.1;
+
+    state.distance += state.speed * 0.01;
+
+    // UI 更新
+    document.getElementById('speed-disp').innerText = Math.floor(state.speed * 3);
+    document.getElementById('stamina-disp').innerText = Math.floor(state.stamina);
+    document.getElementById('hunger-disp').innerText = Math.floor(state.hunger);
+}
+
+function loop() {
+    // 清空
+    ctx.clearRect(0, 0, state.width, state.height);
+
+    // 绘制层级
+    drawBackground();
+    
+    const centerX = state.width / 2;
+    const centerY = state.height / 2 + 100;
+
+    // 1. 鹈鹕 (下层)
+    drawPelican(centerX - 50, centerY, 1.5);
+
+    // 2. 自行车 (上层)
+    drawBicycle(centerX - 50, centerY - 100, 1.5); // 位置在鹈鹕背上
+
+    // 3. 粒子
+    drawParticles();
+
+    // 4. 前景覆盖 (如果有)
+    
+    update();
+    requestAnimationFrame(loop);
+}
+
+// 启动
+loop();
+
+</script>
+</body>
+</html>
